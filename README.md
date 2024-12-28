@@ -1,40 +1,67 @@
-# My Web Application
+# Talk Graph
 
-Brief description of your project
+A full-stack web application that transcribes or audiofiles and texts into mindmaps for introspective and exploratory purposes.
+
+## Tech Stack
+
+- **Frontend**: React
+- **Backend**: Node.js/Express
+- **Other Tools**: Concurrently for development
+
+## Project Structure
+```
+talk-graph/
+├── client/
+│   ├── public/
+│   ├── src/
+│   ├── .env
+│   ├── package.json
+│   └── README.md
+├── server/
+│   ├── server.js
+│   ├── package.json
+│   └── README.md
+├── .env
+├── package.json
+└── README.md
+```
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (version X.X.X)
-- npm/yarn
+
+- Node.js (v14 or higher)
+- npm (v6 or higher)
 
 ### Installation
-1. Clone the repository
-   ```bash
-   git clone https://github.com/username/my-web-app.git
-   ```
-2. Install dependencies
-   ```bash
-   npm install
-   ```
-3. Start the development server
-   ```bash
-   npm start
-   ```
 
-## Project Structure
-- `/src` - Application source code
-- `/public` - Static files
-- `/tests` - Test files
-- `/docs` - Documentation
+1. Clone the repository:
+```bash
+git clone https://github.com/wmmaguire/talk-graph.git
+cd talk-graph
+```
 
-## Available Scripts
-- `npm start` - Runs the app in development mode
-- `npm test` - Runs the test suite
-- `npm run build` - Builds the app for production
+2. Install dependencies:
+```bash
+npm install
+```
 
-## Contributing
-Instructions for contributing to the project
+3. Start the development server:
+```bash
+npm run start
+```
 
-## License
-This project is licensed under the [LICENSE NAME] - see the LICENSE.md file for details
+4. Open your browser and navigate to `http://localhost:3000` to see the app in action.
+
+### Development
+
+- Frontend code can be modified in the `client/src` directory.
+- Backend code can be modified in the `server` directory.
+- The backend will automatically restart when changes are made to the backend code.
+- The frontend will automatically restart when changes are made to the frontend code.
+
+### Additional Notes
+
+- Ensure that the backend server is running before starting the frontend.
+- The backend server is configured to run on port 5001, and the frontend is configured to run on port 3000.
+- The `.env` file contains the necessary environment variables for the backend server.
