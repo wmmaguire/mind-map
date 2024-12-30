@@ -7,7 +7,11 @@ export default function App() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/test');
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? ''
+          : 'http://localhost:5001';
+        
+        const response = await fetch(`${baseUrl}/api/test`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -30,8 +34,7 @@ export default function App() {
       ) : (
         <p>{data ? data.message : 'Loading...'}</p>
       )}
-      <p>Frontend running on port 3000</p>
-      <p>Backend running on port 5001</p>
+      <p>Environment: {process.env.NODE_ENV}</p>
     </div>
   );
 }

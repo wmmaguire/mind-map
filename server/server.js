@@ -11,24 +11,26 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.NODE_ENV === 'production' ? (process.env.PORT || 10000) : 5001;
 
 // Error handling for uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
 
-// Middleware
+// Configure CORS for different environments
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://your-render-app.onrender.com' 
-    : 'http://localhost:3000'
+  origin: process.env.NODE_ENV === 'production'
+    ? false // Disable CORS in production since we're serving frontend from same domain
+    : 'http://localhost:3000' // Allow React dev server in development
 }));
 
 app.use(express.json());
 
-// Serve static files from React build
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Serve static files only in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/build')));
+}
 
 // Test route
 app.get('/api/test', (req, res) => {
@@ -40,10 +42,12 @@ app.get('/api/test', (req, res) => {
   }
 });
 
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
+// Serve React app for all other routes in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
 
 // Basic error handling middleware
 app.use((err, req, res) => {
@@ -53,6 +57,7 @@ app.use((err, req, res) => {
 
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
+  console.log('Environment:', process.env.NODE_ENV);
 }).on('error', (error) => {
   console.error('Server Error:', error);
 });
