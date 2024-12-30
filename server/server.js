@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import process from 'process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -14,8 +19,16 @@ process.on('uncaughtException', (error) => {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://your-render-app.onrender.com' 
+    : 'http://localhost:3000'
+}));
+
 app.use(express.json());
+
+// Serve static files from React build
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Test route
 app.get('/api/test', (req, res) => {
@@ -25,6 +38,11 @@ app.get('/api/test', (req, res) => {
     console.error('Route Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 // Basic error handling middleware
