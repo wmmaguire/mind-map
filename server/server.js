@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import process from 'process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
+import * as fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,9 +38,9 @@ if (process.env.NODE_ENV === 'production') {
 // Test route
 app.get('/api/test', (req, res) => {
   try {
-    res.json({ message: 'Hello from the backend!' });
+    res.json({ message: 'Server is running!' });
   } catch (error) {
-    console.error('Route Error:', error);
+    console.error('Test endpoint error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -49,9 +52,143 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Basic error handling middleware
+// Create directories if they don't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+const metadataDir = path.join(__dirname, 'metadata');
+
+// Use sync operations for directory creation at startup
+if (!existsSync(uploadsDir)) {
+  mkdirSync(uploadsDir, { recursive: true });
+}
+if (!existsSync(metadataDir)) {
+  mkdirSync(metadataDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueId = Date.now();
+    const extension = path.extname(file.originalname);
+    cb(null, `${uniqueId}${extension}`);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    console.log('File type:', file.mimetype); // Debug log
+    const validTypes = ['audio/mpeg', 'text/plain'];
+    if (validTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only MP3 and TXT files are allowed.'));
+    }
+  }
+});
+
+// Add upload endpoint with better error handling
+app.post('/api/upload', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  
+  upload.single('file')(req, res, async (err) => {
+    if (err) {
+      console.error('Upload Error:', err);
+      return res.status(400).json({ 
+        error: err.message || 'Error uploading file'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No file uploaded'
+      });
+    }
+
+    try {
+      // Create metadata for the file
+      const metadata = {
+        originalName: req.file.originalname,
+        customName: req.body.customName || req.file.originalname.replace(/\.[^/.]+$/, ""),
+        uploadDate: new Date().toISOString(),
+        fileType: req.file.mimetype,
+        size: req.file.size
+      };
+
+      // Save metadata
+      await fs.writeFile(
+        path.join(metadataDir, `${req.file.filename}.json`),
+        JSON.stringify(metadata, null, 2)
+      );
+
+      res.json({ 
+        message: 'File uploaded successfully',
+        filename: req.file.filename,
+        metadata
+      });
+    } catch (error) {
+      console.error('Metadata Error:', error);
+      res.status(500).json({ error: 'Error saving file metadata' });
+    }
+  });
+});
+
+// Get list of uploaded files
+app.get('/api/files', async (req, res) => {
+  try {
+    const metadataFiles = await fs.readdir(metadataDir);
+    
+    const fileList = await Promise.all(
+      metadataFiles
+        .filter(file => file.endsWith('.json'))
+        .map(async (metaFile) => {
+          try {
+            const metadata = JSON.parse(
+              await fs.readFile(path.join(metadataDir, metaFile), 'utf8')
+            );
+            return {
+              ...metadata,
+              filename: metaFile.replace('.json', '') // Remove .json extension
+            };
+          } catch (error) {
+            console.error('Error reading metadata:', error);
+            return null;
+          }
+        })
+    );
+
+    // Filter out any null entries from failed metadata reads
+    const validFiles = fileList.filter(file => file !== null);
+    
+    res.json({ files: validFiles });
+  } catch (error) {
+    console.error('Error reading metadata:', error);
+    res.status(500).json({ error: 'Failed to read files' });
+  }
+});
+
+// Get specific file
+app.get('/api/files/:filename', (req, res) => {
+  try {
+    const filePath = path.join(uploadsDir, req.params.filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    res.json({ content });
+  } catch (error) {
+    console.error('Error reading file:', error);
+    res.status(500).json({ error: 'Failed to read file' });
+  }
+});
+
+// Error handling middleware
 app.use((err, req, res) => {
-  console.error('Error:', err);
+  console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 

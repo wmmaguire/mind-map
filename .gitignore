@@ -79,3 +79,7 @@ out
 
 # Debug files
 debug.log
+
+# Uploads
+server/uploads/*
+!server/uploads/.gitkeep
