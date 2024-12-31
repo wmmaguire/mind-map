@@ -13,24 +13,36 @@ export default function Library({ onClose }) {
 
   const fetchFiles = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin
+        : 'http://localhost:5001';
+      
       console.log('Fetching files from:', `${baseUrl}/api/files`); // Debug log
       
-      const response = await fetch(`${baseUrl}/api/files`);
-      console.log('Response status:', response.status); // Debug log
+      const response = await fetch(`${baseUrl}/api/files`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       
+      // Check if response is HTML instead of JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        throw new Error('Received HTML response instead of JSON. API endpoint might be incorrect.');
+      }
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Server error:', errorData); // Debug log
+        console.error('Server error:', errorData);
         throw new Error(errorData.error || 'Failed to fetch files');
       }
 
       const data = await response.json();
-      console.log('Received data:', data); // Debug log
+      console.log('Received data:', data);
       setFiles(data.files);
     } catch (error) {
       console.error('Error fetching files:', error);
-      setError(error.message || 'Failed to load files. Please try again.');
+      setError(`Failed to load files: ${error.message}`);
     } finally {
       setLoading(false);
     }
