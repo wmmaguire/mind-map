@@ -21,12 +21,11 @@ function App() {
           throw new Error('Server response was not ok');
         }
         
-        const data = await response.json();
-        console.log('Server status:', data);
+        await response.json();
         setServerError(null);
       } catch (error) {
         console.error('Server connection error:', error);
-        setServerError('Could not connect to the server. Please try again later.');
+        setServerError('Could not connect to the server. Is it running?');
       }
     };
 
@@ -36,14 +35,41 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Talk Graph</h1>
+        <h1>MemeGraph</h1>
+        <div className="description">
+          <h3>
+            Transform content into visual insights and explore new ideas 
+          </h3>
+        </div>
         {serverError ? (
           <div className="error-message">{serverError}</div>
         ) : (
-          <>
-            <button onClick={() => setShowUpload(true)}>Upload File</button>
-            <button onClick={() => setShowLibrary(true)}>View Library</button>
-          </>
+          <div className="button-group">
+            <div className="button-wrapper">
+              <button 
+                className="action-button upload-button" 
+                onClick={() => setShowUpload(true)}
+              >
+                <span className="button-icon">📤</span>
+                <span className="button-text">Upload File</span>
+              </button>
+              <div className="tooltip">
+                Click here to upload an audio (MP3, WAV) or test (TXT) file to your library.
+              </div>
+            </div>
+            <div className="button-wrapper">
+              <button 
+                className="action-button library-button" 
+                onClick={() => setShowLibrary(true)}
+              >
+                <span className="button-icon">📚</span>
+                <span className="button-text">View Library</span>
+              </button>
+              <div className="tooltip">
+                Access your files in the library to select which ones to visualization.
+              </div>
+            </div>
+          </div>
         )}
       </header>
 

@@ -1,6 +1,6 @@
-# Talk Graph
+# MemeGraph
 
-A full-stack web application that transcribes or audiofiles and texts into mindmaps for introspective and exploratory purposes.
+A full-stack web application that transcribes or audio and text files into memegraphs for introspective and exploratory purposes.
 
 ## Tech Stack
 
