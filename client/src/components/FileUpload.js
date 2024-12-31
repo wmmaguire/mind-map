@@ -60,20 +60,31 @@ export default function FileUpload({ onClose }) {
 
     try {
       setUploadStatus('Uploading...');
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:5001';
+
       const response = await fetch(`${baseUrl}/api/upload`, {
         method: 'POST',
-        body: formData,
+        body: formData, // Don't set Content-Type header - browser will set it with boundary
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
-      setUploadStatus('Upload successful!');
-      setTimeout(onClose, 2000);
+      const data = await response.json();
+      console.log('Upload successful:', data);
+      setUploadStatus('File uploaded successfully!');
+      
+      // Clear the form
+      setFile(null);
+      setCustomName('');
+      
+      if (onClose) {
+        setTimeout(onClose, 1500);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       setUploadStatus(error.message || 'Upload failed. Please try again.');

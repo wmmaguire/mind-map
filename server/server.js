@@ -91,9 +91,7 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  
+app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) {
       console.error('Upload Error:', err);
@@ -124,14 +122,19 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         JSON.stringify(metadata, null, 2)
       );
 
-      res.json({ 
+      console.log('File uploaded successfully:', {
+        filename: req.file.filename,
+        metadata: metadata
+      });
+
+      return res.json({ 
         message: 'File uploaded successfully',
         filename: req.file.filename,
         metadata
       });
     } catch (error) {
       console.error('Metadata Error:', error);
-      res.status(500).json({ error: 'Error saving file metadata' });
+      next(error); // Pass error to error handling middleware
     }
   });
 });
@@ -147,10 +150,13 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Error handling middleware
-app.use((err, req, res) => {
+// Error handling middleware - must be last
+app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(500).json({ 
+    error: 'Something went wrong!',
+    message: err.message
+  });
 });
 
 app.listen(port, () => {

@@ -83,3 +83,5 @@ debug.log
 # Uploads
 server/uploads/*
 !server/uploads/.gitkeep
+server/metadata/*
+!server/metadata/.gitkeep
