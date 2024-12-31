@@ -85,3 +85,6 @@ server/uploads/*
 !server/uploads/.gitkeep
 server/metadata/*
 !server/metadata/.gitkeep
+
+# .env
+server/.env

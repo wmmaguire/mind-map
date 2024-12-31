@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import './Modal.css';
 import './Library.css';
 
-export default function Library({ onClose }) {
+function Library({ onClose }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [graphData, setGraphData] = useState(null);
 
   useEffect(() => {
     fetchFiles();
@@ -13,95 +17,160 @@ export default function Library({ onClose }) {
 
   const fetchFiles = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? window.location.origin
-        : 'http://localhost:5001';
+      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      const response = await fetch(`${baseUrl}/api/files`);
       
-      console.log('Fetching files from:', `${baseUrl}/api/files`); // Debug log
-      
-      const response = await fetch(`${baseUrl}/api/files`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      // Check if response is HTML instead of JSON
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('text/html')) {
-        throw new Error('Received HTML response instead of JSON. API endpoint might be incorrect.');
-      }
-
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Server error:', errorData);
-        throw new Error(errorData.error || 'Failed to fetch files');
+        throw new Error('Failed to fetch files');
       }
 
       const data = await response.json();
-      console.log('Received data:', data);
       setFiles(data.files);
     } catch (error) {
-      console.error('Error fetching files:', error);
-      setError(`Failed to load files: ${error.message}`);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let size = bytes;
-    let unitIndex = 0;
-    
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
+  const handleFileSelect = async (file) => {
+    try {
+      setSelectedFile(file);
+      setAnalyzing(true);
+      setError(null);
+
+      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      console.log('Fetching file:', file);
+      
+      const filename = file.filename || file.originalName;
+      const response = await fetch(`${baseUrl}/api/files/${encodeURIComponent(filename)}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // First try to get the response as text to debug
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      // Try to parse the text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Response text:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch file');
+      }
+
+      console.log('File content received, length:', data.content.length);
+      await analyzeContent(data.content);
+    } catch (error) {
+      console.error('File fetch error:', error);
+      setError('Failed to load file: ' + error.message);
+      setAnalyzing(false);
     }
-    
-    return `${size.toFixed(1)} ${units[unitIndex]}`;
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const analyzeContent = async (content) => {
+    try {
+      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      console.log('Sending content for analysis, length:', content.length);
+      
+      const response = await fetch(`${baseUrl}/api/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ content })
+      });
+
+      // First get response as text for debugging
+      const responseText = await response.text();
+      console.log('Analysis raw response:', responseText);
+
+      // Try to parse the response
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Analysis JSON Parse Error:', parseError);
+        console.error('Analysis response text:', responseText);
+        throw new Error('Invalid JSON response from analysis server');
+      }
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Analysis failed');
+      }
+
+      setGraphData(data.data);
+    } catch (error) {
+      console.error('Analysis error:', error);
+      setError('Failed to analyze content: ' + error.message);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
-    <div className="library-modal">
-      <div className="library-content">
-        <button className="close-button" onClick={onClose}>&times;</button>
-        <h2>Your Uploads</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>File Library</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
 
-        {loading && <div className="loading">Loading...</div>}
-        
-        {error && <div className="error-message">{error}</div>}
-
-        {!loading && !error && (
-          <div className="files-grid">
-            {files.length === 0 ? (
-              <p className="no-files">No files uploaded yet</p>
-            ) : (
-              files.map((metadata) => (
+        {loading ? (
+          <div className="library-loading">Loading files...</div>
+        ) : error ? (
+          <div className="library-error">{error}</div>
+        ) : files.length === 0 ? (
+          <div className="library-empty">
+            <p>No files in library</p>
+            <p>Upload some files to get started!</p>
+          </div>
+        ) : (
+          <div className="library-content">
+            <div className="file-list">
+              {files.map((file) => (
                 <div 
-                  key={metadata.filename}
-                  className="file-card"
+                  key={file.filename || file.originalName}
+                  className={`file-item ${selectedFile?.filename === file.filename ? 'selected' : ''}`}
+                  onClick={() => handleFileSelect(file)}
                 >
-                  <div className="file-icon">
-                    {metadata.fileType === 'audio/mpeg' ? '🎵' : '📄'}
-                  </div>
-                  <div className="file-info">
-                    <h3>{metadata.customName}</h3>
-                    <p className="file-details">
-                      <span>{formatDate(metadata.uploadDate)}</span>
-                      <span>{formatFileSize(metadata.size)}</span>
-                    </p>
+                  <span className="file-icon">
+                    {file.fileType?.includes('audio') ? '🎵' : '📄'}
+                  </span>
+                  <div className="file-details">
+                    <div className="file-name">{file.customName || file.originalName}</div>
+                    <div className="file-meta">
+                      {new Date(file.uploadDate).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
-              ))
+              ))}
+            </div>
+
+            {analyzing && (
+              <div className="analyzing-overlay">
+                <div className="analyzing-spinner"></div>
+                <p>Analyzing content...</p>
+              </div>
+            )}
+
+            {graphData && !analyzing && (
+              <div className="analysis-results">
+                <h3>Analysis Results</h3>
+                <div className="graph-data">
+                  <pre>{JSON.stringify(graphData, null, 2)}</pre>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -112,4 +181,6 @@ export default function Library({ onClose }) {
 
 Library.propTypes = {
   onClose: PropTypes.func.isRequired
-}; 
+};
+
+export default Library; 

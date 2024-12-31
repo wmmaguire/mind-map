@@ -45,30 +45,8 @@ function App() {
           <div className="error-message">{serverError}</div>
         ) : (
           <div className="button-group">
-            <div className="button-wrapper">
-              <button 
-                className="action-button upload-button" 
-                onClick={() => setShowUpload(true)}
-              >
-                <span className="button-icon">📤</span>
-                <span className="button-text">Upload File</span>
-              </button>
-              <div className="tooltip">
-                Click here to upload an audio (MP3, WAV) or test (TXT) file to your library.
-              </div>
-            </div>
-            <div className="button-wrapper">
-              <button 
-                className="action-button library-button" 
-                onClick={() => setShowLibrary(true)}
-              >
-                <span className="button-icon">📚</span>
-                <span className="button-text">View Library</span>
-              </button>
-              <div className="tooltip">
-                Access your files in the library to select which ones to visualization.
-              </div>
-            </div>
+            <button onClick={() => setShowUpload(true)}>Upload File</button>
+            <button onClick={() => setShowLibrary(true)}>View Library</button>
           </div>
         )}
       </header>

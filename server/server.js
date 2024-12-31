@@ -1,41 +1,47 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import process from 'process';
+import { promises as fs } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import multer from 'multer';
-import * as fs from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Check for OpenAI API key
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY is not set in environment variables');
+  process.exit(1);
+}
+
+// Configure OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config();
-
 const app = express();
-const port = process.env.NODE_ENV === 'production' ? (process.env.PORT || 10000) : 5001;
-
-// Error handling for uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-});
-
-// Configure CORS before other middleware
-app.use(cors());
-app.use(express.json());
-
-// Create directories if they don't exist
 const uploadsDir = path.join(__dirname, 'uploads');
 const metadataDir = path.join(__dirname, 'metadata');
 
-if (!existsSync(uploadsDir)) {
-  mkdirSync(uploadsDir, { recursive: true });
-}
-if (!existsSync(metadataDir)) {
-  mkdirSync(metadataDir, { recursive: true });
-}
+// Ensure directories exist
+(async () => {
+  try {
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.mkdir(metadataDir, { recursive: true });
+  } catch (error) {
+    console.error('Error creating directories:', error);
+  }
+})();
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -165,7 +171,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Error handling middleware - must be last
-app.use((err, req, res) => {
+app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ 
     error: 'Something went wrong!',
@@ -173,11 +179,134 @@ app.use((err, req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
-  console.log('Environment:', process.env.NODE_ENV);
-  console.log('Uploads directory:', uploadsDir);
-  console.log('Metadata directory:', metadataDir);
-}).on('error', (error) => {
-  console.error('Server Error:', error);
+// Update the analyze endpoint
+app.post('/api/analyze', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.json({
+        success: false,
+        error: 'No content provided'
+      });
+    }
+
+    console.log('Analyzing content length:', content.length);
+    console.log('Content preview:', content.substring(0, 100));
+
+    const prompt = `
+      Analyze the following content and return a JSON object containing:
+      1. nodes: An array of objects, each representing a key concept with properties:
+         - id: unique identifier
+         - label: name of the concept
+         - description: brief explanation
+      2. links: An array of objects representing relationships between nodes with properties:
+         - source: id of the source node
+         - target: id of the target node
+         - relationship: description of how these concepts are related
+
+      Content to analyze:
+      ${content}
+
+      Please ensure the response is valid JSON and includes at least 5-10 key concepts and their relationships.
+    `;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that analyzes text and identifies key concepts and their relationships. Return only valid JSON without any additional text."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    const graphData = JSON.parse(completion.choices[0].message.content);
+    console.log('Analysis completed successfully');
+    
+    return res.json({
+      success: true,
+      data: graphData
+    });
+  } catch (error) {
+    console.error('Analysis error:', error);
+    return res.json({
+      success: false,
+      error: 'Failed to analyze content',
+      details: error.message
+    });
+  }
+});
+
+// Update the file reading endpoint
+app.get('/api/files/:filename', async (req, res) => {
+  // Set JSON content type header
+  res.setHeader('Content-Type', 'application/json');
+
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(uploadsDir, filename);
+    
+    console.log('Reading file:', filename);
+    console.log('File path:', filePath);
+
+    // Check if file exists before trying to read it
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      console.log('File not found:', filePath);
+      return res.json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+
+    // Read the file content
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      console.log('File read successfully, length:', content.length);
+      console.log('Content preview:', content.substring(0, 100));
+
+      return res.json({
+        success: true,
+        content: content
+      });
+    } catch (error) {
+      console.error('Error reading file:', error);
+      return res.json({
+        success: false,
+        error: 'Error reading file',
+        details: error.message
+      });
+    }
+  } catch (error) {
+    console.error('Server error:', error);
+    return res.json({
+      success: false,
+      error: 'Server error',
+      details: error.message
+    });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => {
+  console.log('=================================');
+  console.log(`Server running on port ${PORT}`);
+  console.log(`http://localhost:${PORT}`);
+  console.log('OpenAI configured:', !!openai);
+  console.log('CORS enabled');
+  console.log('Directories:');
+  console.log(`- Uploads: ${uploadsDir}`);
+  console.log(`- Metadata: ${metadataDir}`);
+  console.log('=================================');
 });

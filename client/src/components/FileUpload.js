@@ -1,52 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import './Modal.css';
 import './FileUpload.css';
 
-export default function FileUpload({ onClose }) {
+function FileUpload({ onClose }) {
   const [file, setFile] = useState(null);
   const [customName, setCustomName] = useState('');
-  const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    const droppedFile = e.dataTransfer.files[0];
-    if (isValidFile(droppedFile)) {
-      setFile(droppedFile);
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files[0];
-    if (isValidFile(selectedFile)) {
-      setFile(selectedFile);
-      const nameWithoutExt = selectedFile.name.replace(/\.[^/.]+$/, '');
-      setCustomName(nameWithoutExt);
-    }
-  };
-
-  const isValidFile = (file) => {
-    if (!file) return false;
-    const validTypes = ['audio/mpeg', 'text/plain'];
-    if (!validTypes.includes(file.type)) {
-      setUploadStatus('Error: Please upload an MP3 or text file');
-      return false;
-    }
-    return true;
-  };
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleUpload = async () => {
     if (!file || !customName.trim()) {
@@ -66,7 +27,7 @@ export default function FileUpload({ onClose }) {
 
       const response = await fetch(`${baseUrl}/api/upload`, {
         method: 'POST',
-        body: formData, // Don't set Content-Type header - browser will set it with boundary
+        body: formData,
       });
 
       if (!response.ok) {
@@ -82,90 +43,102 @@ export default function FileUpload({ onClose }) {
       setFile(null);
       setCustomName('');
       
-      if (onClose) {
-        setTimeout(onClose, 1500);
-      }
+      // Close the modal after a short delay
+      setTimeout(onClose, 1500);
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadStatus(error.message || 'Upload failed. Please try again.');
+      setUploadStatus(`Upload failed: ${error.message}`);
+    }
+  };
+
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      // Set default custom name as file name without extension
+      setCustomName(selectedFile.name.replace(/\.[^/.]+$/, ''));
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      setFile(droppedFile);
+      setCustomName(droppedFile.name.replace(/\.[^/.]+$/, ''));
     }
   };
 
   return (
-    <div className="upload-modal">
-      <div className="upload-content">
-        <button className="close-button" onClick={onClose}>&times;</button>
-        <h2>Upload File</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Upload File</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
         
         <div 
-          className={`drop-zone ${dragActive ? 'active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
+          className={`upload-area ${isDragging ? 'dragging' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           {file ? (
             <div className="file-info">
-              <p>{file.name}</p>
-              <button 
-                className="remove-file"
-                onClick={() => {
-                  setFile(null);
-                  setCustomName('');
-                }}
-              >
-                Remove
-              </button>
+              <span className="file-name">{file.name}</span>
+              <button className="remove-file" onClick={() => setFile(null)}>×</button>
             </div>
           ) : (
-            <>
-              <p>Drag and drop your file here or</p>
-              <label className="file-input-label">
-                Browse Files
-                <input
-                  type="file"
-                  accept=".mp3,.txt"
-                  onChange={handleFileSelect}
-                  className="file-input"
-                />
-              </label>
-              <p className="file-types">Supported files: MP3, TXT</p>
-            </>
+            <div className="upload-prompt">
+              <span className="upload-icon">📁</span>
+              <p>Drag & drop a file here or click to browse</p>
+              <p className="file-types">Supported formats: .mp3, .txt, .md</p>
+            </div>
           )}
+          <input
+            type="file"
+            accept=".mp3,.txt,.md"
+            onChange={handleFileChange}
+            className="file-input"
+          />
         </div>
 
-        {file && (
-          <div className="filename-input">
-            <label htmlFor="customName">Name your file:</label>
-            <input
-              type="text"
-              id="customName"
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              placeholder="Enter a name for your file"
-            />
+        <div className="form-group">
+          <label htmlFor="customName">Custom Name:</label>
+          <input
+            id="customName"
+            type="text"
+            placeholder="Enter a name for your file"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            className="name-input"
+          />
+        </div>
+
+        {uploadStatus && (
+          <div className={`upload-status ${uploadStatus.includes('failed') ? 'error' : ''}`}>
+            {uploadStatus}
           </div>
         )}
 
-        {uploadStatus && (
-          <p className={`upload-status ${uploadStatus.includes('Error') || uploadStatus.includes('failed') ? 'error' : ''}`}>
-            {uploadStatus}
-          </p>
-        )}
-
-        <div className="upload-actions">
+        <div className="modal-actions">
           <button 
-            className="button secondary"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button 
-            className="button primary"
-            onClick={handleUpload}
+            className="upload-button" 
+            onClick={handleUpload} 
             disabled={!file || !customName.trim()}
           >
-            Upload
+            Upload File
           </button>
         </div>
       </div>
@@ -175,4 +148,6 @@ export default function FileUpload({ onClose }) {
 
 FileUpload.propTypes = {
   onClose: PropTypes.func.isRequired
-}; 
+};
+
+export default FileUpload; 

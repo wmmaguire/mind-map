@@ -14,144 +14,6 @@
   padding: 20px;
 }
 
-.content-container {
-  max-width: 1000px;
-  margin: 20px auto;
-  padding: 0 20px;
-}
-
-.description {
-  margin-bottom: 30px;
-}
-
-.description p {
-  font-size: 1.2rem;
-  line-height: 1.6;
-  margin: 10px 0;
-  color: #e0e0e0;
-}
-
-.instructions {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 20px;
-  margin: 20px 0;
-  text-align: left;
-}
-
-.instructions h3 {
-  color: #4CAF50;
-  margin: 0 0 15px 0;
-  font-size: 1.2rem;
-}
-
-.instructions ol {
-  margin: 0;
-  padding-left: 25px;
-}
-
-.instructions li {
-  margin: 12px 0;
-  font-size: 1rem;
-  line-height: 1.4;
-  color: #e0e0e0;
-}
-
-.button-group {
-  margin-top: 30px;
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-}
-
-.action-button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.1rem;
-  padding: 12px 24px;
-  cursor: pointer;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.action-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(-100%);
-  transition: transform 0.3s ease;
-}
-
-.action-button:hover::before {
-  transform: translateX(0);
-}
-
-.upload-button {
-  background-color: #4CAF50;
-  box-shadow: 0 4px 6px rgba(76, 175, 80, 0.2);
-}
-
-.upload-button:hover {
-  background-color: #45a049;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(76, 175, 80, 0.3);
-}
-
-.library-button {
-  background-color: #2196F3;
-  box-shadow: 0 4px 6px rgba(33, 150, 243, 0.2);
-}
-
-.library-button:hover {
-  background-color: #1e88e5;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(33, 150, 243, 0.3);
-}
-
-.button-icon {
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-}
-
-.button-text {
-  position: relative;
-  z-index: 1;
-}
-
-.action-button:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.action-button:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
-}
-
-@media (max-width: 600px) {
-  .button-group {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .action-button {
-    width: 100%;
-    justify-content: center;
-    font-size: 1rem;
-    padding: 10px 20px;
-  }
-}
-
 .App-header button {
   font-size: 1.2em;
   margin: 10px;
@@ -176,79 +38,29 @@
   border-radius: 5px;
 }
 
-.description {
+.content-container {
   max-width: 1000px;
   margin: 20px auto;
-  padding: 20px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  font-size: 0.8em;
+  padding: 0 20px;
 }
 
-.description ol {
-  text-align: left;
-  margin: 0;
-  padding-left: 20px;
-}
-
-.description li {
-  margin: 10px 0;
-}
-
-.description h3 {
-  margin: 20px 0 10px 0;
+.description {
+  margin-bottom: 30px;
 }
 
 .description p {
-  margin-bottom: 20px;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  margin: 10px 0;
+  color: #e0e0e0;
 }
 
-.button-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip {
-  visibility: hidden;
-  position: absolute;
-  bottom: 120%;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.9);
-  color: white;
-  text-align: center;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  width: max-content;
-  max-width: 300px;
-  opacity: 0;
-  transition: opacity 0.3s, visibility 0.3s;
-  z-index: 1;
-  line-height: 1.4;
-}
-
-.tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: rgba(0, 0, 0, 0.9) transparent transparent transparent;
-}
-
-.button-wrapper:hover .tooltip {
-  visibility: visible;
-  opacity: 1;
-}
-
+/* Simple button group styling */
 .button-group {
-  margin-top: 30px;
   display: flex;
   gap: 20px;
   justify-content: center;
+  margin-top: 20px;
 }
 
 @media (max-width: 600px) {
@@ -260,11 +72,8 @@
     font-size: 1.1rem;
   }
 
-  .tooltip {
-    font-size: 1rem;
-    max-width: 250px;
-    padding: 10px 15px;
+  .button-group {
+    flex-direction: column;
+    align-items: center;
   }
-  
-  /* ... rest of the mobile styles remain the same ... */
 }
