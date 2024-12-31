@@ -14,18 +14,23 @@ export default function Library({ onClose }) {
   const fetchFiles = async () => {
     try {
       const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      console.log('Fetching files from:', `${baseUrl}/api/files`); // Debug log
+      
       const response = await fetch(`${baseUrl}/api/files`);
+      console.log('Response status:', response.status); // Debug log
       
       if (!response.ok) {
-        throw new Error('Failed to fetch files');
+        const errorData = await response.json();
+        console.error('Server error:', errorData); // Debug log
+        throw new Error(errorData.error || 'Failed to fetch files');
       }
 
       const data = await response.json();
-      console.log('Fetched files:', data.files); // Debug log
+      console.log('Received data:', data); // Debug log
       setFiles(data.files);
     } catch (error) {
       console.error('Error fetching files:', error);
-      setError('Failed to load files');
+      setError(error.message || 'Failed to load files. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -138,22 +138,25 @@ app.post('/api/upload', (req, res) => {
 // Get list of uploaded files
 app.get('/api/files', async (req, res) => {
   try {
+    console.log('Reading metadata directory:', metadataDir); // Debug log
     const metadataFiles = await fs.readdir(metadataDir);
+    console.log('Found metadata files:', metadataFiles); // Debug log
     
     const fileList = await Promise.all(
       metadataFiles
         .filter(file => file.endsWith('.json'))
         .map(async (metaFile) => {
           try {
+            console.log('Reading metadata file:', metaFile); // Debug log
             const metadata = JSON.parse(
               await fs.readFile(path.join(metadataDir, metaFile), 'utf8')
             );
             return {
               ...metadata,
-              filename: metaFile.replace('.json', '') // Remove .json extension
+              filename: metaFile.replace('.json', '')
             };
           } catch (error) {
-            console.error('Error reading metadata:', error);
+            console.error('Error reading metadata file:', metaFile, error);
             return null;
           }
         })
@@ -162,10 +165,15 @@ app.get('/api/files', async (req, res) => {
     // Filter out any null entries from failed metadata reads
     const validFiles = fileList.filter(file => file !== null);
     
+    console.log('Sending response with files:', validFiles); // Debug log
     res.json({ files: validFiles });
   } catch (error) {
-    console.error('Error reading metadata:', error);
-    res.status(500).json({ error: 'Failed to read files' });
+    console.error('Error reading metadata directory:', error);
+    res.status(500).json({ 
+      error: 'Failed to read files',
+      details: error.message,
+      path: metadataDir
+    });
   }
 });
 
