@@ -1,92 +1,61 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import './App.css';
 import FileUpload from './components/FileUpload';
 import Library from './components/Library';
-import './App.css';
 
-export default function App() {
-  const [error, setError] = useState(null);
+function App() {
   const [showUpload, setShowUpload] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [serverError, setServerError] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const checkServer = async () => {
       try {
         const baseUrl = process.env.NODE_ENV === 'production' 
-          ? ''
+          ? window.location.origin 
           : 'http://localhost:5001';
         
         const response = await fetch(`${baseUrl}/api/test`);
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error('Server response was not ok');
         }
-        await response.json();
+        
+        const data = await response.json();
+        console.log('Server status:', data);
+        setServerError(null);
       } catch (error) {
-        console.error('Error details:', error);
-        setError('Could not connect to the server. Is it running?');
+        console.error('Server connection error:', error);
+        setServerError('Could not connect to the server. Please try again later.');
       }
     };
 
-    fetchData();
+    checkServer();
   }, []);
 
-  const handleUpload = () => {
-    setShowUpload(true);
-  };
-
-  const handleBrowse = () => {
-    setShowLibrary(true);
-  };
-
   return (
-    <div className="app">
-      <header className="header">
+    <div className="App">
+      <header className="App-header">
         <h1>Talk Graph</h1>
-        <p className="subtitle">Visualize conversations through interactive graphs</p>
+        {serverError ? (
+          <div className="error-message">{serverError}</div>
+        ) : (
+          <>
+            <button onClick={() => setShowUpload(true)}>Upload File</button>
+            <button onClick={() => setShowLibrary(true)}>View Library</button>
+          </>
+        )}
       </header>
-
-      <main className="main">
-        <section className="hero">
-          <div className="hero-content">
-            <h2>Transform Your Conversations</h2>
-            <p>
-              Upload audio or text files to generate interactive graph visualizations.
-              Analyze patterns, track topics, and gain insights from your conversations.
-            </p>
-          </div>
-        </section>
-
-        <section className="actions">
-          <div className="action-card">
-            <h3>New Analysis</h3>
-            <p>Upload an MP3 or text file to start visualizing</p>
-            <button className="button primary" onClick={handleUpload}>
-              Upload File
-            </button>
-          </div>
-
-          <div className="action-card">
-            <h3>Previous Analyses</h3>
-            <p>Browse and view your past conversation graphs</p>
-            <button className="button secondary" onClick={handleBrowse}>
-              View Library
-            </button>
-          </div>
-        </section>
-
-        {error && <div className="error-message">{error}</div>}
-      </main>
-
-      <footer className="footer">
-        <p>© 2024 Talk Graph. All rights reserved.</p>
-      </footer>
 
       {showUpload && (
         <FileUpload onClose={() => setShowUpload(false)} />
       )}
-      
+
       {showLibrary && (
         <Library onClose={() => setShowLibrary(false)} />
       )}
     </div>
   );
 }
+
+export default App;

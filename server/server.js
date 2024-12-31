@@ -139,6 +139,20 @@ app.post('/api/upload', (req, res, next) => {
   });
 });
 
+app.get('/api/test', (req, res) => {
+  try {
+    res.json({ 
+      status: 'ok',
+      message: 'Server is running',
+      env: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Production configuration - Add AFTER API routes
 if (process.env.NODE_ENV === 'production') {
   // Serve static files from the React app
@@ -151,7 +165,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Error handling middleware - must be last
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   console.error(err.stack);
   res.status(500).json({ 
     error: 'Something went wrong!',
