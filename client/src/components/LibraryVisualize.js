@@ -24,12 +24,39 @@ function LibraryVisualize() {
     return process.env.NODE_ENV === 'development' ? 'http://localhost:5001' : '';
   };
 
+  const handleApiRequest = async (url, options = {}) => {
+    const baseUrl = getBaseUrl();
+    const fullUrl = `${baseUrl}${url}`;
+    
+    try {
+      const response = await fetch(fullUrl, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        }
+      });
+
+      // Try to parse the response as JSON
+      try {
+        const data = await response.json();
+        return data;
+      } catch (jsonError) {
+        // If JSON parsing fails, throw a more specific error
+        throw new Error(`Invalid response from server at ${url}`);
+      }
+    } catch (error) {
+      console.error(`API request failed for ${url}:`, error);
+      throw error;
+    }
+  };
+
   const fetchFiles = async () => {
     try {
-      const baseUrl = getBaseUrl();
-      const response = await fetch(`${baseUrl}/api/files`);
-      const data = await response.json();
-      setFiles(data.files || []);
+      const data = await handleApiRequest('/api/files');
+      if (data && data.files) {
+        setFiles(data.files);
+      }
     } catch (error) {
       console.error('Error fetching files:', error);
       setError('Failed to fetch files');
@@ -38,13 +65,14 @@ function LibraryVisualize() {
 
   const fetchSavedGraphs = async () => {
     try {
-      const baseUrl = getBaseUrl();
-      const response = await fetch(`${baseUrl}/api/graphs`);
-      const data = await response.json();
-      setSavedGraphs(data.graphs || []);
+      const data = await handleApiRequest('/api/graphs');
+      if (data && data.graphs) {
+        setSavedGraphs(data.graphs);
+      }
     } catch (error) {
-      console.error('Error fetching saved graphs:', error);
-      setError('Failed to fetch saved graphs');
+      // Don't show error for saved graphs as it's not critical
+      console.warn('Error fetching saved graphs:', error);
+      setSavedGraphs([]);
     }
   };
 
@@ -64,7 +92,6 @@ function LibraryVisualize() {
 
     try {
       setSaving(true);
-      const baseUrl = getBaseUrl();
       
       const graphToSave = {
         nodes: graphData.nodes,
@@ -84,19 +111,14 @@ function LibraryVisualize() {
         edgeCount: graphData.links.length
       };
 
-      const response = await fetch(`${baseUrl}/api/graphs/save`, {
+      const data = await handleApiRequest('/api/graphs/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           graph: graphToSave,
           metadata
         })
       });
 
-      const data = await response.json();
-      
       if (data.success) {
         fetchSavedGraphs();
         setShowSaveDialog(false);
@@ -166,34 +188,31 @@ function LibraryVisualize() {
     try {
       setAnalyzing(true);
       setError(null);
-      const baseUrl = getBaseUrl();
       
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
-          const response = await fetch(`${baseUrl}/api/files/${file.filename}`);
-          const data = await response.json();
-          
-          if (!data.success) {
-            throw new Error(`Failed to read file: ${file.originalName}`);
+          try {
+            const fileData = await handleApiRequest(`/api/files/${file.filename}`);
+            if (!fileData.success || !fileData.content) {
+              throw new Error(`Failed to read file: ${file.originalName}`);
+            }
+
+            const analysisData = await handleApiRequest('/api/analyze', {
+              method: 'POST',
+              body: JSON.stringify({ content: fileData.content })
+            });
+
+            if (!analysisData.success || !analysisData.data) {
+              throw new Error(`Analysis failed for: ${file.originalName}`);
+            }
+
+            return {
+              filename: file.originalName,
+              data: analysisData.data
+            };
+          } catch (error) {
+            throw new Error(`Error processing ${file.originalName}: ${error.message}`);
           }
-
-          const analysisResponse = await fetch(`${baseUrl}/api/analyze`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: data.content })
-          });
-
-          const analysisData = await analysisResponse.json();
-          if (!analysisData.success) {
-            throw new Error(`Analysis failed for: ${file.originalName}`);
-          }
-
-          return {
-            filename: file.originalName,
-            data: analysisData.data
-          };
         })
       );
 
