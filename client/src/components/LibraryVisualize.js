@@ -20,44 +20,42 @@ function LibraryVisualize() {
     fetchSavedGraphs();
   }, []);
 
+  const getBaseUrl = () => {
+    return process.env.NODE_ENV === 'development' ? 'http://localhost:5001' : '';
+  };
+
   const fetchFiles = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-      console.log('Fetching files from:', `${baseUrl}/api/files`);
-      
+      const baseUrl = getBaseUrl();
       const response = await fetch(`${baseUrl}/api/files`);
-      console.log('Response status:', response.status);
-      
-      const data = await response.json();
-      console.log('Files response data:', data);
-
-      // Check if data.files exists, even if success is false
-      if (data.files) {
-        setFiles(data.files);
-        setError(null);
-      } else {
-        console.error('No files array in response:', data);
-        setFiles([]);
-        setError('No files found');
+      if (!response.ok) {
+        throw new Error('Failed to fetch files');
       }
+      const data = await response.json();
+      setFiles(data.files || []);
     } catch (error) {
       console.error('Error fetching files:', error);
-      setFiles([]);
-      setError(`Failed to load files: ${error.message}`);
+      setError('Failed to fetch files');
     }
   };
 
   const fetchSavedGraphs = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      const baseUrl = getBaseUrl();
       const response = await fetch(`${baseUrl}/api/graphs`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch saved graphs');
+      }
       const data = await response.json();
       
       if (data.success) {
         setSavedGraphs(data.graphs);
+      } else {
+        throw new Error(data.error || 'Failed to fetch saved graphs');
       }
     } catch (error) {
       console.error('Error fetching saved graphs:', error);
+      setError('Failed to fetch saved graphs');
     }
   };
 
@@ -77,7 +75,7 @@ function LibraryVisualize() {
 
     try {
       setSaving(true);
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+      const baseUrl = getBaseUrl();
       
       const graphToSave = {
         nodes: graphData.nodes,
@@ -108,6 +106,10 @@ function LibraryVisualize() {
         })
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to save graph');
+      }
+
       const data = await response.json();
       
       if (data.success) {
@@ -116,11 +118,11 @@ function LibraryVisualize() {
         setGraphName('');
         setGraphDescription('');
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to save graph');
       }
     } catch (error) {
       console.error('Error saving graph:', error);
-      setError('Failed to save graph');
+      setError(error.message);
     } finally {
       setSaving(false);
     }
@@ -179,17 +181,22 @@ function LibraryVisualize() {
     try {
       setAnalyzing(true);
       setError(null);
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-
+      const baseUrl = getBaseUrl();
+      
+      // Analyze each file and combine results
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
           const response = await fetch(`${baseUrl}/api/files/${file.filename}`);
+          if (!response.ok) {
+            throw new Error(`Failed to read file: ${file.originalName}`);
+          }
           const data = await response.json();
           
           if (!data.success) {
             throw new Error(`Failed to read file: ${file.originalName}`);
           }
 
+          // Analyze individual file
           const analysisResponse = await fetch(`${baseUrl}/api/analyze`, {
             method: 'POST',
             headers: {
@@ -197,6 +204,10 @@ function LibraryVisualize() {
             },
             body: JSON.stringify({ content: data.content })
           });
+
+          if (!analysisResponse.ok) {
+            throw new Error(`Analysis failed for: ${file.originalName}`);
+          }
 
           const analysisData = await analysisResponse.json();
           if (!analysisData.success) {
@@ -210,6 +221,7 @@ function LibraryVisualize() {
         })
       );
 
+      // Combine the graphs
       const combinedGraph = combineGraphs(fileResults.map(r => r.data));
       setGraphData(combinedGraph);
 
