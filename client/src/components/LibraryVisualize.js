@@ -33,7 +33,13 @@ function LibraryVisualize() {
     const fullUrl = `${baseUrl}${url}`;
     
     try {
-      console.log('Making request to:', fullUrl); // Debug log
+      console.log('Request details:', {
+        url: fullUrl,
+        method: options.method || 'GET',
+        headers: options.headers,
+        body: options.body ? JSON.parse(options.body) : undefined
+      });
+
       const response = await fetch(fullUrl, {
         ...options,
         headers: {
@@ -42,12 +48,18 @@ function LibraryVisualize() {
         }
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       try {
         const data = await response.json();
+        console.log('Response data:', data);
         return data;
       } catch (jsonError) {
         console.error('JSON parsing error:', jsonError);

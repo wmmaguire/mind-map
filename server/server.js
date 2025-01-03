@@ -246,56 +246,58 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Update the file reading endpoint
+// Update the existing route with debug logging
 app.get('/api/files/:filename', async (req, res) => {
-  // Set JSON content type header
-  res.setHeader('Content-Type', 'application/json');
-
-  try {
-    const filename = decodeURIComponent(req.params.filename);
-    const filePath = path.join(uploadsDir, filename);
+    console.log('File request received:', {
+      filename: req.params.filename,
+      path: req.path,
+      method: req.method
+    });
     
-    console.log('Reading file:', filename);
-    console.log('File path:', filePath);
-
-    // Check if file exists before trying to read it
     try {
-      await fs.access(filePath);
+      const filename = decodeURIComponent(req.params.filename);
+      const filePath = path.join(uploadsDir, filename);
+      
+      console.log('Attempting to read file:', filePath);
+      
+      // Check if file exists before trying to read it
+      try {
+        await fs.access(filePath);
+      } catch (error) {
+        console.log('File not found:', filePath);
+        return res.json({
+          success: false,
+          error: 'File not found'
+        });
+      }
+  
+      // Read the file content
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        console.log('File read successfully, length:', content.length);
+        console.log('Content preview:', content.substring(0, 100));
+  
+        return res.json({
+          success: true,
+          content: content
+        });
+      } catch (error) {
+        console.error('Error reading file:', error);
+        return res.json({
+          success: false,
+          error: 'Error reading file',
+          details: error.message
+        });
+      }
     } catch (error) {
-      console.log('File not found:', filePath);
+      console.error('Server error:', error);
       return res.json({
         success: false,
-        error: 'File not found'
-      });
-    }
-
-    // Read the file content
-    try {
-      const content = await fs.readFile(filePath, 'utf8');
-      console.log('File read successfully, length:', content.length);
-      console.log('Content preview:', content.substring(0, 100));
-
-      return res.json({
-        success: true,
-        content: content
-      });
-    } catch (error) {
-      console.error('Error reading file:', error);
-      return res.json({
-        success: false,
-        error: 'Error reading file',
+        error: 'Server error',
         details: error.message
       });
     }
-  } catch (error) {
-    console.error('Server error:', error);
-    return res.json({
-      success: false,
-      error: 'Server error',
-      details: error.message
-    });
-  }
-});
+  });
 
 // Import the router
 import uploadRouter from './routes/upload.js';
