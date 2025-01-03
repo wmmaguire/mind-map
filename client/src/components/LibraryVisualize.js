@@ -21,7 +21,11 @@ function LibraryVisualize() {
   }, []);
 
   const getBaseUrl = () => {
-    return process.env.NODE_ENV === 'development' ? 'http://localhost:5001' : '';
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:5001';
+    }
+    // In production, use the full domain
+    return 'https://talk-graph.onrender.com';
   };
 
   const handleApiRequest = async (url, options = {}) => {
@@ -29,6 +33,7 @@ function LibraryVisualize() {
     const fullUrl = `${baseUrl}${url}`;
     
     try {
+      console.log('Making request to:', fullUrl); // Debug log
       const response = await fetch(fullUrl, {
         ...options,
         headers: {
@@ -37,16 +42,19 @@ function LibraryVisualize() {
         }
       });
 
-      // Try to parse the response as JSON
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       try {
         const data = await response.json();
         return data;
       } catch (jsonError) {
-        // If JSON parsing fails, throw a more specific error
-        throw new Error(`Invalid response from server at ${url}`);
+        console.error('JSON parsing error:', jsonError);
+        throw new Error(`Invalid response from server at ${url} (${response.status})`);
       }
     } catch (error) {
-      console.error(`API request failed for ${url}:`, error);
+      console.error(`API request failed for ${fullUrl}:`, error);
       throw error;
     }
   };
@@ -59,7 +67,7 @@ function LibraryVisualize() {
       }
     } catch (error) {
       console.error('Error fetching files:', error);
-      setError('Failed to fetch files');
+      setError(`Failed to fetch files: ${error.message}`);
     }
   };
 
@@ -70,16 +78,14 @@ function LibraryVisualize() {
         setSavedGraphs(data.graphs);
       }
     } catch (error) {
-      // Don't show error for saved graphs as it's not critical
       console.warn('Error fetching saved graphs:', error);
       setSavedGraphs([]);
     }
   };
 
   const handleSaveClick = () => {
-    // Generate default name from selected files
     const defaultName = Array.from(selectedFiles)
-      .map(f => f.customName || f.originalName.replace(/\.[^/.]+$/, '')) // Remove file extension
+      .map(f => f.customName || f.originalName.replace(/\.[^/.]+$/, ''))
       .join(' + ');
     
     setGraphName(defaultName);
@@ -192,11 +198,13 @@ function LibraryVisualize() {
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
           try {
+            console.log('Fetching file:', file.filename);
             const fileData = await handleApiRequest(`/api/files/${file.filename}`);
             if (!fileData.success || !fileData.content) {
               throw new Error(`Failed to read file: ${file.originalName}`);
             }
 
+            console.log('Analyzing file:', file.originalName);
             const analysisData = await handleApiRequest('/api/analyze', {
               method: 'POST',
               body: JSON.stringify({ content: fileData.content })
@@ -211,6 +219,7 @@ function LibraryVisualize() {
               data: analysisData.data
             };
           } catch (error) {
+            console.error('Error processing file:', file.originalName, error);
             throw new Error(`Error processing ${file.originalName}: ${error.message}`);
           }
         })
@@ -365,7 +374,6 @@ function LibraryVisualize() {
         )}
       </div>
 
-      {/* Enhanced Save Dialog */}
       {showSaveDialog && (
         <div className="modal-overlay" onClick={() => !saving && setShowSaveDialog(false)}>
           <div className="save-dialog" onClick={e => e.stopPropagation()}>
