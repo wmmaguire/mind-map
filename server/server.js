@@ -166,23 +166,115 @@ app.get('/api/test', (req, res) => {
   }
 });
 
-// Production configuration - Add AFTER API routes
+// API Routes - Must come BEFORE the production static/catch-all routes
+app.get('/api/files/:filename', async (req, res) => {
+  console.log('File request received:', {
+    filename: req.params.filename,
+    path: req.path,
+    method: req.method,
+    uploadsDir: uploadsDir
+  });
+  
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(uploadsDir, filename);
+    
+    console.log('File access attempt:', {
+      requestedFile: filename,
+      fullPath: filePath,
+      exists: await fs.access(filePath).then(() => true).catch(() => false)
+    });
+
+    // List all files in uploads directory for debugging
+    const files = await fs.readdir(uploadsDir);
+    console.log('Files in uploads directory:', files);
+    
+    // Check if file exists before trying to read it
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      console.log('File not found:', {
+        filePath,
+        error: error.message,
+        uploadsDir,
+        availableFiles: files
+      });
+      return res.status(404).json({
+        success: false,
+        error: 'File not found',
+        details: {
+          requested: filename,
+          path: filePath,
+          availableFiles: files
+        }
+      });
+    }
+
+    const content = await fs.readFile(filePath, 'utf8');
+    console.log('File read successfully:', {
+      filename,
+      contentLength: content.length,
+      preview: content.substring(0, 100)
+    });
+
+    return res.json({
+      success: true,
+      content: content
+    });
+  } catch (error) {
+    console.error('Server error:', {
+      error: error.message,
+      stack: error.stack,
+      filename: req.params.filename
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Server error',
+      details: error.message
+    });
+  }
+});
+
+// Import the router
+import uploadRouter from './routes/upload.js';
+
+// Use the router BEFORE your other routes
+app.use('/api', uploadRouter);
+
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    success: false,
+    error: err.message || 'Internal server error'
+  });
+});
+
+// Production configuration - Must come AFTER all API routes
 if (process.env.NODE_ENV === 'production') {
   // Serve static files from the React app
   app.use(express.static(path.join(__dirname, '../client/build')));
 
-  // Handle any remaining requests with index.html
+  // The "catch-all" route handler must be last
   app.get('*', (req, res) => {
+    // Don't handle /api routes here
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({
+        success: false,
+        error: 'API endpoint not found'
+      });
+    }
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
   });
 }
 
 // Error handling middleware - must be last
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Global error handler:', err);
   res.status(500).json({ 
     error: 'Something went wrong!',
-    message: err.message
+    message: err.message,
+    path: req.path
   });
 });
 
@@ -251,74 +343,6 @@ app.post('/api/analyze', async (req, res) => {
       details: error.message
     });
   }
-});
-
-// Update the existing route with debug logging
-app.get('/api/files/:filename', async (req, res) => {
-    console.log('File request received:', {
-      filename: req.params.filename,
-      path: req.path,
-      method: req.method
-    });
-    
-    try {
-      const filename = decodeURIComponent(req.params.filename);
-      const filePath = path.join(uploadsDir, filename);
-      
-      console.log('Attempting to read file:', filePath);
-      
-      // Check if file exists before trying to read it
-      try {
-        await fs.access(filePath);
-      } catch (error) {
-        console.log('File not found:', filePath);
-        return res.json({
-          success: false,
-          error: 'File not found'
-        });
-      }
-  
-      // Read the file content
-      try {
-        const content = await fs.readFile(filePath, 'utf8');
-        console.log('File read successfully, length:', content.length);
-        console.log('Content preview:', content.substring(0, 100));
-  
-        return res.json({
-          success: true,
-          content: content
-        });
-      } catch (error) {
-        console.error('Error reading file:', error);
-        return res.json({
-          success: false,
-          error: 'Error reading file',
-          details: error.message
-        });
-      }
-    } catch (error) {
-      console.error('Server error:', error);
-      return res.json({
-        success: false,
-        error: 'Server error',
-        details: error.message
-      });
-    }
-  });
-
-// Import the router
-import uploadRouter from './routes/upload.js';
-
-// Use the router BEFORE your other routes
-app.use('/api', uploadRouter);
-
-// Error handling
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    error: err.message || 'Internal server error'
-  });
 });
 
 // Start server
