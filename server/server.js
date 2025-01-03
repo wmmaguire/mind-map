@@ -33,6 +33,13 @@ const baseDir = process.env.NODE_ENV === 'production'
 const uploadsDir = path.join(baseDir, 'uploads');
 const metadataDir = path.join(baseDir, 'metadata');
 
+// Create Express app
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
 // Ensure directories exist
 (async () => {
   try {
@@ -42,10 +49,6 @@ const metadataDir = path.join(baseDir, 'metadata');
     console.error('Error creating directories:', error);
   }
 })();
-
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -252,67 +255,56 @@ app.post('/api/analyze', async (req, res) => {
 
 // Update the existing route with debug logging
 app.get('/api/files/:filename', async (req, res) => {
-  console.log('File request received:', {
-    filename: req.params.filename,
-    path: req.path,
-    method: req.method,
-    uploadsDir: uploadsDir // Log the uploads directory
-  });
-  
-  try {
-    const filename = decodeURIComponent(req.params.filename);
-    const filePath = path.join(uploadsDir, filename);
-    
-    console.log('File access attempt:', {
-      requestedFile: filename,
-      fullPath: filePath,
-      exists: await fs.access(filePath).then(() => true).catch(() => false)
+    console.log('File request received:', {
+      filename: req.params.filename,
+      path: req.path,
+      method: req.method
     });
     
-    // Check if file exists before trying to read it
     try {
-      await fs.access(filePath);
+      const filename = decodeURIComponent(req.params.filename);
+      const filePath = path.join(uploadsDir, filename);
+      
+      console.log('Attempting to read file:', filePath);
+      
+      // Check if file exists before trying to read it
+      try {
+        await fs.access(filePath);
+      } catch (error) {
+        console.log('File not found:', filePath);
+        return res.json({
+          success: false,
+          error: 'File not found'
+        });
+      }
+  
+      // Read the file content
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        console.log('File read successfully, length:', content.length);
+        console.log('Content preview:', content.substring(0, 100));
+  
+        return res.json({
+          success: true,
+          content: content
+        });
+      } catch (error) {
+        console.error('Error reading file:', error);
+        return res.json({
+          success: false,
+          error: 'Error reading file',
+          details: error.message
+        });
+      }
     } catch (error) {
-      console.log('File not found:', {
-        filePath,
-        error: error.message,
-        uploadsDir,
-        files: await fs.readdir(uploadsDir).catch(e => `Error reading dir: ${e.message}`)
-      });
-      return res.status(404).json({
+      console.error('Server error:', error);
+      return res.json({
         success: false,
-        error: 'File not found',
-        details: {
-          requested: filename,
-          path: filePath
-        }
+        error: 'Server error',
+        details: error.message
       });
     }
-
-    const content = await fs.readFile(filePath, 'utf8');
-    console.log('File read successfully:', {
-      filename,
-      contentLength: content.length,
-      preview: content.substring(0, 100)
-    });
-
-    return res.json({
-      success: true,
-      content: content
-    });
-  } catch (error) {
-    console.error('Server error:', {
-      error: error.message,
-      stack: error.stack,
-      filename: req.params.filename
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Server error',
-      details: error.message
-    });
-  }
-});
+  });
 
 // Import the router
 import uploadRouter from './routes/upload.js';
