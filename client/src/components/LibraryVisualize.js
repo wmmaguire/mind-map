@@ -28,9 +28,6 @@ function LibraryVisualize() {
     try {
       const baseUrl = getBaseUrl();
       const response = await fetch(`${baseUrl}/api/files`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch files');
-      }
       const data = await response.json();
       setFiles(data.files || []);
     } catch (error) {
@@ -43,16 +40,8 @@ function LibraryVisualize() {
     try {
       const baseUrl = getBaseUrl();
       const response = await fetch(`${baseUrl}/api/graphs`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch saved graphs');
-      }
       const data = await response.json();
-      
-      if (data.success) {
-        setSavedGraphs(data.graphs);
-      } else {
-        throw new Error(data.error || 'Failed to fetch saved graphs');
-      }
+      setSavedGraphs(data.graphs || []);
     } catch (error) {
       console.error('Error fetching saved graphs:', error);
       setError('Failed to fetch saved graphs');
@@ -105,10 +94,6 @@ function LibraryVisualize() {
           metadata
         })
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save graph');
-      }
 
       const data = await response.json();
       
@@ -183,20 +168,15 @@ function LibraryVisualize() {
       setError(null);
       const baseUrl = getBaseUrl();
       
-      // Analyze each file and combine results
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
           const response = await fetch(`${baseUrl}/api/files/${file.filename}`);
-          if (!response.ok) {
-            throw new Error(`Failed to read file: ${file.originalName}`);
-          }
           const data = await response.json();
           
           if (!data.success) {
             throw new Error(`Failed to read file: ${file.originalName}`);
           }
 
-          // Analyze individual file
           const analysisResponse = await fetch(`${baseUrl}/api/analyze`, {
             method: 'POST',
             headers: {
@@ -204,10 +184,6 @@ function LibraryVisualize() {
             },
             body: JSON.stringify({ content: data.content })
           });
-
-          if (!analysisResponse.ok) {
-            throw new Error(`Analysis failed for: ${file.originalName}`);
-          }
 
           const analysisData = await analysisResponse.json();
           if (!analysisData.success) {
@@ -221,7 +197,6 @@ function LibraryVisualize() {
         })
       );
 
-      // Combine the graphs
       const combinedGraph = combineGraphs(fileResults.map(r => r.data));
       setGraphData(combinedGraph);
 
