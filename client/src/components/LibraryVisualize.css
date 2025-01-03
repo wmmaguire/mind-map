@@ -138,4 +138,68 @@
   text-align: center;
   color: #666;
   padding: 20px;
+}
+
+.saved-graphs {
+  margin-top: 20px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.saved-graph-item {
+  padding: 10px;
+  margin-bottom: 10px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.graph-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.graph-info small {
+  color: #6c757d;
+}
+
+.load-button {
+  padding: 4px 12px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.load-button:hover {
+  background: #357abd;
+}
+
+.save-button {
+  padding: 8px 16px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save-button:hover {
+  background: #218838;
+}
+
+.save-button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.visualization-controls {
+  padding: 10px;
+  border-bottom: 1px solid #dee2e6;
 } 

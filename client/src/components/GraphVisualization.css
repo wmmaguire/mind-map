@@ -29,4 +29,65 @@ svg {
 
 .save-button:hover {
   background-color: #45a049;
-} 
+}
+
+.graph-visualization {
+  width: 100%;
+  height: 100%;
+  background-color: #f8f9fa;
+}
+
+.tooltip {
+  position: absolute;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #f1c40f;
+  border-radius: 6px;
+  pointer-events: none;
+  font-size: 14px;
+  max-width: 250px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.link-group .link-line {
+  transition: all 0.3s ease;
+}
+
+.link-group .link-hover-area {
+  cursor: pointer;
+}
+
+.link-label {
+  font-size: 12px;
+  pointer-events: none;
+  fill: #666;
+}
+
+.node circle {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.node circle:hover {
+  filter: brightness(1.2);
+}
+
+.node circle.selected {
+  filter: drop-shadow(0 0 5px rgba(241, 196, 15, 0.5));
+}
+
+.node text {
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.node.selected text {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.link-line {
+  transition: all 0.3s ease;
+}
