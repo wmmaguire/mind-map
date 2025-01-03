@@ -297,12 +297,29 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
+// Import the router
+import uploadRouter from './routes/upload.js';
+
+// Use the router BEFORE your other routes
+app.use('/api', uploadRouter);
+
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    success: false,
+    error: err.message || 'Internal server error'
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log('=================================');
   console.log(`Server running on port ${PORT}`);
   console.log(`http://localhost:${PORT}`);
+  console.log(`Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`Files endpoint: http://localhost:${PORT}/api/files`);
   console.log('OpenAI configured:', !!openai);
   console.log('CORS enabled');
   console.log('Directories:');

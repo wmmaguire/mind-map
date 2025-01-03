@@ -1,63 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
+import React, { useState } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
-import Library from './components/Library';
+import LibraryVisualize from './components/LibraryVisualize';
+import './App.css';
 
 function App() {
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
-  const [serverError, setServerError] = useState(null);
 
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        const baseUrl = process.env.NODE_ENV === 'production' 
-          ? window.location.origin 
-          : 'http://localhost:5001';
-        
-        const response = await fetch(`${baseUrl}/api/test`);
-        
-        if (!response.ok) {
-          throw new Error('Server response was not ok');
-        }
-        
-        await response.json();
-        setServerError(null);
-      } catch (error) {
-        console.error('Server connection error:', error);
-        setServerError('Could not connect to the server. Is it running?');
-      }
-    };
-
-    checkServer();
-  }, []);
+  const handleUploadComplete = (wasSuccessful) => {
+    setShowUpload(false); // Close the modal
+    if (wasSuccessful) {
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+    }
+  };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>MemeGraph</h1>
-        <div className="description">
-          <h3>
-            Transform content into visual insights and explore new ideas 
-          </h3>
-        </div>
-        {serverError ? (
-          <div className="error-message">{serverError}</div>
-        ) : (
-          <div className="button-group">
-            <button onClick={() => setShowUpload(true)}>Upload File</button>
-            <button onClick={() => setShowLibrary(true)}>View Library</button>
-          </div>
-        )}
-      </header>
+    <div className="app">
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <div className="landing-container">
+              <div className="content">
+                <h1>Talk Graph</h1>
+                <p className="description">
+                  Transform your text into interactive visual networks
+                </p>
+                
+                <div className="features-grid">
+                  <div 
+                    className="feature-card" 
+                    onClick={() => setShowUpload(true)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="feature-icon">📄</div>
+                    <h3>Upload</h3>
+                    <p>Upload your text files and let AI analyze the connections</p>
+                  </div>
+                  
+                  <Link 
+                    to="/visualize" 
+                    className="feature-card"
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="feature-icon">🔍</div>
+                    <h3>Visualize</h3>
+                    <p>See your content transformed into interactive network graphs</p>
+                  </Link>
+                </div>
 
-      {showUpload && (
-        <FileUpload onClose={() => setShowUpload(false)} />
-      )}
+                {showUpload && (
+                  <FileUpload 
+                    onUploadSuccess={handleUploadComplete}
+                    onClose={() => setShowUpload(false)}
+                  />
+                )}
 
-      {showLibrary && (
-        <Library onClose={() => setShowLibrary(false)} />
-      )}
+                {uploadSuccess && (
+                  <div className="success-message">
+                    File uploaded successfully!
+                  </div>
+                )}
+              </div>
+            </div>
+          } 
+        />
+        <Route path="/visualize" element={<LibraryVisualize />} />
+      </Routes>
     </div>
   );
 }

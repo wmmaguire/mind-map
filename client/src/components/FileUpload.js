@@ -93,6 +93,7 @@ function FileUpload({ onClose }) {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+
         >
           {file ? (
             <div className="file-info">
