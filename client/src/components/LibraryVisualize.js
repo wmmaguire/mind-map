@@ -5,11 +5,15 @@ import './LibraryVisualize.css';
 function LibraryVisualize() {
   const [files, setFiles] = useState([]);
   const [savedGraphs, setSavedGraphs] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [graphData, setGraphData] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [currentSource, setCurrentSource] = useState(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [graphName, setGraphName] = useState('');
+  const [graphDescription, setGraphDescription] = useState('');
 
   useEffect(() => {
     fetchFiles();
@@ -57,14 +61,24 @@ function LibraryVisualize() {
     }
   };
 
+  const handleSaveClick = () => {
+    // Generate default name from selected files
+    const defaultName = Array.from(selectedFiles)
+      .map(f => f.customName || f.originalName.replace(/\.[^/.]+$/, '')) // Remove file extension
+      .join(' + ');
+    
+    setGraphName(defaultName);
+    setGraphDescription(`Graph generated from ${selectedFiles.size} source${selectedFiles.size > 1 ? 's' : ''}`);
+    setShowSaveDialog(true);
+  };
+
   const handleSaveGraph = async () => {
-    if (!graphData) return;
+    if (!graphData || !graphName.trim()) return;
 
     try {
       setSaving(true);
       const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
       
-      // Prepare graph data for saving
       const graphToSave = {
         nodes: graphData.nodes,
         links: graphData.links.map(link => ({
@@ -75,9 +89,10 @@ function LibraryVisualize() {
       };
 
       const metadata = {
-        sourceFile: selectedFile?.originalName,
+        name: graphName.trim(),
+        description: graphDescription.trim(),
+        sourceFiles: Array.from(selectedFiles).map(f => f.originalName),
         generatedAt: new Date().toISOString(),
-        description: 'Graph generated from text analysis',
         nodeCount: graphData.nodes.length,
         edgeCount: graphData.links.length
       };
@@ -97,6 +112,9 @@ function LibraryVisualize() {
       
       if (data.success) {
         fetchSavedGraphs();
+        setShowSaveDialog(false);
+        setGraphName('');
+        setGraphDescription('');
       } else {
         throw new Error(data.error);
       }
@@ -115,29 +133,25 @@ function LibraryVisualize() {
       const data = await response.json();
       
       if (data.success) {
-        // Reconstruct the graph data with proper references
         const graphData = data.data.graph;
-        
-        // Create a map of node IDs to node objects
         const nodeMap = new Map();
         graphData.nodes.forEach(node => {
           nodeMap.set(node.id, node);
         });
 
-        // Reconstruct links with proper references
         const reconstructedLinks = graphData.links.map(link => ({
           ...link,
           source: nodeMap.get(typeof link.source === 'object' ? link.source.id : link.source),
           target: nodeMap.get(typeof link.target === 'object' ? link.target.id : link.target)
         }));
 
-        // Set the reconstructed graph data
         setGraphData({
           nodes: graphData.nodes,
           links: reconstructedLinks
         });
         
-        setSelectedFile(null);
+        setSelectedFiles(new Set());
+        setCurrentSource(data.data.metadata);
       } else {
         throw new Error(data.error);
       }
@@ -147,42 +161,101 @@ function LibraryVisualize() {
     }
   };
 
-  const handleAnalyze = async (file) => {
+  const handleFileSelect = (file) => {
+    setSelectedFiles(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(file)) {
+        newSelection.delete(file);
+      } else {
+        newSelection.add(file);
+      }
+      return newSelection;
+    });
+  };
+
+  const handleAnalyzeMultiple = async () => {
+    if (selectedFiles.size === 0) return;
+
     try {
       setAnalyzing(true);
-      setSelectedFile(file);
       setError(null);
-
       const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-      const response = await fetch(`${baseUrl}/api/files/${file.filename}`);
-      const data = await response.json();
 
-      if (data.success && data.content) {
-        // Analyze the content
-        const analysisResponse = await fetch(`${baseUrl}/api/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: data.content })
-        });
+      const fileResults = await Promise.all(
+        Array.from(selectedFiles).map(async (file) => {
+          const response = await fetch(`${baseUrl}/api/files/${file.filename}`);
+          const data = await response.json();
+          
+          if (!data.success) {
+            throw new Error(`Failed to read file: ${file.originalName}`);
+          }
 
-        const analysisData = await analysisResponse.json();
-        if (analysisData.success) {
-          setGraphData(analysisData.data);
-        } else {
-          throw new Error(analysisData.error || 'Analysis failed');
-        }
-      } else {
-        throw new Error(data.error || 'Failed to read file');
-      }
+          const analysisResponse = await fetch(`${baseUrl}/api/analyze`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: data.content })
+          });
+
+          const analysisData = await analysisResponse.json();
+          if (!analysisData.success) {
+            throw new Error(`Analysis failed for: ${file.originalName}`);
+          }
+
+          return {
+            filename: file.originalName,
+            data: analysisData.data
+          };
+        })
+      );
+
+      const combinedGraph = combineGraphs(fileResults.map(r => r.data));
+      setGraphData(combinedGraph);
+
     } catch (error) {
       console.error('Analysis error:', error);
-      setError(`Failed to analyze file: ${error.message}`);
+      setError(`Failed to analyze files: ${error.message}`);
       setGraphData(null);
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const combineGraphs = (graphs) => {
+    const nodeMap = new Map();
+    const links = new Set();
+    
+    graphs.forEach(graph => {
+      graph.nodes.forEach(node => {
+        if (!nodeMap.has(node.id)) {
+          nodeMap.set(node.id, {
+            ...node,
+            sources: new Set([node.source || 'unknown'])
+          });
+        } else {
+          nodeMap.get(node.id).sources.add(node.source || 'unknown');
+        }
+      });
+
+      graph.links.forEach(link => {
+        links.add(JSON.stringify({
+          ...link,
+          sources: [link.source || 'unknown']
+        }));
+      });
+    });
+
+    const nodes = Array.from(nodeMap.values()).map(node => ({
+      ...node,
+      sources: Array.from(node.sources),
+      size: 20 + (node.sources.length * 5),
+      color: node.sources.length > 1 ? '#e74c3c' : '#69b3a2'
+    }));
+
+    const combinedLinks = Array.from(links).map(link => JSON.parse(link));
+
+    return { nodes, links: combinedLinks };
   };
 
   return (
@@ -199,29 +272,39 @@ function LibraryVisualize() {
         )}
         <div className="file-list">
           {files.length === 0 ? (
-            <p className="no-files">
-              {error ? 'Failed to load files' : 'No files available'}
-            </p>
+            <p className="no-files">No files available</p>
           ) : (
-            <ul>
-              {files.map((file, index) => (
-                <li 
-                  key={file.id || index}
-                  className={`file-item ${selectedFile === file ? 'selected' : ''}`}
+            <>
+              <div className="file-list-header">
+                <span>Selected: {selectedFiles.size} files</span>
+                <button
+                  className="analyze-button"
+                  onClick={handleAnalyzeMultiple}
+                  disabled={analyzing || selectedFiles.size === 0}
                 >
-                  <span className="file-name">
-                    {file.customName || file.originalName}
-                  </span>
-                  <button
-                    className="analyze-button"
-                    onClick={() => handleAnalyze(file)}
-                    disabled={analyzing && selectedFile === file}
+                  {analyzing ? 'Analyzing...' : 'Analyze Selected'}
+                </button>
+              </div>
+              <ul>
+                {files.map((file, index) => (
+                  <li 
+                    key={file.id || index}
+                    className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
                   >
-                    {analyzing && selectedFile === file ? 'Analyzing...' : 'Visualize'}
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <label className="file-label">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.has(file)}
+                        onChange={() => handleFileSelect(file)}
+                      />
+                      <span className="file-name">
+                        {file.customName || file.originalName}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
         
@@ -252,18 +335,18 @@ function LibraryVisualize() {
         {graphData && (
           <div className="visualization-controls">
             <button 
-              onClick={handleSaveGraph}
+              onClick={handleSaveClick}
               disabled={saving || !graphData}
               className="save-button"
             >
-              {saving ? 'Saving...' : 'Save Graph'}
+              Save Graph
             </button>
           </div>
         )}
         {graphData ? (
           <>
             <div className="visualization-header">
-              <h3>Visualization: {selectedFile?.customName || selectedFile?.originalName}</h3>
+              <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
             </div>
             <div className="graph-container">
               <GraphVisualization data={graphData} />
@@ -275,6 +358,102 @@ function LibraryVisualize() {
           </div>
         )}
       </div>
+
+      {/* Enhanced Save Dialog */}
+      {showSaveDialog && (
+        <div className="modal-overlay" onClick={() => !saving && setShowSaveDialog(false)}>
+          <div className="save-dialog" onClick={e => e.stopPropagation()}>
+            <div className="save-dialog-header">
+              <h3>Save Graph</h3>
+              {!saving && (
+                <button 
+                  className="close-button" 
+                  onClick={() => setShowSaveDialog(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="save-dialog-content">
+              <div className="form-group">
+                <label htmlFor="graphName">
+                  Graph Name <span className="required">*</span>
+                </label>
+                <input
+                  id="graphName"
+                  type="text"
+                  value={graphName}
+                  onChange={(e) => setGraphName(e.target.value)}
+                  placeholder="Enter a name for your graph"
+                  disabled={saving}
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="graphDescription">Description</label>
+                <textarea
+                  id="graphDescription"
+                  value={graphDescription}
+                  onChange={(e) => setGraphDescription(e.target.value)}
+                  placeholder="Add a description to help identify this graph later"
+                  rows="3"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="graph-metadata">
+                <h4>Graph Details</h4>
+                <div className="metadata-grid">
+                  <div className="metadata-item">
+                    <span className="metadata-label">Nodes</span>
+                    <span className="metadata-value">{graphData?.nodes.length || 0}</span>
+                  </div>
+                  <div className="metadata-item">
+                    <span className="metadata-label">Edges</span>
+                    <span className="metadata-value">{graphData?.links.length || 0}</span>
+                  </div>
+                  <div className="metadata-item">
+                    <span className="metadata-label">Sources</span>
+                    <span className="metadata-value">{selectedFiles.size}</span>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="dialog-error">
+                  <span className="error-icon">⚠️</span>
+                  {error}
+                </div>
+              )}
+            </div>
+
+            <div className="save-dialog-footer">
+              <button 
+                onClick={() => setShowSaveDialog(false)}
+                className="cancel-button"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveGraph}
+                className={`save-button ${saving ? 'loading' : ''}`}
+                disabled={saving || !graphName.trim()}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner"></span>
+                    Saving...
+                  </>
+                ) : 'Save Graph'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
