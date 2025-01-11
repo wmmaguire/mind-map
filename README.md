@@ -1,6 +1,6 @@
-# MemeGraph
+# MindMap 
 
-A full-stack web application that transcribes or audio and text files into memegraphs for introspective and exploratory purposes.
+A full-stack web application that transcribes or audio and text files into mindmaps for introspective and exploratory purposes.
 
 ## Tech Stack
 
@@ -10,7 +10,7 @@ A full-stack web application that transcribes or audio and text files into memeg
 
 ## Project Structure
 ```
-talk-graph/
+mind-map/
 ├── client/
 │   ├── public/
 │   ├── src/
@@ -37,7 +37,7 @@ talk-graph/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/wmmaguire/talk-graph.git
+git clone https://github.com/wmmaguire/mind-map.git
 cd talk-graph
 ```
 

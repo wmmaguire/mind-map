@@ -24,9 +24,9 @@ function App() {
           element={
             <div className="landing-container">
               <div className="content">
-                <h1>Talk Graph</h1>
+                <h1>MindMap</h1>
                 <p className="description">
-                  Transform your text into interactive visual networks
+                  Transform your ideas into interactive visual networks
                 </p>
                 
                 <div className="features-grid">
