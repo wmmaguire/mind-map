@@ -477,28 +477,53 @@ app.listen(PORT, () => {
   console.log('=================================');
 });
 
-// MongoDB connection with SSL/TLS options
+// MongoDB connection with environment-specific options
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mind-map';
-    console.log('Attempting to connect to MongoDB...');
-    
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      ssl: true,
-      tls: true,
-      tlsAllowInvalidCertificates: false,
-      tlsAllowInvalidHostnames: false,
-      retryWrites: true,
-      w: 'majority'
+    console.log('Attempting to connect to MongoDB...', {
+      environment: process.env.NODE_ENV,
+      uri: mongoURI
     });
     
+    // Base options that work for both environments
+    const baseOptions = {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    };
+
+    // Environment-specific options
+    const options = process.env.NODE_ENV === 'production'
+      ? {
+          ...baseOptions,
+          ssl: true,
+          tls: true,
+          retryWrites: true,
+          w: 'majority'
+        }
+      : {
+          ...baseOptions,
+          ssl: false,
+          tls: false
+        };
+
+    console.log('MongoDB connection options:', options);
+    
+    await mongoose.connect(mongoURI, options);
     console.log('MongoDB Connected Successfully');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('MongoDB connection error:', {
+      name: err.name,
+      message: err.message,
+      code: err.code
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Make sure MongoDB is running locally:');
+      console.log('1. Start MongoDB: brew services start mongodb-community');
+      console.log('2. Check status: brew services list');
+    }
+    
     // Retry connection
     console.log('Retrying connection in 5 seconds...');
     setTimeout(connectDB, 5000);
@@ -508,12 +533,25 @@ const connectDB = async () => {
 // Initial connection
 connectDB();
 
-// Handle connection errors
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to MongoDB');
+});
+
 mongoose.connection.on('error', err => {
-  console.error('MongoDB connection error:', err);
+  console.error('Mongoose connection error:', err);
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected. Attempting to reconnect...');
-  connectDB();
+  console.log('Mongoose disconnected from MongoDB');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Attempting to reconnect...');
+    setTimeout(connectDB, 5000);
+  }
+});
+
+// Clean up connection on app termination
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  process.exit(0);
 });
