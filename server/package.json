@@ -29,5 +29,8 @@
     "nodemon": "^3.1.9"
   },
   "proxy": "http://localhost:5000",
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }
