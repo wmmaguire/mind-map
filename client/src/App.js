@@ -10,7 +10,7 @@ function App() {
   const [showUpload, setShowUpload] = useState(false);
 
   const handleUploadComplete = (wasSuccessful) => {
-    setShowUpload(false); // Close the modal
+    setShowUpload(false);
     if (wasSuccessful) {
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
@@ -19,9 +19,6 @@ function App() {
 
   return (
     <div className="App">
-      <div className="landing-container">
-        <Landing />
-      </div>
       <Routes>
         <Route 
           path="/" 
@@ -70,10 +67,19 @@ function App() {
                   </div>
                 )}
               </div>
+              <Landing />
             </div>
           } 
         />
-        <Route path="/visualize" element={<LibraryVisualize />} />
+        <Route 
+          path="/visualize" 
+          element={
+            <div>
+              <LibraryVisualize />
+              <Landing />
+            </div>
+          } 
+        />
       </Routes>
     </div>
   );

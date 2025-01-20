@@ -1,18 +1,25 @@
-.app {
+.App {
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  flex-direction: column;
 }
 
 .landing-container {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   min-height: 100vh;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
 }
 
 .content {
   text-align: center;
+  margin-bottom: 2rem;
   background: white;
   padding: 3rem;
   border-radius: 15px;
@@ -27,11 +34,10 @@ h1 {
   font-size: 2.5rem;
   animation: fadeIn 0.8s ease-out;
 }
-
+  
 .description {
-  color: #666;
-  margin-bottom: 2rem;
-  font-size: 1.2rem;
+    color: #666;
+    font-size: 1.2rem;
   line-height: 1.6;
   animation: fadeIn 0.8s ease-out 0.2s backwards;
 }
@@ -58,18 +64,28 @@ h1 {
 
 .feature-card:hover,
 .feature-card:focus {
-  transform: translateY(-5px);
+   transform: translateY(-5px);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.feature-card:focus {
-  outline: 2px solid #3498db;
-  outline-offset: 2px;
 }
 
 .feature-icon {
   font-size: 2rem;
   margin-bottom: 1rem;
+}
+
+h1 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  font-size: 2.5rem;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.description {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  animation: fadeIn 0.8s ease-out 0.2s backwards;
 }
 
 .feature-card h3 {
