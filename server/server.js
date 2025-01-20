@@ -456,17 +456,23 @@ app.listen(PORT, () => {
   console.log('=================================');
 });
 
-// MongoDB connection with better error handling and options
+// MongoDB connection with SSL/TLS options
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mind-map';
-    console.log('Attempting to connect to MongoDB at:', mongoURI);
+    console.log('Attempting to connect to MongoDB...');
     
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-      socketTimeoutMS: 45000, // Close sockets after 45s
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      ssl: true,
+      tls: true,
+      tlsAllowInvalidCertificates: false,
+      tlsAllowInvalidHostnames: false,
+      retryWrites: true,
+      w: 'majority'
     });
     
     console.log('MongoDB Connected Successfully');
