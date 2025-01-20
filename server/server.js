@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import Feedback from './models/feedback.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,7 +39,12 @@ const metadataDir = path.join(baseDir, 'metadata');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://mind-map.onrender.com'  // Update this to your frontend URL
+    : 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // Ensure directories exist
@@ -235,6 +242,94 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
+// Add feedback endpoint
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const { rating, feedback } = req.body;
+    
+    // Validate input
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid rating'
+      });
+    }
+
+    // Create new feedback document
+    const newFeedback = new Feedback({
+      rating,
+      feedback
+    });
+
+    // Save to database
+    await newFeedback.save();
+
+    console.log('Feedback saved to database:', newFeedback);
+
+    res.json({ 
+      success: true,
+      message: 'Feedback saved successfully'
+    });
+  } catch (error) {
+    console.error('Error saving feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save feedback'
+    });
+  }
+});
+
+// Optional: Add endpoint to retrieve feedback
+app.get('/api/feedback', async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find().sort({ timestamp: -1 });
+    res.json({ 
+      success: true, 
+      feedbacks 
+    });
+  } catch (error) {
+    console.error('Error fetching feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch feedback'
+    });
+  }
+});
+
+// Add this route to view feedback
+app.get('/api/feedback/view', async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find().sort({ timestamp: -1 });
+    // Send as formatted HTML for better browser viewing
+    res.send(`
+      <html>
+        <head>
+          <title>Feedback Results</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .feedback { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
+            .rating { font-weight: bold; }
+            .timestamp { color: #666; }
+          </style>
+        </head>
+        <body>
+          <h1>Feedback Results</h1>
+          ${feedbacks.map(f => `
+            <div class="feedback">
+              <div class="rating">Rating: ${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</div>
+              <div>Feedback: ${f.feedback || 'No comment provided'}</div>
+              <div class="timestamp">Submitted: ${new Date(f.timestamp).toLocaleString()}</div>
+            </div>
+          `).join('')}
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error fetching feedback:', error);
+    res.status(500).send('Error fetching feedback');
+  }
+});
+
 // Import the router
 import uploadRouter from './routes/upload.js';
 
@@ -359,4 +454,39 @@ app.listen(PORT, () => {
   console.log(`- Uploads: ${uploadsDir}`);
   console.log(`- Metadata: ${metadataDir}`);
   console.log('=================================');
+});
+
+// MongoDB connection with better error handling and options
+const connectDB = async () => {
+  try {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mind-map';
+    console.log('Attempting to connect to MongoDB at:', mongoURI);
+    
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s
+    });
+    
+    console.log('MongoDB Connected Successfully');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    // Retry connection
+    console.log('Retrying connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
+  }
+};
+
+// Initial connection
+connectDB();
+
+// Handle connection errors
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected. Attempting to reconnect...');
+  connectDB();
 });

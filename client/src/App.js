@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
+import Landing from './components/Landing';
 import './App.css';
 
 function App() {
@@ -17,7 +18,10 @@ function App() {
   };
 
   return (
-    <div className="app">
+    <div className="App">
+      <div className="landing-container">
+        <Landing />
+      </div>
       <Routes>
         <Route 
           path="/" 
