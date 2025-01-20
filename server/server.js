@@ -38,14 +38,14 @@ const metadataDir = path.join(baseDir, 'metadata');
 // Create Express app
 const app = express();
 
-// Define allowed origins
+// Define allowed origins with exact production URL
 const allowedOrigins = [
-  'https://talk-graph.onrender.com',    // Production frontend
-  'https://mind-map.onrender.com',      // Alternative production URL
-  'http://localhost:3000'               // Local development
+  'https://talk-graph.onrender.com',
+  'https://mind-map.onrender.com',
+  'http://localhost:3000'
 ];
 
-// Update CORS configuration
+// Update CORS configuration with more specific options
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -60,10 +60,11 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
-// Add CORS headers for preflight requests
+// Add explicit OPTIONS handling for preflight requests
 app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' }));
@@ -264,7 +265,12 @@ app.get('/api/files/:filename', async (req, res) => {
 });
 
 // Add feedback endpoint
-app.post('/api/feedback', async (req, res) => {
+app.post('/api/feedback', cors(), async (req, res) => {
+  res.header('Access-Control-Allow-Origin', allowedOrigins);
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', true);
+
   try {
     const { rating, feedback } = req.body;
     
