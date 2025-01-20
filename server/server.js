@@ -483,52 +483,47 @@ app.listen(PORT, () => {
   console.log('=================================');
 });
 
-// MongoDB connection with updated SSL options
+// MongoDB connection with auth error handling
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mind-map';
-    console.log('Attempting to connect to MongoDB...');
+    const mongoURI = process.env.MONGODB_URI;
     
-    // Different options for production and development
-    const options = process.env.NODE_ENV === 'production' 
-      ? {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000,
-          socketTimeoutMS: 45000,
-          ssl: true,
-          tls: true,
-          tlsAllowInvalidCertificates: false,
-          tlsAllowInvalidHostnames: false,
-          retryWrites: true,
-          w: 'majority',
-          serverApi: {
-            version: '1',
-            strict: true,
-            deprecationErrors: true
-          }
-        }
-      : {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000,
-          socketTimeoutMS: 45000
-        };
+    if (!mongoURI) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
 
+    console.log('Attempting to connect to MongoDB...');
     console.log('Environment:', process.env.NODE_ENV);
-    console.log('MongoDB connection options:', options);
     
+    const options = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      // Production specific options
+      ...(process.env.NODE_ENV === 'production' && {
+        ssl: true,
+        tls: true,
+        retryWrites: true,
+        w: 'majority'
+      })
+    };
+
     await mongoose.connect(mongoURI, options);
     console.log('MongoDB Connected Successfully');
   } catch (err) {
     console.error('MongoDB connection error:', {
       name: err.name,
       message: err.message,
-      code: err.code,
-      stack: err.stack
+      code: err.code
     });
+
+    if (err.message.includes('bad auth')) {
+      console.error('Authentication failed. Please check your MongoDB credentials.');
+      console.error('Make sure your MONGODB_URI environment variable is correctly set.');
+    }
     
-    // Retry connection
+    // Retry connection after delay
     console.log('Retrying connection in 5 seconds...');
     setTimeout(connectDB, 5000);
   }
@@ -537,25 +532,25 @@ const connectDB = async () => {
 // Initial connection
 connectDB();
 
-// Handle connection events with better error reporting
+// Connection event handlers
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to MongoDB');
+});
+
 mongoose.connection.on('error', err => {
   console.error('Mongoose connection error:', {
     name: err.name,
     message: err.message,
-    stack: err.stack
+    code: err.code
   });
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected');
+  console.log('Mongoose disconnected from MongoDB');
   if (process.env.NODE_ENV === 'production') {
     console.log('Attempting to reconnect...');
     setTimeout(connectDB, 5000);
   }
-});
-
-mongoose.connection.on('connected', () => {
-  console.log('MongoDB connected successfully');
 });
 
 // Clean up on app termination
