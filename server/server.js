@@ -38,15 +38,14 @@ const metadataDir = path.join(baseDir, 'metadata');
 // Create Express app
 const app = express();
 
-// Define allowed origins with exact production URL
+// Define allowed origins
 const allowedOrigins = [
   'https://talk-graph.onrender.com',
-  'https://mind-map.onrender.com',
   'http://localhost:3000'
 ];
 
-// Update CORS configuration with more specific options
-app.use(cors({
+// Configure CORS options
+const corsOptions = {
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -57,15 +56,17 @@ app.use(cors({
     }
     return callback(null, true);
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200,
-  preflightContinue: false
-}));
+  optionsSuccessStatus: 200
+};
 
-// Add explicit OPTIONS handling for preflight requests
-app.options('*', cors());
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -264,17 +265,12 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
-// Add feedback endpoint
-app.post('/api/feedback', cors(), async (req, res) => {
-  res.header('Access-Control-Allow-Origin', allowedOrigins);
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', true);
-
+// Feedback endpoint with explicit CORS handling
+app.post('/api/feedback', cors(corsOptions), async (req, res) => {
   try {
     const { rating, feedback } = req.body;
-    
-    // Validate input
+    console.log('Received feedback request:', { rating, feedback });
+
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
@@ -282,18 +278,15 @@ app.post('/api/feedback', cors(), async (req, res) => {
       });
     }
 
-    // Create new feedback document
     const newFeedback = new Feedback({
       rating,
       feedback
     });
 
-    // Save to database
     await newFeedback.save();
+    console.log('Feedback saved successfully:', newFeedback);
 
-    console.log('Feedback saved to database:', newFeedback);
-
-    res.json({ 
+    res.json({
       success: true,
       message: 'Feedback saved successfully'
     });

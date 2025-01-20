@@ -14,7 +14,7 @@ function Landing() {
       return 'http://localhost:5001/api';
     }
     // In production, use the full domain with /api
-    return 'https://mind-map-server.onrender.com/api';
+    return 'https://talk-graph.onrender.com/api';
   };
 
   const handleFeedbackSubmit = async (e) => {
