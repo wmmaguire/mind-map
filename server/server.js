@@ -483,7 +483,7 @@ app.listen(PORT, () => {
   console.log('=================================');
 });
 
-// MongoDB connection with auth error handling
+// MongoDB connection with simplified options
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
@@ -495,19 +495,24 @@ const connectDB = async () => {
     console.log('Attempting to connect to MongoDB...');
     console.log('Environment:', process.env.NODE_ENV);
     
+    // Simplified options without deprecated flags
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       // Production specific options
       ...(process.env.NODE_ENV === 'production' && {
-        ssl: true,
-        tls: true,
         retryWrites: true,
         w: 'majority'
       })
     };
+
+    // Log connection attempt details (without sensitive info)
+    console.log('Connection details:', {
+      environment: process.env.NODE_ENV,
+      options,
+      uriPrefix: mongoURI.split('@')[0].split(':')[0], // Log only the protocol part
+      database: mongoURI.split('/').pop().split('?')[0] // Log only the database name
+    });
 
     await mongoose.connect(mongoURI, options);
     console.log('MongoDB Connected Successfully');
@@ -515,12 +520,16 @@ const connectDB = async () => {
     console.error('MongoDB connection error:', {
       name: err.name,
       message: err.message,
-      code: err.code
+      code: err.code,
+      details: err.toString()
     });
 
     if (err.message.includes('bad auth')) {
-      console.error('Authentication failed. Please check your MongoDB credentials.');
-      console.error('Make sure your MONGODB_URI environment variable is correctly set.');
+      console.error('Authentication failed - Please verify:');
+      console.error('1. Username and password are correct');
+      console.error('2. User has correct database permissions');
+      console.error('3. Database name is correct');
+      console.error('4. Connection string format is correct');
     }
     
     // Retry connection after delay
