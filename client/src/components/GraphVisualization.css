@@ -39,14 +39,24 @@ svg {
 
 .tooltip {
   position: absolute;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #f1c40f;
-  border-radius: 6px;
-  pointer-events: none;
+  padding: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  pointer-events: auto;
   font-size: 14px;
-  max-width: 250px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  max-width: 300px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tooltip a {
+  color: #4a90e2;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tooltip a:hover {
+  color: #357abd;
 }
 
 .link-group .link-line {

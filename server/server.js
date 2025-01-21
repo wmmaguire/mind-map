@@ -416,19 +416,27 @@ app.post('/api/analyze', async (req, res) => {
          - id: unique identifier
          - label: name of the concept
          - description: brief explanation
+         - wikiUrl: URL of the Wikipedia page for the concept
       2. links: An array of objects representing relationships between nodes with properties:
          - source: id of the source node
          - target: id of the target node
          - relationship: description of how these concepts are related
+      
+      Rules for generating the graph:
+      1. Every node MUST have a wikiUrl
+      2. All wikiUrl values must be valid Wikipedia URLs
+      3. The wikiUrl should be as relevant as possible to the concept
+      4. The graph should be fully connected
+      5. The graph should be as accurate as possible, based on the content provided
+
+      Please ensure the response is valid JSON and includes at least 5-10 key concepts and their relationships.
 
       Content to analyze:
       ${content}
-
-      Please ensure the response is valid JSON and includes at least 5-10 key concepts and their relationships.
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4",
       messages: [
         {
           role: "system",

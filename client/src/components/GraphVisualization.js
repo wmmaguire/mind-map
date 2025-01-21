@@ -176,15 +176,30 @@ function GraphVisualization({ data }) {
         selectedNodeId = d.id;
         updateHighlighting();
         
-        // Show tooltip
+        // Show tooltip with Wikipedia link if available
         tooltip.transition()
           .duration(200)
           .style('opacity', 0.9);
         
-        tooltip.html(`
+        let tooltipContent = `
           <strong>${d.label}</strong><br/>
-          ${d.description || 'No description available'}
-        `)
+          ${d.description || 'No description available'}<br/>
+        `;
+
+        // Add Wikipedia link if available
+        if (d.wikiUrl) {
+          tooltipContent += `
+            <br/>
+            <a href="${d.wikiUrl}" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               style="color: #4a90e2; text-decoration: underline;">
+              Learn more on Wikipedia →
+            </a>
+          `;
+        }
+        
+        tooltip.html(tooltipContent)
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px');
       }
