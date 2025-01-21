@@ -398,7 +398,7 @@ app.post('/api/analyze', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
 
   try {
-    const { content } = req.body;
+    const { content, context } = req.body;
 
     if (!content) {
       return res.json({
@@ -409,6 +409,9 @@ app.post('/api/analyze', async (req, res) => {
 
     console.log('Analyzing content length:', content.length);
     console.log('Content preview:', content.substring(0, 100));
+    if (context) {
+      console.log('Additional context provided:', context);
+    }
 
     const prompt = `
       Analyze the following content and return a JSON object containing:
@@ -428,11 +431,15 @@ app.post('/api/analyze', async (req, res) => {
       3. The wikiUrl should be as relevant as possible to the concept
       4. The graph should be fully connected
       5. The graph should be as accurate as possible, based on the content provided
+      6. All Additional Context MUST be applied to the content during analysis
+
 
       Please ensure the response is valid JSON and includes at least 5-10 key concepts and their relationships.
 
       Content to analyze:
       ${content}
+
+      ${context ? `Additional Context:\n${context}\n` : ''}
     `;
 
     const completion = await openai.chat.completions.create({

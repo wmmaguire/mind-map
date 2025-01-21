@@ -14,6 +14,8 @@ function LibraryVisualize() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [graphName, setGraphName] = useState('');
   const [graphDescription, setGraphDescription] = useState('');
+  const [showContextModal, setShowContextModal] = useState(false);
+  const [additionalContext, setAdditionalContext] = useState('');
 
   useEffect(() => {
     fetchFiles();
@@ -200,7 +202,7 @@ function LibraryVisualize() {
     });
   };
 
-  const handleAnalyzeMultiple = async () => {
+  const handleAnalyzeMultiple = async (context = '') => {
     if (selectedFiles.size === 0) return;
 
     try {
@@ -219,7 +221,10 @@ function LibraryVisualize() {
             console.log('Analyzing file:', file.originalName);
             const analysisData = await handleApiRequest('/api/analyze', {
               method: 'POST',
-              body: JSON.stringify({ content: fileData.content })
+              body: JSON.stringify({ 
+                content: fileData.content,
+                context: context
+              })
             });
 
             if (!analysisData.success || !analysisData.data) {
@@ -246,6 +251,8 @@ function LibraryVisualize() {
       setGraphData(null);
     } finally {
       setAnalyzing(false);
+      setShowContextModal(false);
+      setAdditionalContext('');
     }
   };
 
@@ -285,6 +292,11 @@ function LibraryVisualize() {
     return { nodes, links: combinedLinks };
   };
 
+  const handleAnalyzeClick = () => {
+    if (selectedFiles.size === 0) return;
+    setShowContextModal(true);
+  };
+
   return (
     <div className="library-visualize">
       <div className="sidebar">
@@ -306,7 +318,7 @@ function LibraryVisualize() {
                 <span>Selected: {selectedFiles.size} files</span>
                 <button
                   className="analyze-button"
-                  onClick={handleAnalyzeMultiple}
+                  onClick={handleAnalyzeClick}
                   disabled={analyzing || selectedFiles.size === 0}
                 >
                   {analyzing ? 'Analyzing...' : 'Analyze Selected'}
@@ -474,6 +486,73 @@ function LibraryVisualize() {
                       Saving...
                     </>
                   ) : 'Save Graph'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showContextModal && (
+        <div className="modal-overlay" onClick={() => !analyzing && setShowContextModal(false)}>
+          <div className="save-dialog" onClick={e => e.stopPropagation()}>
+            <div className="save-dialog-header">
+              <h3>Add Analysis Context</h3>
+              {!analyzing && (
+                <button 
+                  className="close-button" 
+                  onClick={() => setShowContextModal(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="save-dialog-content">
+              <div className="form-group">
+                <label htmlFor="analysisContext">Additional Context (Optional)</label>
+                <textarea
+                  id="analysisContext"
+                  value={additionalContext}
+                  onChange={(e) => setAdditionalContext(e.target.value)}
+                  placeholder="Enter any additional context to guide the analysis..."
+                  rows="4"
+                  disabled={analyzing}
+                />
+              </div>
+
+              <div className="graph-metadata">
+                <h4>Analysis Details</h4>
+                <div className="metadata-grid">
+                  <div className="metadata-item">
+                    <span className="metadata-label">Files Selected</span>
+                    <span className="metadata-value">{selectedFiles.size}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="save-dialog-footer">
+              <div className="dialog-buttons">
+                <button 
+                  onClick={() => handleAnalyzeMultiple()}
+                  className="cancel-button"
+                  disabled={analyzing}
+                >
+                  Skip Context
+                </button>
+                <button
+                  onClick={() => handleAnalyzeMultiple(additionalContext)}
+                  className={`save-button ${analyzing ? 'loading' : ''}`}
+                  disabled={analyzing}
+                >
+                  {analyzing ? (
+                    <>
+                      <span className="spinner"></span>
+                      Analyzing...
+                    </>
+                  ) : 'Analyze with Context'}
                 </button>
               </div>
             </div>
