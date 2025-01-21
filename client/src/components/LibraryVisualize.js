@@ -335,41 +335,41 @@ function LibraryVisualize() {
           )}
         </div>
         
-        <h3>Saved Graphs</h3>
-        <div className="saved-graphs">
-          {savedGraphs.map((graph, index) => (
-            <div key={index} className="saved-graph-item">
-              <div className="graph-info">
-                <strong>{graph.metadata.sourceFile || 'Unnamed Graph'}</strong>
-                <small>
-                  Nodes: {graph.metadata.nodeCount} | 
-                  Edges: {graph.metadata.edgeCount}
-                </small>
-                <small>Saved: {new Date(graph.metadata.savedAt).toLocaleDateString()}</small>
+        <div className="saved-graphs-section">
+          <h2>Saved Graphs</h2>
+          {graphData && (
+            <button 
+              onClick={handleSaveClick}
+              disabled={saving}
+              className="save-current-button"
+            >
+              {saving ? 'Saving...' : 'Save Current Graph'}
+            </button>
+          )}
+          <div className="saved-graphs">
+            {savedGraphs.map((graph, index) => (
+              <div key={index} className="saved-graph-item">
+                <div className="graph-info">
+                  <strong>{graph.metadata.sourceFile || 'Unnamed Graph'}</strong>
+                  <small>
+                    Nodes: {graph.metadata.nodeCount} | 
+                    Edges: {graph.metadata.edgeCount}
+                  </small>
+                  <small>Saved: {new Date(graph.metadata.savedAt).toLocaleDateString()}</small>
+                </div>
+                <button 
+                  onClick={() => handleLoadGraph(graph.filename)}
+                  className="load-button"
+                >
+                  Load
+                </button>
               </div>
-              <button 
-                onClick={() => handleLoadGraph(graph.filename)}
-                className="load-button"
-              >
-                Load
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="visualization-panel">
-        {graphData && (
-          <div className="visualization-controls">
-            <button 
-              onClick={handleSaveClick}
-              disabled={saving || !graphData}
-              className="save-button"
-            >
-              Save Graph
-            </button>
-          </div>
-        )}
         {graphData ? (
           <>
             <div className="visualization-header">
@@ -404,9 +404,7 @@ function LibraryVisualize() {
 
             <div className="save-dialog-content">
               <div className="form-group">
-                <label htmlFor="graphName">
-                  Graph Name <span className="required">*</span>
-                </label>
+                <label htmlFor="graphName">Graph Name <span className="required">*</span></label>
                 <input
                   id="graphName"
                   type="text"
@@ -457,25 +455,27 @@ function LibraryVisualize() {
             </div>
 
             <div className="save-dialog-footer">
-              <button 
-                onClick={() => setShowSaveDialog(false)}
-                className="cancel-button"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveGraph}
-                className={`save-button ${saving ? 'loading' : ''}`}
-                disabled={saving || !graphName.trim()}
-              >
-                {saving ? (
-                  <>
-                    <span className="spinner"></span>
-                    Saving...
-                  </>
-                ) : 'Save Graph'}
-              </button>
+              <div className="dialog-buttons">
+                <button 
+                  onClick={() => setShowSaveDialog(false)}
+                  className="cancel-button"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveGraph}
+                  className={`save-button ${saving ? 'loading' : ''}`}
+                  disabled={saving || !graphName.trim()}
+                >
+                  {saving ? (
+                    <>
+                      <span className="spinner"></span>
+                      Saving...
+                    </>
+                  ) : 'Save Graph'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
