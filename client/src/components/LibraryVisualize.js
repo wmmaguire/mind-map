@@ -297,6 +297,54 @@ function LibraryVisualize() {
     setShowContextModal(true);
   };
 
+  const handleGraphDataUpdate = (newData) => {
+    console.log('Updating graph data in LibraryVisualize:', newData);
+    
+    // Create a map of all nodes for reference
+    const nodeMap = new Map();
+    newData.nodes.forEach(node => {
+      nodeMap.set(node.id, node);
+    });
+
+    // Process links to ensure they reference actual node objects
+    const processedLinks = newData.links.map(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      
+      const sourceNode = nodeMap.get(sourceId);
+      const targetNode = nodeMap.get(targetId);
+      
+      if (!sourceNode || !targetNode) {
+        console.error('Missing node reference:', { sourceId, targetId, link });
+        return null;
+      }
+
+      return {
+        ...link,
+        source: sourceNode,
+        target: targetNode,
+        relationship: link.relationship
+      };
+    }).filter(link => link !== null);
+
+    // Update graph data with processed links
+    const processedData = {
+      nodes: newData.nodes,
+      links: processedLinks
+    };
+
+    console.log('Processed graph data:', processedData);
+    setGraphData(processedData);
+    
+    // Update metadata
+    setCurrentSource(prev => ({
+      ...prev,
+      nodeCount: processedData.nodes.length,
+      edgeCount: processedData.links.length,
+      lastModified: new Date().toISOString()
+    }));
+  };
+
   return (
     <div className="library-visualize">
       <div className="sidebar">
@@ -362,7 +410,7 @@ function LibraryVisualize() {
             {savedGraphs.map((graph, index) => (
               <div key={index} className="saved-graph-item">
                 <div className="graph-info">
-                  <strong>{graph.metadata.sourceFile || 'Unnamed Graph'}</strong>
+                  <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
                   <small>
                     Nodes: {graph.metadata.nodeCount} | 
                     Edges: {graph.metadata.edgeCount}
@@ -388,7 +436,10 @@ function LibraryVisualize() {
               <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
             </div>
             <div className="graph-container">
-              <GraphVisualization data={graphData} />
+              <GraphVisualization 
+                data={graphData} 
+                onDataUpdate={handleGraphDataUpdate}
+              />
             </div>
           </>
         ) : (

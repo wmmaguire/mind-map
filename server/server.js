@@ -475,6 +475,190 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+// Add after other API endpoints
+app.post('/api/extend-node', async (req, res) => {
+  try {
+    const { selectedNodes } = req.body;
+    const numNodesToGenerate = req.body.numNodes || 3;
+    const timestamp = Date.now(); // Get current timestamp
+
+    console.log('Number nodes to add:', numNodesToGenerate);
+    console.log('Selected nodes for extension:', selectedNodes.map(n => `${n.label} (${n.id})`));
+    console.log('Using timestamp prefix:', timestamp);
+
+    const prompt = `
+      Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to these existing nodes:
+      ${selectedNodes.map(node => `- ${node.label}: ${node.description || 'No description available'}`).join('\n')}
+
+      Each new concept should:
+      1. Be a real, well-defined concept or topic
+      2. Have a clear, meaningful relationship to each existing node
+      3. Include a relevant Wikipedia URL
+      4. Have a concise but informative description
+
+      Response must be a valid JSON object with this structure:
+      {
+        "nodes": [
+          {
+            "id": "${timestamp}_1",
+            "label": "<meaningful concept name>",
+            "description": "<clear, informative description>",
+            "wikiUrl": "<actual Wikipedia URL>"
+          }
+          // Additional nodes use ${timestamp}_2, ${timestamp}_3, etc.
+        ],
+        "links": [
+          // Each new node must connect to all selected nodes
+          {
+            "source": "${timestamp}_1",
+            "target": "<existing node id>",
+            "relationship": "<specific, meaningful relationship>"
+          }
+          // Additional links for all connections
+        ]
+      }
+
+      IMPORTANT:
+      - Generate real, meaningful concepts (not placeholders)
+      - Create specific, logical relationships between nodes
+      - Ensure all Wikipedia URLs are valid and relevant
+      - Each new node must connect to all selected nodes
+      - Use "${timestamp}_1", "${timestamp}_2", etc. for node IDs
+      - Use exact IDs for existing nodes: ${selectedNodes.map(n => `"${n.id}"`).join(', ')}
+
+      Return ONLY the JSON object.
+    `;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: `You are a knowledgeable AI tasked with expanding a knowledge graph. Follow these rules exactly:
+
+          1. Generate valid JSON only
+          2. Use the exact node IDs provided
+          3. Create all required connections
+          4. Follow the format exactly as shown
+          5. No extra text or explanations`
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.2, // Even lower temperature for more consistent output
+      max_tokens: 2000
+    });
+
+    let newData;
+    try {
+      newData = JSON.parse(completion.choices[0].message.content);
+      console.log('Generated data:', JSON.stringify(newData, null, 2));
+    } catch (error) {
+      console.error('Failed to parse GPT response:', error);
+      console.log('Raw response:', completion.choices[0].message.content);
+      return res.json({
+        success: false,
+        error: 'Invalid JSON response from GPT',
+        details: error.message
+      });
+    }
+
+    // Validate node IDs and convert them to strings for consistent comparison
+    const newNodeIds = new Set(newData.nodes.map(node => node.id));
+    const selectedNodeIds = new Set(selectedNodes.map(node => String(node.id))); // Convert to string
+    
+    // Validate connections
+    const connectionMap = new Map();
+    newNodeIds.forEach(newId => {
+      connectionMap.set(newId, new Set());
+    });
+
+    // Check each link and count connections
+    console.log('Checking connections...');
+    newData.links.forEach(link => {
+      const source = String(link.source); // Convert to string
+      const target = String(link.target); // Convert to string
+      
+      console.log(`Checking link: source=${source}, target=${target}`);
+      
+      // Validate source and target exist
+      if (!source || !target) {
+        throw new Error(`Invalid link: missing source or target`);
+      }
+
+      // Track connections for new nodes to selected nodes
+      if (newNodeIds.has(source) && selectedNodeIds.has(target)) {
+        console.log(`Adding connection: ${source} -> ${target}`);
+        connectionMap.get(source).add(target);
+      }
+    });
+
+    // Debug log the connection map
+    console.log('Connection map:');
+    connectionMap.forEach((connections, newId) => {
+      console.log(`${newId} is connected to:`, Array.from(connections));
+    });
+
+    // Verify each new node connects to all selected nodes
+    let isValid = true;
+    let missingConnections = [];
+
+    connectionMap.forEach((connections, newId) => {
+      console.log(`Checking ${newId} connections:`, {
+        has: Array.from(connections),
+        needs: Array.from(selectedNodeIds)
+      });
+      
+      if (connections.size !== selectedNodeIds.size) {
+        isValid = false;
+        const missing = Array.from(selectedNodeIds)
+          .filter(id => !connections.has(id));
+        missingConnections.push(
+          `Node ${newId} has ${connections.size} connections but needs ${selectedNodeIds.size}. ` +
+          `Missing connections to: ${missing.map(id => 
+            `${id} (${selectedNodes.find(n => String(n.id) === id)?.label})`
+          ).join(', ')}`
+        );
+      }
+    });
+
+    if (!isValid) {
+      console.error('Validation details:', {
+        newNodes: Array.from(newNodeIds),
+        selectedNodes: Array.from(selectedNodeIds),
+        connections: Object.fromEntries(connectionMap),
+        missingConnections
+      });
+      return res.json({
+        success: false,
+        error: 'Generated graph does not meet connectivity requirements',
+        details: missingConnections.join('\n')
+      });
+    }
+
+    console.log('Validation passed:', {
+      newNodes: newData.nodes.length,
+      totalLinks: newData.links.length,
+      connectionsPerNode: selectedNodeIds.size
+    });
+
+    return res.json({
+      success: true,
+      data: newData
+    });
+
+  } catch (error) {
+    console.error('Error extending graph:', error);
+    return res.json({
+      success: false,
+      error: 'Failed to extend graph',
+      details: error.message
+    });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {

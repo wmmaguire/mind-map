@@ -1,10 +1,23 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import './GraphVisualization.css';
 
-function GraphVisualization({ data }) {
+// Add this function at the top of the file, outside the component
+const getBaseUrl = () => {
+  return process.env.NODE_ENV === 'production'
+    ? 'https://talk-graph.onrender.com'
+    : 'http://localhost:5001';
+};
+
+function GraphVisualization({ data, onDataUpdate }) {
   const svgRef = useRef();
+  const selectedNodeIds = useRef(new Set());
+  const selectedNodeId = useRef(null);
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [showExtendForm, setShowExtendForm] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
+  const [numNodesToAdd, setNumNodesToAdd] = useState(2);
 
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
@@ -28,10 +41,24 @@ function GraphVisualization({ data }) {
         g.attr('transform', event.transform);
       }));
 
-    // Create the force simulation
+    // Create a map of nodes for reference
+    const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
+
+    // Process links to ensure they reference actual node objects
+    const processedLinks = data.links.map(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      
+      return {
+        ...link,
+        source: nodeMap.get(sourceId),
+        target: nodeMap.get(targetId)
+      };
+    });
+
+    // Create the force simulation with processed data
     const simulation = d3.forceSimulation(data.nodes)
-      .force('link', d3.forceLink()
-        .links(data.links)
+      .force('link', d3.forceLink(processedLinks)
         .id(d => d.id)
         .distance(100))
       .force('charge', d3.forceManyBody().strength(-200))
@@ -46,7 +73,7 @@ function GraphVisualization({ data }) {
     // Draw the links with clickable areas
     const linkGroups = g.append('g')
       .selectAll('g')
-      .data(data.links)
+      .data(processedLinks)
       .join('g')
       .attr('class', 'link-group');
 
@@ -73,9 +100,6 @@ function GraphVisualization({ data }) {
       .attr('text-anchor', 'middle')
       .attr('dy', -5)
       .attr('opacity', 0);
-
-    // Add state for selected node
-    let selectedNodeId = null;
 
     // Draw the nodes
     const nodes = g.append('g')
@@ -163,17 +187,18 @@ function GraphVisualization({ data }) {
     }
 
     function handleNodeClick(event, d) {
-      event.stopPropagation(); // Prevent event bubbling
-
-      // Toggle selection
-      if (selectedNodeId === d.id) {
+      event.stopPropagation();
+      
+      if (selectedNodeIds.current.has(d.id)) {
         // Deselect if already selected
-        selectedNodeId = null;
+        selectedNodeIds.current.delete(d.id);
+        selectedNodeId.current = null;
         updateHighlighting();
         tooltip.transition().duration(200).style('opacity', 0);
       } else {
         // Select new node
-        selectedNodeId = d.id;
+        selectedNodeIds.current.add(d.id);
+        selectedNodeId.current = d.id;
         updateHighlighting();
         
         // Show tooltip with Wikipedia link if available
@@ -186,7 +211,6 @@ function GraphVisualization({ data }) {
           ${d.description || 'No description available'}<br/>
         `;
 
-        // Add Wikipedia link if available
         if (d.wikiUrl) {
           tooltipContent += `
             <br/>
@@ -203,52 +227,54 @@ function GraphVisualization({ data }) {
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px');
       }
+      
+      setSelectedCount(selectedNodeIds.current.size);
     }
 
     function updateHighlighting() {
       // Update nodes
       nodes.selectAll('circle')
-        .attr('fill', d => d.id === selectedNodeId ? '#e74c3c' : '#69b3a2')
-        .attr('stroke', d => d.id === selectedNodeId ? '#f1c40f' : '#fff')
-        .attr('stroke-width', d => d.id === selectedNodeId ? 4 : 2)
-        .attr('r', d => d.id === selectedNodeId ? 25 : 20);
+        .attr('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : '#69b3a2')
+        .attr('stroke', d => selectedNodeIds.current.has(d.id) ? '#f1c40f' : '#fff')
+        .attr('stroke-width', d => selectedNodeIds.current.has(d.id) ? 4 : 2)
+        .attr('r', d => selectedNodeIds.current.has(d.id) ? 25 : 20);
 
       // Update links
       linkGroups.selectAll('.link-line')
         .attr('stroke', l => {
-          if (!selectedNodeId) return '#999';
-          return (l.source.id === selectedNodeId || l.target.id === selectedNodeId) 
+          if (selectedNodeIds.current.size === 0) return '#999';
+          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
             ? '#e74c3c' 
             : '#999';
         })
         .attr('stroke-width', l => {
-          if (!selectedNodeId) return 2;
-          return (l.source.id === selectedNodeId || l.target.id === selectedNodeId) 
+          if (selectedNodeIds.current.size === 0) return 2;
+          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
             ? 3 
             : 1;
         })
         .attr('stroke-opacity', l => {
-          if (!selectedNodeId) return 0.6;
-          return (l.source.id === selectedNodeId || l.target.id === selectedNodeId) 
+          if (selectedNodeIds.current.size === 0) return 0.6;
+          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
             ? 1 
             : 0.3;
         });
 
       // Update connected nodes
-      if (selectedNodeId) {
+      if (selectedNodeIds.current.size > 0) {
         const connectedNodeIds = new Set();
         data.links.forEach(link => {
-          if (link.source.id === selectedNodeId) connectedNodeIds.add(link.target.id);
-          if (link.target.id === selectedNodeId) connectedNodeIds.add(link.source.id);
+          if (selectedNodeIds.current.has(link.source.id)) connectedNodeIds.add(link.target.id);
+          if (selectedNodeIds.current.has(link.target.id)) connectedNodeIds.add(link.source.id);
         });
 
         nodes.selectAll('circle')
           .attr('fill', d => {
-            if (d.id === selectedNodeId) return '#e74c3c';
+            if (selectedNodeIds.current.has(d.id)) return '#e74c3c';
             return connectedNodeIds.has(d.id) ? '#4a90e2' : '#69b3a2';
           })
           .attr('opacity', d => {
-            if (d.id === selectedNodeId) return 1;
+            if (selectedNodeIds.current.has(d.id)) return 1;
             return connectedNodeIds.has(d.id) ? 1 : 0.5;
           });
       } else {
@@ -261,10 +287,12 @@ function GraphVisualization({ data }) {
 
     // Add click handler to svg to deselect
     svg.on('click', () => {
-      if (selectedNodeId) {
-        selectedNodeId = null;
+      if (selectedNodeId.current) {
+        selectedNodeId.current = null;
+        selectedNodeIds.current.clear();
         updateHighlighting();
         tooltip.transition().duration(200).style('opacity', 0);
+        setSelectedCount(0);
       }
     });
 
@@ -311,7 +339,131 @@ function GraphVisualization({ data }) {
     };
   }, [data]);
 
-  return <svg ref={svgRef} className="graph-visualization"></svg>;
+  const handleExtend = async (event) => {
+    event.preventDefault();
+    setIsExtending(true);
+
+    try {
+      const selectedNodes = Array.from(selectedNodeIds.current).map(id => 
+        data.nodes.find(node => node.id === id)
+      );
+
+      console.log('Calling extend-node API with:', {
+        selectedNodes,
+        numNodes: numNodesToAdd
+      });
+
+      const response = await fetch(`${getBaseUrl()}/api/extend-node`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedNodes,
+          numNodes: numNodesToAdd
+        })
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to extend nodes');
+      }
+
+      console.log('Received new data:', result.data);
+
+      // Create a map of all existing and new nodes
+      const nodeMap = new Map();
+      data.nodes.forEach(node => nodeMap.set(node.id, node));
+      result.data.nodes.forEach(node => nodeMap.set(node.id, node));
+
+      // Process links to ensure they reference actual node objects
+      const processedLinks = [...data.links, ...result.data.links].map(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        
+        const sourceNode = nodeMap.get(sourceId);
+        const targetNode = nodeMap.get(targetId);
+        
+        if (!sourceNode || !targetNode) {
+          console.error('Missing node reference:', { sourceId, targetId, link });
+          return null;
+        }
+
+        return {
+          ...link,
+          source: sourceNode,
+          target: targetNode,
+          relationship: link.relationship
+        };
+      }).filter(link => link !== null);
+
+      // Create new data object with merged nodes and processed links
+      const newData = {
+        nodes: Array.from(nodeMap.values()),
+        links: processedLinks
+      };
+
+      console.log('Merged data:', newData);
+
+      // Update parent component with new data
+      if (onDataUpdate) {
+        onDataUpdate(newData);
+      }
+
+      // Clear selections and close form
+      selectedNodeIds.current.clear();
+      selectedNodeId.current = null;
+      setSelectedCount(0);
+      setShowExtendForm(false);
+
+    } catch (error) {
+      console.error('Error extending nodes:', error);
+      alert('Error extending nodes: ' + error.message);
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  return (
+    <div className="graph-container">
+      <div className="controls">
+        <button 
+          onClick={() => setShowExtendForm(true)}
+          disabled={selectedNodeIds.current.size === 0}
+          className="extend-button"
+        >
+          Extend ({selectedCount} nodes selected)
+        </button>
+
+        {showExtendForm && (
+          <div className="extend-form">
+            <form onSubmit={handleExtend}>
+              <label>
+                Number of nodes to add:
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={numNodesToAdd}
+                  onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
+                />
+              </label>
+              <div className="form-buttons">
+                <button type="submit" disabled={isExtending}>
+                  {isExtending ? 'Extending...' : 'Confirm'}
+                </button>
+                <button type="button" onClick={() => setShowExtendForm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+      <svg ref={svgRef} className="graph-visualization"></svg>
+    </div>
+  );
 }
 
 GraphVisualization.propTypes = {
@@ -320,7 +472,8 @@ GraphVisualization.propTypes = {
       PropTypes.shape({
         id: PropTypes.string.isRequired,
         label: PropTypes.string.isRequired,
-        description: PropTypes.string
+        description: PropTypes.string,
+        wikiUrl: PropTypes.string
       })
     ).isRequired,
     links: PropTypes.arrayOf(
@@ -330,7 +483,8 @@ GraphVisualization.propTypes = {
         relationship: PropTypes.string
       })
     ).isRequired
-  })
+  }),
+  onDataUpdate: PropTypes.func
 };
 
 export default GraphVisualization; 
