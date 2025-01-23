@@ -16,6 +16,26 @@ function LibraryVisualize() {
   const [graphDescription, setGraphDescription] = useState('');
   const [showContextModal, setShowContextModal] = useState(false);
   const [additionalContext, setAdditionalContext] = useState('');
+  const [showSidebar, setShowSidebar] = useState(true);
+
+  // Add responsive width calculation
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  // Add resize handler
+  useEffect(() => {
+    function handleResize() {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchFiles();
@@ -347,8 +367,19 @@ function LibraryVisualize() {
 
   return (
     <div className="library-visualize">
-      <div className="sidebar">
-        <h2>File Library</h2>
+      {/* Mobile-friendly layout structure */}
+      <div className={`sidebar ${dimensions.width <= 768 ? 'mobile' : ''} ${showSidebar ? 'visible' : 'hidden'}`}>
+        <div className="sidebar-header">
+          <h2>File Library</h2>
+          {dimensions.width <= 768 && (
+            <button 
+              className="toggle-sidebar"
+              onClick={() => setShowSidebar(prev => !prev)}
+            >
+              {showSidebar ? '×' : '☰'}
+            </button>
+          )}
+        </div>
         {error && (
           <div className="error">
             {error}
@@ -439,6 +470,8 @@ function LibraryVisualize() {
               <GraphVisualization 
                 data={graphData} 
                 onDataUpdate={handleGraphDataUpdate}
+                width={dimensions.width > 768 ? dimensions.width - 300 : dimensions.width}
+                height={dimensions.height - 100}
               />
             </div>
           </>
