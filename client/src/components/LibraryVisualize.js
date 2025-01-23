@@ -460,6 +460,18 @@ function LibraryVisualize() {
         </div>
       </div>
 
+      {/* Add floating button for mobile */}
+      {dimensions.width <= 768 && !showSidebar && (
+        <button 
+          className="mobile-sidebar-toggle"
+          onClick={() => setShowSidebar(true)}
+          aria-label="Open Library"
+        >
+          <span className="toggle-icon">☰</span>
+          <span className="toggle-text">Library</span>
+        </button>
+      )}
+
       <div className="visualization-panel">
         {graphData ? (
           <>
