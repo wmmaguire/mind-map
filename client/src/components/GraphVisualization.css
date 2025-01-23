@@ -105,16 +105,17 @@ svg {
 .controls {
   position: absolute;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 20px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
+  pointer-events: none;
 }
 
 .extend-button {
+  pointer-events: auto;
   padding: 12px 24px;
   background-color: #4a90e2;
   color: white;
@@ -124,7 +125,7 @@ svg {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  opacity: 0.9;
 }
 
 .extend-button:disabled {
@@ -135,21 +136,21 @@ svg {
 
 .extend-button:hover:not(:disabled) {
   background-color: #357abd;
+  opacity: 1;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .extend-form {
+  pointer-events: auto;
   position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 70px;
+  right: 20px;
   background: white;
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  width: 90%;
-  max-width: 320px;
+  width: 280px;
   z-index: 1001;
 }
 
@@ -201,20 +202,19 @@ svg {
 @media (max-width: 768px) {
   .controls {
     top: 10px;
-    width: 100%;
-    padding: 0 20px;
+    right: 10px;
+    width: auto;
   }
 
   .extend-button {
-    width: auto;
-    max-width: 300px;
-    padding: 12px 20px;
-    font-size: 16px;
+    padding: 10px 16px;
+    font-size: 14px;
   }
 
   .extend-form {
-    top: 70px;
-    width: 90%;
+    top: 60px;
+    right: 10px;
+    width: 250px;
   }
 
   .extend-form form {
