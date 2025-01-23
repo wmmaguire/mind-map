@@ -372,31 +372,44 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       console.log('Received new data:', result.data);
 
-      // Create a map of all existing and new nodes
-      const nodeMap = new Map();
-      data.nodes.forEach(node => nodeMap.set(node.id, node));
-      result.data.nodes.forEach(node => nodeMap.set(node.id, node));
+      // Create a map of all existing nodes first
+      const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
+      
+      // Add new nodes to the map
+      result.data.nodes.forEach(node => {
+        // Ensure the node has all required properties
+        const processedNode = {
+          ...node,
+          x: data.nodes[0].x + Math.random() * 100 - 50, // Random position near first node
+          y: data.nodes[0].y + Math.random() * 100 - 50,
+          vx: 0,
+          vy: 0
+        };
+        nodeMap.set(node.id, processedNode);
+      });
 
       // Process links to ensure they reference actual node objects
-      const processedLinks = [...data.links, ...result.data.links].map(link => {
+      const processedLinks = [...data.links];
+      
+      // Only add new links if both source and target nodes exist
+      result.data.links.forEach(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
         
         const sourceNode = nodeMap.get(sourceId);
         const targetNode = nodeMap.get(targetId);
         
-        if (!sourceNode || !targetNode) {
-          console.error('Missing node reference:', { sourceId, targetId, link });
-          return null;
+        if (sourceNode && targetNode) {
+          processedLinks.push({
+            ...link,
+            source: sourceNode,
+            target: targetNode,
+            relationship: link.relationship
+          });
+        } else {
+          console.warn('Skipping link due to missing node:', { sourceId, targetId, link });
         }
-
-        return {
-          ...link,
-          source: sourceNode,
-          target: targetNode,
-          relationship: link.relationship
-        };
-      }).filter(link => link !== null);
+      });
 
       // Create new data object with merged nodes and processed links
       const newData = {
@@ -473,13 +486,24 @@ GraphVisualization.propTypes = {
         id: PropTypes.string.isRequired,
         label: PropTypes.string.isRequired,
         description: PropTypes.string,
-        wikiUrl: PropTypes.string
+        wikiUrl: PropTypes.string,
+        x: PropTypes.number,
+        y: PropTypes.number,
+        vx: PropTypes.number,
+        vy: PropTypes.number,
+        index: PropTypes.number
       })
     ).isRequired,
     links: PropTypes.arrayOf(
       PropTypes.shape({
-        source: PropTypes.string.isRequired,
-        target: PropTypes.string.isRequired,
+        source: PropTypes.oneOfType([
+          PropTypes.string,
+          PropTypes.object
+        ]).isRequired,
+        target: PropTypes.oneOfType([
+          PropTypes.string,
+          PropTypes.object
+        ]).isRequired,
         relationship: PropTypes.string
       })
     ).isRequired
