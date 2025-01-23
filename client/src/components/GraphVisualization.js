@@ -350,10 +350,7 @@ function GraphVisualization({ data, onDataUpdate }) {
         data.nodes.find(node => node.id === id)
       );
 
-      console.log('Calling extend-node API with:', {
-        selectedNodes,
-        numNodes: numNodesToAdd
-      });
+      console.log('Selected nodes for extension:', selectedNodes.map(n => `${n.label} (${n.id})`));
 
       const response = await fetch(`${getBaseUrl()}/api/extend-node`, {
         method: 'POST',
@@ -367,22 +364,22 @@ function GraphVisualization({ data, onDataUpdate }) {
       });
 
       const result = await response.json();
+      console.log('API Response:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to extend nodes');
       }
 
-      console.log('Received new data:', result.data);
-
-      // Create a map of all existing nodes first
+      // Create a map of all existing nodes
       const nodeMap = new Map();
       
       // Add existing nodes to the map
       data.nodes.forEach(node => {
         nodeMap.set(node.id, node);
+        console.log(`Mapped existing node: ${node.label} (${node.id})`);
       });
       
-      // Add new nodes to the map with initial positions
+      // Add new nodes to the map
       result.data.nodes.forEach(node => {
         const baseX = data.nodes[0].x || width / 2;
         const baseY = data.nodes[0].y || height / 2;
@@ -395,32 +392,46 @@ function GraphVisualization({ data, onDataUpdate }) {
           vy: 0
         };
         nodeMap.set(node.id, processedNode);
+        console.log(`Added new node: ${node.label} (${node.id})`);
       });
 
-      // Process links
+      // Process links with explicit type checking
       const processedLinks = [...data.links];
       
       result.data.links.forEach(link => {
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        // Ensure we're working with string IDs
+        const sourceId = typeof link.source === 'object' ? link.source.id : String(link.source);
+        const targetId = typeof link.target === 'object' ? link.target.id : String(link.target);
         
         const sourceNode = nodeMap.get(sourceId);
         const targetNode = nodeMap.get(targetId);
         
+        console.log('Processing link:', {
+          sourceId,
+          targetId,
+          sourceNode: sourceNode ? `${sourceNode.label} (${sourceNode.id})` : 'not found',
+          targetNode: targetNode ? `${targetNode.label} (${targetNode.id})` : 'not found'
+        });
+
         if (sourceNode && targetNode) {
-          console.log('Adding link:', { sourceId, targetId, relationship: link.relationship });
-          processedLinks.push({
+          const newLink = {
             source: sourceNode,
             target: targetNode,
             relationship: link.relationship
+          };
+          processedLinks.push(newLink);
+          console.log('Added link:', {
+            source: `${sourceNode.label} (${sourceNode.id})`,
+            target: `${targetNode.label} (${targetNode.id})`,
+            relationship: link.relationship
           });
         } else {
-          console.warn('Missing node for link:', {
+          console.warn('Failed to create link:', {
             sourceId,
             targetId,
             sourceExists: !!sourceNode,
             targetExists: !!targetNode,
-            availableNodes: Array.from(nodeMap.keys())
+            availableNodes: Array.from(nodeMap.entries()).map(([id, node]) => `${node.label} (${id})`)
           });
         }
       });
@@ -431,13 +442,15 @@ function GraphVisualization({ data, onDataUpdate }) {
         links: processedLinks
       };
 
-      console.log('Final processed data:', {
-        nodeCount: newData.nodes.length,
-        linkCount: newData.links.length,
-        nodes: newData.nodes.map(n => n.id),
-        links: newData.links.map(l => ({
-          source: typeof l.source === 'object' ? l.source.id : l.source,
-          target: typeof l.target === 'object' ? l.target.id : l.target
+      // Validate the final data
+      console.log('Final data validation:', {
+        totalNodes: newData.nodes.length,
+        totalLinks: newData.links.length,
+        allNodes: newData.nodes.map(n => `${n.label} (${n.id})`),
+        allLinks: newData.links.map(l => ({
+          source: typeof l.source === 'object' ? `${l.source.label} (${l.source.id})` : l.source,
+          target: typeof l.target === 'object' ? `${l.target.label} (${l.target.id})` : l.target,
+          relationship: l.relationship
         }))
       });
 
