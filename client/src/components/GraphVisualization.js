@@ -19,6 +19,10 @@ function GraphVisualization({ data, onDataUpdate }) {
   const [isExtending, setIsExtending] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
 
+  // Add width and height constants
+  const width = 800;
+  const height = 600;
+
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
 
@@ -26,8 +30,6 @@ function GraphVisualization({ data, onDataUpdate }) {
     d3.select(svgRef.current).selectAll('*').remove();
 
     // Set up the SVG dimensions
-    const width = 800;
-    const height = 600;
     const svg = d3.select(svgRef.current)
       .attr('width', width)
       .attr('height', height);
@@ -373,25 +375,31 @@ function GraphVisualization({ data, onDataUpdate }) {
       console.log('Received new data:', result.data);
 
       // Create a map of all existing nodes first
-      const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
+      const nodeMap = new Map();
       
-      // Add new nodes to the map
+      // Add existing nodes to the map
+      data.nodes.forEach(node => {
+        nodeMap.set(node.id, node);
+      });
+      
+      // Add new nodes to the map with initial positions
       result.data.nodes.forEach(node => {
-        // Ensure the node has all required properties
+        const baseX = data.nodes[0].x || width / 2;
+        const baseY = data.nodes[0].y || height / 2;
+        
         const processedNode = {
           ...node,
-          x: data.nodes[0].x + Math.random() * 100 - 50, // Random position near first node
-          y: data.nodes[0].y + Math.random() * 100 - 50,
+          x: baseX + (Math.random() - 0.5) * 200,
+          y: baseY + (Math.random() - 0.5) * 200,
           vx: 0,
           vy: 0
         };
         nodeMap.set(node.id, processedNode);
       });
 
-      // Process links to ensure they reference actual node objects
+      // Process links
       const processedLinks = [...data.links];
       
-      // Only add new links if both source and target nodes exist
       result.data.links.forEach(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -400,26 +408,40 @@ function GraphVisualization({ data, onDataUpdate }) {
         const targetNode = nodeMap.get(targetId);
         
         if (sourceNode && targetNode) {
+          console.log('Adding link:', { sourceId, targetId, relationship: link.relationship });
           processedLinks.push({
-            ...link,
             source: sourceNode,
             target: targetNode,
             relationship: link.relationship
           });
         } else {
-          console.warn('Skipping link due to missing node:', { sourceId, targetId, link });
+          console.warn('Missing node for link:', {
+            sourceId,
+            targetId,
+            sourceExists: !!sourceNode,
+            targetExists: !!targetNode,
+            availableNodes: Array.from(nodeMap.keys())
+          });
         }
       });
 
-      // Create new data object with merged nodes and processed links
+      // Create new data object
       const newData = {
         nodes: Array.from(nodeMap.values()),
         links: processedLinks
       };
 
-      console.log('Merged data:', newData);
+      console.log('Final processed data:', {
+        nodeCount: newData.nodes.length,
+        linkCount: newData.links.length,
+        nodes: newData.nodes.map(n => n.id),
+        links: newData.links.map(l => ({
+          source: typeof l.source === 'object' ? l.source.id : l.source,
+          target: typeof l.target === 'object' ? l.target.id : l.target
+        }))
+      });
 
-      // Update parent component with new data
+      // Update parent component
       if (onDataUpdate) {
         onDataUpdate(newData);
       }
