@@ -364,22 +364,27 @@ function GraphVisualization({ data, onDataUpdate }) {
       });
 
       const result = await response.json();
-      console.log('API Response:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to extend nodes');
       }
 
-      // Create a map of all existing nodes
+      // Create a map of all existing nodes with string IDs
       const nodeMap = new Map();
       
-      // Add existing nodes to the map
+      // Add existing nodes to the map with string IDs
       data.nodes.forEach(node => {
-        nodeMap.set(node.id, node);
-        console.log(`Mapped existing node: ${node.label} (${node.id})`);
+        // Convert all IDs to strings
+        const stringId = String(node.id);
+        const nodeWithStringId = {
+          ...node,
+          id: stringId
+        };
+        nodeMap.set(stringId, nodeWithStringId);
+        console.log(`Mapped existing node: ${node.label} (${stringId})`);
       });
       
-      // Add new nodes to the map
+      // Add new nodes to the map (these already have string IDs)
       result.data.nodes.forEach(node => {
         const baseX = data.nodes[0].x || width / 2;
         const baseY = data.nodes[0].y || height / 2;
@@ -395,13 +400,23 @@ function GraphVisualization({ data, onDataUpdate }) {
         console.log(`Added new node: ${node.label} (${node.id})`);
       });
 
-      // Process links with explicit type checking
-      const processedLinks = [...data.links];
+      // Process links with string IDs
+      const processedLinks = data.links.map(link => {
+        // Convert existing link IDs to strings
+        const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
+        const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
+        
+        return {
+          ...link,
+          source: nodeMap.get(sourceId),
+          target: nodeMap.get(targetId)
+        };
+      });
       
+      // Process new links
       result.data.links.forEach(link => {
-        // Ensure we're working with string IDs
-        const sourceId = typeof link.source === 'object' ? link.source.id : String(link.source);
-        const targetId = typeof link.target === 'object' ? link.target.id : String(link.target);
+        const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
+        const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
         
         const sourceNode = nodeMap.get(sourceId);
         const targetNode = nodeMap.get(targetId);
@@ -436,7 +451,7 @@ function GraphVisualization({ data, onDataUpdate }) {
         }
       });
 
-      // Create new data object
+      // Create new data object with consistent string IDs
       const newData = {
         nodes: Array.from(nodeMap.values()),
         links: processedLinks
@@ -454,12 +469,10 @@ function GraphVisualization({ data, onDataUpdate }) {
         }))
       });
 
-      // Update parent component
       if (onDataUpdate) {
         onDataUpdate(newData);
       }
 
-      // Clear selections and close form
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
       setSelectedCount(0);
