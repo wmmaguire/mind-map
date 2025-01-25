@@ -30,6 +30,7 @@ function GraphVisualization({ data, onDataUpdate }) {
     show: false,
     relationship: ''
   });
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
 
   // Add width and height constants
   const width = 800;
@@ -121,23 +122,34 @@ function GraphVisualization({ data, onDataUpdate }) {
       .on('drag', dragged)
       .on('end', dragended);
 
-    // Update node selection with drag behavior
+    // Update node selection with click and drag handlers
     const node = g.selectAll('.node')
       .data(data.nodes)
       .join('g')
       .attr('class', 'node')
       .classed('selected', d => selectedNodes.some(n => n.id === d.id))
-      .on('click', handleNodeClick)
+      .on('click', (event, d) => handleNodeClick(event, d))
       .call(drag);
 
-    // Update node styling
+    // Update link selection with click handler
+    const link = g.selectAll('.link-group')
+      .data(data.links)
+      .join('g')
+      .attr('class', 'link-group')
+      .on('click', (event, d) => handleLinkClick(event, d));
+
+    // Update visual states based on delete mode
     node.selectAll('circle')
       .data(d => [d])
       .join('circle')
       .attr('r', 20)
       .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? '#e74c3c' : '#4a90e2')
       .classed('selectable', isAddingRelationship)
-      .classed('selected', d => selectedNodes.some(n => n.id === d.id));
+      .classed('selected', d => selectedNodes.some(n => n.id === d.id))
+      .classed('deletable', isDeleteMode);
+
+    link.selectAll('.link-line')
+      .classed('deletable', isDeleteMode);
 
     // Add labels
     node.append('text')
@@ -179,36 +191,60 @@ function GraphVisualization({ data, onDataUpdate }) {
     }
 
     function handleLinkClick(event, d) {
-      // Reset all links
-      linkGroups.selectAll('.link-line')
-        .attr('stroke', '#999')
-        .attr('stroke-width', 2);
-
-      // Highlight selected link
-      d3.select(this.parentNode).select('.link-line')
-        .attr('stroke', '#e74c3c')
-        .attr('stroke-width', 4);
-
-      // Show tooltip with relationship description
-      tooltip.transition()
-        .duration(200)
-        .style('opacity', 0.9);
+      event.stopPropagation();
       
-      tooltip.html(`
-        <strong>Relationship:</strong><br/>
-        ${d.relationship}<br/>
-        <br/>
-        <strong>Between:</strong><br/>
-        ${d.source.label} → ${d.target.label}
-      `)
-        .style('left', (event.pageX + 10) + 'px')
-        .style('top', (event.pageY - 10) + 'px');
+      if (isDeleteMode) {
+        handleDeleteLink(d);
+      } else {
+        if (selectedNodeIds.current.has(d.source.id) || selectedNodeIds.current.has(d.target.id)) {
+          selectedNodeIds.current.clear();
+          selectedNodeId.current = null;
+          updateHighlighting();
+          tooltip.transition().duration(200).style('opacity', 0);
+          setSelectedCount(0);
+        } else {
+          selectedNodeIds.current.add(d.source.id);
+          selectedNodeIds.current.add(d.target.id);
+          selectedNodeId.current = d.source.id;
+          updateHighlighting();
+          
+          // Show tooltip with Wikipedia link if available
+          tooltip.transition()
+            .duration(200)
+            .style('opacity', 0.9);
+          
+          let tooltipContent = `
+            <strong>${d.source.label} → ${d.target.label}</strong><br/>
+            ${d.relationship}<br/>
+          `;
+
+          if (d.source.wikiUrl) {
+            tooltipContent += `
+              <br/>
+              <a href="${d.source.wikiUrl}" 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 style="color: #4a90e2; text-decoration: underline;">
+                Learn more on Wikipedia →
+              </a>
+            `;
+          }
+          
+          tooltip.html(tooltipContent)
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 10) + 'px');
+        }
+        
+        setSelectedCount(selectedNodeIds.current.size);
+      }
     }
 
     function handleNodeClick(event, node) {
       event.stopPropagation();
       
-      if (isAddingRelationship) {
+      if (isDeleteMode) {
+        handleDeleteNode(node);
+      } else if (isAddingRelationship) {
         if (selectedNodes.length === 0) {
           setSelectedNodes([node]);
         } else if (selectedNodes.length === 1 && node.id !== selectedNodes[0].id) {
@@ -363,7 +399,7 @@ function GraphVisualization({ data, onDataUpdate }) {
       simulation.stop();
       tooltip.remove();
     };
-  }, [data, selectedNodes, isAddingRelationship]);
+  }, [data, selectedNodes, isAddingRelationship, isDeleteMode]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -556,6 +592,51 @@ function GraphVisualization({ data, onDataUpdate }) {
     setIsAddingRelationship(false);
   };
 
+  const handleDeleteNode = (node) => {
+    // Find all connected relationships
+    const connectedLinks = data.links.filter(l => 
+      l.source.id === node.id || l.target.id === node.id
+    );
+
+    const confirmMessage = `Are you sure you want to delete the node "${node.label}"?\n\n` + 
+      (connectedLinks.length > 0 
+        ? `This will also delete ${connectedLinks.length} connected relationship${connectedLinks.length === 1 ? '' : 's'}`
+        : 'This node has no connected relationships.');
+
+    if (window.confirm(confirmMessage)) {
+      // Remove the node
+      const newNodes = data.nodes.filter(n => n.id !== node.id);
+      
+      // Remove all connected relationships
+      const newLinks = data.links.filter(l => 
+        l.source.id !== node.id && l.target.id !== node.id
+      );
+      
+      onDataUpdate({
+        nodes: newNodes,
+        links: newLinks
+      });
+      
+      // Clear any selections
+      selectedNodeIds.current.clear();
+      selectedNodeId.current = null;
+      setSelectedCount(0);
+    }
+  };
+
+  const handleDeleteLink = (link) => {
+    if (window.confirm(`Are you sure you want to delete the relationship "${link.relationship}" between "${link.source.label}" and "${link.target.label}"?`)) {
+      const newLinks = data.links.filter(l => 
+        !(l.source.id === link.source.id && l.target.id === link.target.id)
+      );
+      
+      onDataUpdate({
+        nodes: [...data.nodes],
+        links: newLinks
+      });
+    }
+  };
+
   return (
     <div className="graph-container">
       <div className="edit-controls">
@@ -563,18 +644,37 @@ function GraphVisualization({ data, onDataUpdate }) {
           className="add-node-button"
           onClick={() => setShowAddForm(true)}
         >
-          Add Concept
+          Add Node
         </button>
         <button 
           className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
           onClick={() => {
             setIsAddingRelationship(!isAddingRelationship);
             setSelectedNodes([]);
+            if (isDeleteMode) setIsDeleteMode(false);
           }}
         >
           {isAddingRelationship ? 'Cancel Relationship' : 'Add Relationship'}
         </button>
+        <button 
+          className={`delete-button ${isDeleteMode ? 'active' : ''}`}
+          onClick={() => {
+            setIsDeleteMode(!isDeleteMode);
+            if (isAddingRelationship) {
+              setIsAddingRelationship(false);
+              setSelectedNodes([]);
+            }
+          }}
+        >
+          {isDeleteMode ? 'Cancel Delete' : 'Delete'}
+        </button>
       </div>
+
+      {isDeleteMode && (
+        <div className="delete-helper">
+          Click on a node or relationship to delete it
+        </div>
+      )}
 
       <div className="generate-controls">
         <button 

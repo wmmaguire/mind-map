@@ -431,3 +431,50 @@ svg {
   color: #333;
   transform: scale(1.1);
 }
+
+.delete-button {
+  padding: 10px 20px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+  transform: translateY(-1px);
+}
+
+.delete-button.active {
+  background-color: #c0392b;
+}
+
+.delete-helper {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(231, 76, 60, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+/* Update node and link styles for delete mode */
+.node circle.deletable {
+  cursor: pointer;
+  filter: brightness(0.9);
+}
+
+.link-line.deletable {
+  cursor: pointer;
+  stroke-dasharray: 5;
+}
