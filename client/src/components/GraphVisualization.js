@@ -18,6 +18,18 @@ function GraphVisualization({ data, onDataUpdate }) {
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newNodeData, setNewNodeData] = useState({
+    label: '',
+    description: '',
+    wikiUrl: ''
+  });
+  const [isAddingRelationship, setIsAddingRelationship] = useState(false);
+  const [selectedNodes, setSelectedNodes] = useState([]);
+  const [relationshipForm, setRelationshipForm] = useState({
+    show: false,
+    relationship: ''
+  });
 
   // Add width and height constants
   const width = 800;
@@ -103,27 +115,32 @@ function GraphVisualization({ data, onDataUpdate }) {
       .attr('dy', -5)
       .attr('opacity', 0);
 
-    // Draw the nodes
-    const nodes = g.append('g')
-      .selectAll('g')
+    // Add drag behavior
+    const drag = d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended);
+
+    // Update node selection with drag behavior
+    const node = g.selectAll('.node')
       .data(data.nodes)
       .join('g')
       .attr('class', 'node')
-      .call(d3.drag()
-        .on('start', dragstarted)
-        .on('drag', dragged)
-        .on('end', dragended));
+      .classed('selected', d => selectedNodes.some(n => n.id === d.id))
+      .on('click', handleNodeClick)
+      .call(drag);
 
-    // Add circles for nodes
-    nodes.append('circle')
+    // Update node styling
+    node.selectAll('circle')
+      .data(d => [d])
+      .join('circle')
       .attr('r', 20)
-      .attr('fill', '#69b3a2')
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .on('click', handleNodeClick);
+      .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? '#e74c3c' : '#4a90e2')
+      .classed('selectable', isAddingRelationship)
+      .classed('selected', d => selectedNodes.some(n => n.id === d.id));
 
     // Add labels
-    nodes.append('text')
+    node.append('text')
       .text(d => d.label)
       .attr('x', 0)
       .attr('y', 30)
@@ -188,55 +205,62 @@ function GraphVisualization({ data, onDataUpdate }) {
         .style('top', (event.pageY - 10) + 'px');
     }
 
-    function handleNodeClick(event, d) {
+    function handleNodeClick(event, node) {
       event.stopPropagation();
       
-      if (selectedNodeIds.current.has(d.id)) {
-        // Deselect if already selected
-        selectedNodeIds.current.delete(d.id);
-        selectedNodeId.current = null;
-        updateHighlighting();
-        tooltip.transition().duration(200).style('opacity', 0);
+      if (isAddingRelationship) {
+        if (selectedNodes.length === 0) {
+          setSelectedNodes([node]);
+        } else if (selectedNodes.length === 1 && node.id !== selectedNodes[0].id) {
+          setSelectedNodes([...selectedNodes, node]);
+          setRelationshipForm({ show: true, relationship: '' });
+        }
       } else {
-        // Select new node
-        selectedNodeIds.current.add(d.id);
-        selectedNodeId.current = d.id;
-        updateHighlighting();
-        
-        // Show tooltip with Wikipedia link if available
-        tooltip.transition()
-          .duration(200)
-          .style('opacity', 0.9);
-        
-        let tooltipContent = `
-          <strong>${d.label}</strong><br/>
-          ${d.description || 'No description available'}<br/>
-        `;
-
-        if (d.wikiUrl) {
-          tooltipContent += `
-            <br/>
-            <a href="${d.wikiUrl}" 
-               target="_blank" 
-               rel="noopener noreferrer" 
-               style="color: #4a90e2; text-decoration: underline;">
-              Learn more on Wikipedia →
-            </a>
+        if (selectedNodeIds.current.has(node.id)) {
+          selectedNodeIds.current.delete(node.id);
+          selectedNodeId.current = null;
+          updateHighlighting();
+          tooltip.transition().duration(200).style('opacity', 0);
+        } else {
+          selectedNodeIds.current.add(node.id);
+          selectedNodeId.current = node.id;
+          updateHighlighting();
+          
+          // Show tooltip with Wikipedia link if available
+          tooltip.transition()
+            .duration(200)
+            .style('opacity', 0.9);
+          
+          let tooltipContent = `
+            <strong>${node.label}</strong><br/>
+            ${node.description || 'No description available'}<br/>
           `;
+
+          if (node.wikiUrl) {
+            tooltipContent += `
+              <br/>
+              <a href="${node.wikiUrl}" 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 style="color: #4a90e2; text-decoration: underline;">
+                Learn more on Wikipedia →
+              </a>
+            `;
+          }
+          
+          tooltip.html(tooltipContent)
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 10) + 'px');
         }
         
-        tooltip.html(tooltipContent)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 10) + 'px');
+        setSelectedCount(selectedNodeIds.current.size);
       }
-      
-      setSelectedCount(selectedNodeIds.current.size);
     }
 
     function updateHighlighting() {
       // Update nodes
-      nodes.selectAll('circle')
-        .attr('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : '#69b3a2')
+      node.selectAll('circle')
+        .attr('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : '#4a90e2')
         .attr('stroke', d => selectedNodeIds.current.has(d.id) ? '#f1c40f' : '#fff')
         .attr('stroke-width', d => selectedNodeIds.current.has(d.id) ? 4 : 2)
         .attr('r', d => selectedNodeIds.current.has(d.id) ? 25 : 20);
@@ -270,10 +294,10 @@ function GraphVisualization({ data, onDataUpdate }) {
           if (selectedNodeIds.current.has(link.target.id)) connectedNodeIds.add(link.source.id);
         });
 
-        nodes.selectAll('circle')
+        node.selectAll('circle')
           .attr('fill', d => {
             if (selectedNodeIds.current.has(d.id)) return '#e74c3c';
-            return connectedNodeIds.has(d.id) ? '#4a90e2' : '#69b3a2';
+            return connectedNodeIds.has(d.id) ? '#4a90e2' : '#4a90e2';
           })
           .attr('opacity', d => {
             if (selectedNodeIds.current.has(d.id)) return 1;
@@ -281,8 +305,8 @@ function GraphVisualization({ data, onDataUpdate }) {
           });
       } else {
         // Reset all nodes when nothing is selected
-        nodes.selectAll('circle')
-          .attr('fill', '#69b3a2')
+        node.selectAll('circle')
+          .attr('fill', '#4a90e2')
           .attr('opacity', 1);
       }
     }
@@ -298,7 +322,7 @@ function GraphVisualization({ data, onDataUpdate }) {
       }
     });
 
-    // Drag handlers
+    // Drag event handlers
     function dragstarted(event, d) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
@@ -331,7 +355,7 @@ function GraphVisualization({ data, onDataUpdate }) {
         .attr('y', d => (d.source.y + d.target.y) / 2);
 
       // Update node positions
-      nodes.attr('transform', d => `translate(${d.x},${d.y})`);
+      node.attr('transform', d => `translate(${d.x},${d.y})`);
     });
 
     // Cleanup
@@ -339,7 +363,7 @@ function GraphVisualization({ data, onDataUpdate }) {
       simulation.stop();
       tooltip.remove();
     };
-  }, [data]);
+  }, [data, selectedNodes, isAddingRelationship]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -486,9 +510,73 @@ function GraphVisualization({ data, onDataUpdate }) {
     }
   };
 
+  const handleAddNodeSubmit = (e) => {
+    e.preventDefault();
+    
+    const newNode = {
+      id: `node_${Date.now()}`,
+      label: newNodeData.label,
+      description: newNodeData.description,
+      wikiUrl: newNodeData.wikiUrl,
+      x: width / 2,
+      y: height / 2,
+      vx: 0,
+      vy: 0
+    };
+
+    const newData = {
+      nodes: [...data.nodes, newNode],
+      links: [...data.links]
+    };
+
+    onDataUpdate(newData);
+    setShowAddForm(false);
+    setNewNodeData({ label: '', description: '', wikiUrl: '' });
+  };
+
+  const handleAddRelationship = (e) => {
+    e.preventDefault();
+    
+    const newLink = {
+      source: selectedNodes[0],
+      target: selectedNodes[1],
+      relationship: relationshipForm.relationship
+    };
+
+    const newData = {
+      nodes: [...data.nodes],
+      links: [...data.links, newLink]
+    };
+
+    onDataUpdate(newData);
+    
+    // Reset states
+    setRelationshipForm({ show: false, relationship: '' });
+    setSelectedNodes([]);
+    setIsAddingRelationship(false);
+  };
+
   return (
     <div className="graph-container">
-      <div className="controls">
+      <div className="edit-controls">
+        <button 
+          className="add-node-button"
+          onClick={() => setShowAddForm(true)}
+        >
+          Add Concept
+        </button>
+        <button 
+          className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
+          onClick={() => {
+            setIsAddingRelationship(!isAddingRelationship);
+            setSelectedNodes([]);
+          }}
+        >
+          {isAddingRelationship ? 'Cancel Relationship' : 'Add Relationship'}
+        </button>
+      </div>
+
+      <div className="generate-controls">
         <button 
           onClick={() => setShowGenerateForm(true)}
           disabled={selectedNodeIds.current.size === 0}
@@ -496,32 +584,120 @@ function GraphVisualization({ data, onDataUpdate }) {
         >
           Generate ({selectedCount} nodes selected)
         </button>
+      </div>
 
-        {showGenerateForm && (
-          <div className="generate-form">
-            <form onSubmit={handleGenerate}>
-              <label>
-                Number of nodes to generate:
+      {isAddingRelationship && (
+        <div className="relationship-helper">
+          {selectedNodes.length === 0 && 'Select first node'}
+          {selectedNodes.length === 1 && 'Select second node'}
+          {selectedNodes.length === 2 && 'Define relationship'}
+        </div>
+      )}
+
+      {relationshipForm.show && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Define Relationship</h2>
+            <form onSubmit={handleAddRelationship}>
+              <div className="form-group">
+                <label>Relationship:</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  value={numNodesToAdd}
-                  onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
+                  type="text"
+                  value={relationshipForm.relationship}
+                  onChange={(e) => setRelationshipForm({
+                    ...relationshipForm,
+                    relationship: e.target.value
+                  })}
+                  placeholder="e.g., 'is part of', 'relates to'"
+                  required
+                  autoFocus
                 />
-              </label>
-              <div className="form-buttons">
-                <button type="submit" disabled={isGenerating}>
-                  {isGenerating ? 'Generating...' : 'Confirm'}
-                </button>
-                <button type="button" onClick={() => setShowGenerateForm(false)}>
+              </div>
+              <div className="relationship-preview">
+                {selectedNodes[0]?.label} → {selectedNodes[1]?.label}
+              </div>
+              <div className="modal-buttons">
+                <button type="submit">Add Relationship</button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setRelationshipForm({ show: false, relationship: '' });
+                    setSelectedNodes([]);
+                    setIsAddingRelationship(false);
+                  }}
+                >
                   Cancel
                 </button>
               </div>
             </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {showAddForm && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Add New Concept</h2>
+            <form onSubmit={handleAddNodeSubmit}>
+              <div className="form-group">
+                <label>Label:</label>
+                <input
+                  type="text"
+                  value={newNodeData.label}
+                  onChange={(e) => setNewNodeData({...newNodeData, label: e.target.value})}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="form-group">
+                <label>Description:</label>
+                <textarea
+                  value={newNodeData.description}
+                  onChange={(e) => setNewNodeData({...newNodeData, description: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>URL:</label>
+                <input
+                  type="url"
+                  value={newNodeData.wikiUrl}
+                  onChange={(e) => setNewNodeData({...newNodeData, wikiUrl: e.target.value})}
+                  placeholder="https://"
+                />
+              </div>
+              <div className="modal-buttons">
+                <button type="submit">Add Concept</button>
+                <button type="button" onClick={() => setShowAddForm(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showGenerateForm && (
+        <div className="generate-form">
+          <form onSubmit={handleGenerate}>
+            <label>
+              Number of nodes to generate:
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={numNodesToAdd}
+                onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
+              />
+            </label>
+            <div className="form-buttons">
+              <button type="submit" disabled={isGenerating}>
+                {isGenerating ? 'Generating...' : 'Confirm'}
+              </button>
+              <button type="button" onClick={() => setShowGenerateForm(false)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       <svg ref={svgRef} className="graph-visualization"></svg>
     </div>
   );
