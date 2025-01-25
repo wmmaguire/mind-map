@@ -15,8 +15,8 @@ function GraphVisualization({ data, onDataUpdate }) {
   const selectedNodeIds = useRef(new Set());
   const selectedNodeId = useRef(null);
   const [selectedCount, setSelectedCount] = useState(0);
-  const [showExtendForm, setShowExtendForm] = useState(false);
-  const [isExtending, setIsExtending] = useState(false);
+  const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
 
   // Add width and height constants
@@ -341,18 +341,18 @@ function GraphVisualization({ data, onDataUpdate }) {
     };
   }, [data]);
 
-  const handleExtend = async (event) => {
+  const handleGenerate = async (event) => {
     event.preventDefault();
-    setIsExtending(true);
+    setIsGenerating(true);
 
     try {
       const selectedNodes = Array.from(selectedNodeIds.current).map(id => 
         data.nodes.find(node => node.id === id)
       );
 
-      console.log('Selected nodes for extension:', selectedNodes.map(n => `${n.label} (${n.id})`));
+      console.log('Selected nodes for generation:', selectedNodes.map(n => `${n.label} (${n.id})`));
 
-      const response = await fetch(`${getBaseUrl()}/api/extend-node`, {
+      const response = await fetch(`${getBaseUrl()}/api/generate-node`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -366,7 +366,7 @@ function GraphVisualization({ data, onDataUpdate }) {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to extend nodes');
+        throw new Error(result.error || 'Failed to generate nodes');
       }
 
       // Create a map of all existing nodes with string IDs
@@ -476,13 +476,13 @@ function GraphVisualization({ data, onDataUpdate }) {
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
       setSelectedCount(0);
-      setShowExtendForm(false);
+      setShowGenerateForm(false);
 
     } catch (error) {
-      console.error('Error extending nodes:', error);
-      alert('Error extending nodes: ' + error.message);
+      console.error('Error generating nodes:', error);
+      alert('Error generating nodes: ' + error.message);
     } finally {
-      setIsExtending(false);
+      setIsGenerating(false);
     }
   };
 
@@ -490,18 +490,18 @@ function GraphVisualization({ data, onDataUpdate }) {
     <div className="graph-container">
       <div className="controls">
         <button 
-          onClick={() => setShowExtendForm(true)}
+          onClick={() => setShowGenerateForm(true)}
           disabled={selectedNodeIds.current.size === 0}
-          className="extend-button"
+          className="generate-button"
         >
-          Extend ({selectedCount} nodes selected)
+          Generate ({selectedCount} nodes selected)
         </button>
 
-        {showExtendForm && (
-          <div className="extend-form">
-            <form onSubmit={handleExtend}>
+        {showGenerateForm && (
+          <div className="generate-form">
+            <form onSubmit={handleGenerate}>
               <label>
-                Number of nodes to add:
+                Number of nodes to generate:
                 <input
                   type="number"
                   min="1"
@@ -511,10 +511,10 @@ function GraphVisualization({ data, onDataUpdate }) {
                 />
               </label>
               <div className="form-buttons">
-                <button type="submit" disabled={isExtending}>
-                  {isExtending ? 'Extending...' : 'Confirm'}
+                <button type="submit" disabled={isGenerating}>
+                  {isGenerating ? 'Generating...' : 'Confirm'}
                 </button>
-                <button type="button" onClick={() => setShowExtendForm(false)}>
+                <button type="button" onClick={() => setShowGenerateForm(false)}>
                   Cancel
                 </button>
               </div>

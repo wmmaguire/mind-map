@@ -476,7 +476,7 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // Add after other API endpoints
-app.post('/api/extend-node', async (req, res) => {
+app.post('/api/generate-node', async (req, res) => {
   try {
     const { selectedNodes } = req.body;
     const numNodesToGenerate = req.body.numNodes || 3;
@@ -650,10 +650,10 @@ app.post('/api/extend-node', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error extending graph:', error);
+    console.error('Error generating graph:', error);
     return res.json({
       success: false,
-      error: 'Failed to extend graph',
+      error: 'Failed to generate graph',
       details: error.message
     });
   }
