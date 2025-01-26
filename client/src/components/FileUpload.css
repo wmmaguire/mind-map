@@ -1,12 +1,13 @@
 .upload-area {
-    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border: 2px dashed #4a90e2;
     border-radius: 8px;
     padding: 20px;
     text-align: center;
     position: relative;
     margin-bottom: 20px;
     transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.05);
+    background: white;
+    cursor: pointer;
   }
   
   .upload-area.dragging {
@@ -16,6 +17,7 @@
   
   .upload-prompt {
     color: #333;
+    pointer-events: none;
   }
   
   .upload-icon {
@@ -183,10 +185,6 @@
 
   .modal-close:hover {
     color: #333;
-  }
-
-  .file-input {
-    display: none;
   }
 
   .upload-button {
