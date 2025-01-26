@@ -575,12 +575,12 @@ svg {
   min-width: 20px;
   position: absolute;
   left: 10px;
-  transform: rotate(-90deg); /* Point left when expanded */
+  transform: rotate(-90deg); /* Point right when expanded */
 }
 
 .controls-panel.collapsed .controls-toggle {
   left: 10px;
-  transform: rotate(90deg); /* Point right when collapsed */
+  transform: rotate(90deg); /* Point left when collapsed */
 }
 
 .controls-content {
@@ -636,11 +636,11 @@ svg {
     position: absolute;
     left: 15px;
     top: 50%;
-    transform: translateY(-50%) rotate(0deg); /* Point up when expanded */
+    transform: translateY(-50%) rotate(180deg); /* Point down when expanded */
   }
 
   .controls-panel.collapsed .controls-toggle {
-    transform: translateY(-50%) rotate(180deg); /* Point down when collapsed */
+    transform: translateY(-50%) rotate(0deg); /* Point up when collapsed */
   }
 
   .controls-content {
