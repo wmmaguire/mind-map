@@ -548,10 +548,12 @@ svg {
   flex-shrink: 0;
   white-space: nowrap;
   min-width: 40px;
+  position: relative;
 }
 
 .controls-header h3 {
   margin: 0;
+  margin-left: 30px;
   transition: opacity 0.2s ease;
   overflow: hidden;
 }
@@ -563,11 +565,22 @@ svg {
 }
 
 .controls-toggle {
-  transform: rotate(180deg);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #666;
+  cursor: pointer;
+  padding: 5px;
+  transition: transform 0.3s ease;
+  min-width: 20px;
+  position: absolute;
+  left: 10px;
+  transform: rotate(-90deg); /* Point left when expanded */
 }
 
-.controls-toggle.collapsed {
-  transform: rotate(0deg);
+.controls-panel.collapsed .controls-toggle {
+  left: 10px;
+  transform: rotate(90deg); /* Point right when collapsed */
 }
 
 .controls-content {
@@ -621,17 +634,13 @@ svg {
 
   .controls-toggle {
     position: absolute;
-    right: 15px;
+    left: 15px;
     top: 50%;
-    transform: translateY(-50%) rotate(0deg);
-    font-size: 1.2rem;
-    padding: 5px;
-    color: #666;
-    z-index: 1002;
+    transform: translateY(-50%) rotate(0deg); /* Point up when expanded */
   }
 
-  .controls-toggle.collapsed {
-    transform: translateY(-50%) rotate(180deg);
+  .controls-panel.collapsed .controls-toggle {
+    transform: translateY(-50%) rotate(180deg); /* Point down when collapsed */
   }
 
   .controls-content {
@@ -678,6 +687,10 @@ svg {
     opacity: 1;
     position: relative;
     z-index: 1001;
+  }
+
+  .controls-header h3 {
+    margin-left: 40px;
   }
 }
 
