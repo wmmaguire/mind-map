@@ -14,7 +14,6 @@ function GraphVisualization({ data, onDataUpdate }) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
   const selectedNodeId = useRef(null);
-  const [selectedCount, setSelectedCount] = useState(0);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
@@ -31,6 +30,7 @@ function GraphVisualization({ data, onDataUpdate }) {
     relationship: ''
   });
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [isControlsPanelOpen, setIsControlsPanelOpen] = useState(true);
 
   // Add width and height constants
   const width = 800;
@@ -201,7 +201,6 @@ function GraphVisualization({ data, onDataUpdate }) {
           selectedNodeId.current = null;
           updateHighlighting();
           tooltip.transition().duration(200).style('opacity', 0);
-          setSelectedCount(0);
         } else {
           selectedNodeIds.current.add(d.source.id);
           selectedNodeIds.current.add(d.target.id);
@@ -234,8 +233,6 @@ function GraphVisualization({ data, onDataUpdate }) {
             .style('left', (event.pageX + 10) + 'px')
             .style('top', (event.pageY - 10) + 'px');
         }
-        
-        setSelectedCount(selectedNodeIds.current.size);
       }
     }
 
@@ -288,8 +285,6 @@ function GraphVisualization({ data, onDataUpdate }) {
             .style('left', (event.pageX + 10) + 'px')
             .style('top', (event.pageY - 10) + 'px');
         }
-        
-        setSelectedCount(selectedNodeIds.current.size);
       }
     }
 
@@ -354,7 +349,6 @@ function GraphVisualization({ data, onDataUpdate }) {
         selectedNodeIds.current.clear();
         updateHighlighting();
         tooltip.transition().duration(200).style('opacity', 0);
-        setSelectedCount(0);
       }
     });
 
@@ -535,7 +529,6 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
-      setSelectedCount(0);
       setShowGenerateForm(false);
 
     } catch (error) {
@@ -620,7 +613,6 @@ function GraphVisualization({ data, onDataUpdate }) {
       // Clear any selections
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
-      setSelectedCount(0);
     }
   };
 
@@ -638,59 +630,56 @@ function GraphVisualization({ data, onDataUpdate }) {
   };
 
   return (
-    <div className="graph-container">
-      <div className="edit-controls">
-        <button 
-          className="add-node-button"
-          onClick={() => setShowAddForm(true)}
+    <div className="graph-visualization-container">
+      <div className={`controls-panel ${!isControlsPanelOpen ? 'collapsed' : ''}`}>
+        <div 
+          className="controls-header"
+          onClick={() => setIsControlsPanelOpen(!isControlsPanelOpen)}
         >
-          Add Node
-        </button>
-        <button 
-          className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
-          onClick={() => {
-            setIsAddingRelationship(!isAddingRelationship);
-            setSelectedNodes([]);
-            if (isDeleteMode) setIsDeleteMode(false);
-          }}
-        >
-          {isAddingRelationship ? 'Cancel Relationship' : 'Add Relationship'}
-        </button>
-        <button 
-          className={`delete-button ${isDeleteMode ? 'active' : ''}`}
-          onClick={() => {
-            setIsDeleteMode(!isDeleteMode);
-            if (isAddingRelationship) {
-              setIsAddingRelationship(false);
-              setSelectedNodes([]);
-            }
-          }}
-        >
-          {isDeleteMode ? 'Cancel Delete' : 'Delete'}
-        </button>
+          <h3>Graph Controls</h3>
+          <button 
+            className={`controls-toggle ${!isControlsPanelOpen ? 'collapsed' : ''}`}
+            aria-label={isControlsPanelOpen ? 'Collapse Controls' : 'Expand Controls'}
+          >
+            ▼
+          </button>
+        </div>
+        
+        <div className="controls-content">
+          <div className="generate-controls">
+            <button
+              className="generate-button"
+              onClick={() => setShowGenerateForm(true)}
+            >
+              Generate Nodes
+            </button>
+          </div>
+          <div className="edit-controls">
+            <button
+              className={`add-node-button ${showAddForm ? 'active' : ''}`}
+              onClick={() => setShowAddForm(true)}
+            >
+              Add Node
+            </button>
+            <button
+              className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
+              onClick={() => setIsAddingRelationship(!isAddingRelationship)}
+            >
+              Add Relationship
+            </button>
+            <button
+              className={`delete-button ${isDeleteMode ? 'active' : ''}`}
+              onClick={() => setIsDeleteMode(!isDeleteMode)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
       </div>
 
       {isDeleteMode && (
         <div className="delete-helper">
           Click on a node or relationship to delete it
-        </div>
-      )}
-
-      <div className="generate-controls">
-        <button 
-          onClick={() => setShowGenerateForm(true)}
-          disabled={selectedNodeIds.current.size === 0}
-          className="generate-button"
-        >
-          Generate ({selectedCount} nodes selected)
-        </button>
-      </div>
-
-      {isAddingRelationship && (
-        <div className="relationship-helper">
-          {selectedNodes.length === 0 && 'Select first node'}
-          {selectedNodes.length === 1 && 'Select second node'}
-          {selectedNodes.length === 2 && 'Define relationship'}
         </div>
       )}
 

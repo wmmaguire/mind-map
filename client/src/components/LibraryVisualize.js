@@ -473,25 +473,17 @@ function LibraryVisualize() {
       )}
 
       <div className="visualization-panel">
-        {graphData ? (
-          <>
-            <div className="visualization-header">
-              <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
-            </div>
-            <div className="graph-container">
-              <GraphVisualization 
-                data={graphData} 
-                onDataUpdate={handleGraphDataUpdate}
-                width={dimensions.width > 768 ? dimensions.width - 300 : dimensions.width}
-                height={dimensions.height - 100}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="empty-state">
-            {analyzing ? 'Analyzing file...' : 'Select a file from the library to visualize'}
-          </div>
-        )}
+        <div className="visualization-header">
+          <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
+        </div>
+        <div className="graph-container">
+          <GraphVisualization 
+            data={graphData || { nodes: [], links: [] }}
+            onDataUpdate={handleGraphDataUpdate}
+            width={dimensions.width > 768 ? dimensions.width - 300 : dimensions.width}
+            height={dimensions.height - 100}
+          />
+        </div>
       </div>
 
       {showSaveDialog && (
