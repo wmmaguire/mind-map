@@ -646,15 +646,13 @@ function GraphVisualization({ data, onDataUpdate }) {
         </div>
         
         <div className="controls-content">
-          <div className="generate-controls">
+          <div className="edit-controls">
             <button
               className="generate-button"
               onClick={() => setShowGenerateForm(true)}
             >
               Generate Nodes
             </button>
-          </div>
-          <div className="edit-controls">
             <button
               className={`add-node-button ${showAddForm ? 'active' : ''}`}
               onClick={() => setShowAddForm(true)}

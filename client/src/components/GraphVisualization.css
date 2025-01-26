@@ -110,14 +110,6 @@ svg {
   margin-bottom: 15px;
 }
 
-.generate-controls {
-  position: static;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 15px;
-}
-
 .add-node-button,
 .add-relationship-button,
 .delete-button,
@@ -243,12 +235,6 @@ svg {
   }
 
   .edit-controls,
-  .generate-controls {
-    position: fixed;
-    top: auto;
-    bottom: 20px;
-    max-height: 40px;
-  }
 
   .edit-controls {
     left: 50%;
@@ -257,13 +243,6 @@ svg {
     gap: 8px;
     width: auto;
     justify-content: center;
-  }
-
-  .generate-controls {
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 70px; /* Position above edit controls */
-    width: auto;
   }
 
   .add-node-button,
@@ -302,9 +281,6 @@ svg {
       padding-bottom: env(safe-area-inset-bottom);
     }
     
-    .generate-controls {
-      bottom: max(70px, calc(env(safe-area-inset-bottom) + 50px));
-    }
   }
 }
 
@@ -657,29 +633,12 @@ svg {
   }
 
   .edit-controls,
-  .generate-controls {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
 
   .edit-controls button,
-  .generate-controls button {
-    width: 100%;
-    margin: 0;
-    padding: 12px;
-    font-size: 1rem;
-  }
 
   /* Ensure graph visualization doesn't get covered by controls */
   .graph-visualization-container {
     padding-bottom: 80vh; /* Match max-height of controls panel */
-  }
-
-  /* Improve button visibility and spacing */
-  .generate-controls {
-    margin-bottom: 15px;
   }
 
   /* Ensure all buttons are equally visible */
