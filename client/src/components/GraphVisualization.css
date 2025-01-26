@@ -239,9 +239,33 @@ svg {
 
 /* Mobile-specific styles */
 @media (max-width: 768px) {
+  .graph-container {
+    margin-top: 60px; /* Add space for the Library component */
+    position: relative;
+  }
+
   .edit-controls,
   .generate-controls {
+    position: fixed;
+    top: auto;
+    bottom: 20px;
     max-height: 40px;
+  }
+
+  .edit-controls {
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    width: auto;
+    justify-content: center;
+  }
+
+  .generate-controls {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 70px; /* Position above edit controls */
+    width: auto;
   }
 
   .add-node-button,
@@ -252,38 +276,37 @@ svg {
     padding: 8px 16px;
     font-size: 13px;
     line-height: 24px;
+    white-space: nowrap;
   }
 
-  .generate-form {
-    top: 60px;
-    right: 10px;
-    width: 250px;
+  /* Adjust helper text positions for mobile */
+  .relationship-helper,
+  .delete-helper {
+    bottom: 80px;
+    top: auto;
   }
 
-  .generate-form form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+  /* Adjust modal positions for mobile */
+  .modal-overlay {
+    padding: 20px;
   }
 
-  .generate-form input[type="number"] {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
+  .modal-content {
+    margin-bottom: 100px; /* Add space for controls at bottom */
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
   }
 
-  .form-buttons {
-    display: flex;
-    gap: 10px;
-  }
-
-  .form-buttons button {
-    flex: 1;
-    padding: 12px;
-    font-size: 16px;
-    border-radius: 6px;
+  /* Ensure buttons don't overlap with iOS home indicator */
+  @supports (-webkit-touch-callout: none) {
+    .edit-controls {
+      bottom: max(20px, env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .generate-controls {
+      bottom: max(70px, calc(env(safe-area-inset-bottom) + 50px));
+    }
   }
 }
 
