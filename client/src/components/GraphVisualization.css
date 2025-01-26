@@ -109,6 +109,7 @@ svg {
   display: flex;
   gap: 12px;
   z-index: 1000;
+  max-height: 45px;
 }
 
 .generate-controls {
@@ -116,44 +117,42 @@ svg {
   top: 20px;
   right: 20px;
   z-index: 1000;
+  max-height: 45px;
+}
+
+.add-node-button,
+.add-relationship-button,
+.delete-button,
+.generate-button {
+  padding: 10px 20px;
+  height: 45px;
+  line-height: 25px;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .add-node-button,
 .add-relationship-button {
-  padding: 10px 20px;
   background-color: #4a90e2;
   color: white;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  white-space: nowrap;
-  transition: all 0.2s ease;
 }
 
 .generate-button {
-  padding: 10px 20px;
   background-color: #4CAF50;
   color: white;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  white-space: nowrap;
-  transition: all 0.2s ease;
 }
 
-.generate-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.generate-button:not(:disabled):hover {
-  background-color: #45a049;
-  transform: translateY(-1px);
+.delete-button {
+  background-color: #e74c3c;
+  color: white;
 }
 
 .add-node-button:hover,
@@ -162,11 +161,25 @@ svg {
   transform: translateY(-1px);
 }
 
+.generate-button:hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+  transform: translateY(-1px);
+}
+
 .add-relationship-button.active {
   background-color: #e74c3c;
 }
 
 .add-relationship-button.active:hover {
+  background-color: #c0392b;
+}
+
+.delete-button.active {
   background-color: #c0392b;
 }
 
@@ -226,15 +239,19 @@ svg {
 
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  .edit-controls {
-    top: 10px;
-    left: 10px;
-    width: auto;
+  .edit-controls,
+  .generate-controls {
+    max-height: 40px;
   }
 
+  .add-node-button,
+  .add-relationship-button,
+  .delete-button,
   .generate-button {
-    padding: 10px 16px;
-    font-size: 14px;
+    height: 40px;
+    padding: 8px 16px;
+    font-size: 13px;
+    line-height: 24px;
   }
 
   .generate-form {
