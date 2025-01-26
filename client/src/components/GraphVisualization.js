@@ -762,27 +762,29 @@ function GraphVisualization({ data, onDataUpdate }) {
       )}
 
       {showGenerateForm && (
-        <div className="generate-form">
-          <form onSubmit={handleGenerate}>
-            <label>
-              Number of nodes to generate:
-              <input
-                type="number"
-                min="1"
-                max="5"
-                value={numNodesToAdd}
-                onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
-              />
-            </label>
-            <div className="form-buttons">
-              <button type="submit" disabled={isGenerating}>
-                {isGenerating ? 'Generating...' : 'Confirm'}
-              </button>
-              <button type="button" onClick={() => setShowGenerateForm(false)}>
-                Cancel
-              </button>
-            </div>
-          </form>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <form onSubmit={handleGenerate}>
+              <label>
+                Number of nodes to generate:
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={numNodesToAdd}
+                  onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
+                />
+              </label>
+              <div className="form-buttons">
+                <button type="submit" disabled={isGenerating}>
+                  {isGenerating ? 'Generating...' : 'Confirm'}
+                </button>
+                <button type="button" onClick={() => setShowGenerateForm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
       <svg ref={svgRef} className="graph-visualization"></svg>
