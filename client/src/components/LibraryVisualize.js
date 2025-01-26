@@ -474,7 +474,7 @@ function LibraryVisualize() {
 
       <div className="visualization-panel">
         <div className="visualization-header">
-          <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
+          <h3>Visualization: {currentSource?.name || 'Unnamed Graph'}</h3>
         </div>
         <div className="graph-container">
           <GraphVisualization 
