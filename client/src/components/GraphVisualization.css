@@ -519,21 +519,22 @@ svg {
 
 /* Controls Panel */
 .controls-panel {
-  position: absolute;
-  left: 0;
+  position: fixed;
+  right: 0;
   top: 0;
   background: white;
-  border-right: 1px solid #ddd;
+  border-left: 1px solid #ddd;
   height: 100%;
+  width: 250px;
   transition: all 0.3s ease;
   z-index: 1000;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
 }
 
 .controls-panel.collapsed {
-  width: 40px; /* Just enough width to show the toggle button */
+  width: 40px;
 }
 
 .controls-header {
@@ -546,7 +547,7 @@ svg {
   border-bottom: 1px solid #ddd;
   flex-shrink: 0;
   white-space: nowrap;
-  min-width: 40px; /* Match collapsed panel width */
+  min-width: 40px;
 }
 
 .controls-header h3 {
@@ -562,7 +563,6 @@ svg {
 }
 
 .controls-content {
-  width: 250px;
   padding: 15px;
   transition: all 0.3s ease;
   overflow: hidden;
@@ -574,6 +574,7 @@ svg {
 .controls-panel.collapsed .controls-content {
   width: 0;
   padding: 0;
+  visibility: hidden;
 }
 
 .controls-toggle {
@@ -584,41 +585,62 @@ svg {
   cursor: pointer;
   padding: 5px;
   transition: transform 0.3s ease;
-  min-width: 20px; /* Ensure toggle button maintains size */
+  min-width: 20px;
   position: absolute;
   right: 10px;
+  transform: rotate(180deg);
 }
 
 .controls-panel.collapsed .controls-toggle {
-  right: 10px; /* Keep the toggle button positioned consistently */
+  right: 10px;
 }
 
 .controls-toggle.collapsed {
-  transform: rotate(90deg);
+  transform: rotate(0deg);
 }
 
-/* Mobile adjustments */
+/* Mobile styles */
 @media (max-width: 768px) {
   .controls-panel {
     position: fixed;
-    height: auto;
-    width: 100%;
-    bottom: 0;
     top: auto;
-    border-right: none;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    max-height: 50vh;
+    border-left: none;
     border-top: 1px solid #ddd;
     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
   }
 
   .controls-panel.collapsed {
-    height: 0;
+    height: 40px;
     width: 100%;
-    border-top: none;
+    max-height: 40px;
+  }
+
+  .controls-header {
+    width: 100%;
+    justify-content: center;
   }
 
   .controls-content {
     width: 100%;
-    padding: 15px;
+    overflow-y: auto;
+  }
+
+  .controls-panel.collapsed .controls-content {
+    height: 0;
+    padding: 0;
+    visibility: hidden;
+  }
+
+  .controls-toggle {
+    position: absolute;
+    right: 15px;
+    transform: rotate(0deg);
   }
 
   .controls-toggle.collapsed {
@@ -627,12 +649,18 @@ svg {
 
   .edit-controls,
   .generate-controls {
-    flex-direction: row;
-    justify-content: center;
+    flex-direction: column;
+    width: 100%;
   }
 
   .edit-controls button,
   .generate-controls button {
-    width: auto;
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  /* Ensure graph visualization doesn't get covered by controls */
+  .graph-visualization-container {
+    padding-bottom: 50vh;
   }
 }
