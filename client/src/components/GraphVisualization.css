@@ -493,7 +493,7 @@ svg {
   stroke-dasharray: 5;
 }
 
-/* Controls Panel */
+/* Controls Panel - Base Styles */
 .controls-panel {
   position: fixed;
   right: 0;
@@ -581,58 +581,59 @@ svg {
     bottom: 0;
     left: 0;
     right: 0;
-    width: 100vw; /* Use viewport width */
-    background: white;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: transform 0.3s ease;
+    top: auto; /* Override top position */
+    width: 100%;
     height: 25vh;
+    background: white;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    border-left: none;
+    border-top: 1px solid #ddd;
     transform: translateY(0);
-    margin: 0; /* Remove any margin */
+    margin: 0;
   }
 
   .controls-panel.collapsed {
     transform: translateY(calc(100% - 48px));
+    width: 100%; /* Override desktop collapsed width */
   }
 
   .controls-header {
     width: 100%;
-    min-height: 48px;
-    padding: 10px 15px;
+    height: 48px;
+    padding: 0 15px;
     background: white;
-    border-top: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     display: flex;
     justify-content: center;
     align-items: center;
     position: relative;
-    flex-shrink: 0;
   }
 
   .controls-content {
-    width: 100%;
     height: calc(25vh - 48px);
+    padding: 10px;
     background: white;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Center vertically */
-    align-items: center; /* Center horizontally */
+    align-items: center;
+    justify-content: center;
     overflow-y: auto;
-    padding: 0; /* Remove padding */
+    width: 100%;
+    visibility: visible;
   }
 
   .edit-controls {
     width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center; /* Center horizontally */
-    justify-content: center; /* Center vertically */
+    align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 0;
+    padding: 0 20px;
     margin: 0;
+    position: static;
+    transform: none;
   }
 
   .edit-controls button,
@@ -640,21 +641,34 @@ svg {
   .add-node-button,
   .add-relationship-button,
   .delete-button {
-    width: 80%;
+    width: 90%;
     height: 36px;
-    padding: 0;
+    padding: 0 20px;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 18px;
-    margin: 0; /* Remove margins */
+    margin: 0;
+    white-space: nowrap;
   }
 
-  /* Ensure graph doesn't get covered by controls */
-  .graph-visualization-container {
+  /* Ensure graph container adjusts for controls */
+  .graph-container {
+    margin-bottom: 25vh;
+    margin-top: 0;
     padding-bottom: 25vh;
-    margin-bottom: 0; /* Remove any margin */
+  }
+
+  /* Ensure visualization header is small */
+  .visualization-header {
+    padding: 4px 8px;
+    height: 30px;
+  }
+
+  .visualization-header h3 {
+    font-size: 0.8rem;
+    margin: 0;
   }
 }
 
