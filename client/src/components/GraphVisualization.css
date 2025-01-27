@@ -589,24 +589,11 @@ svg {
     flex-direction: column;
     align-items: center;
     transition: transform 0.3s ease;
-    max-height: 25vh; /* Reduced from 80vh to 25vh */
+    height: 25vh; /* Fixed height instead of max-height */
   }
 
   .controls-panel.collapsed {
     transform: translateY(calc(100% - 48px)); /* Leave header visible */
-  }
-
-  .controls-content {
-    width: 100%;
-    padding: 10px 15px;
-    overflow-y: auto;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: auto; /* Remove fixed min-height */
-    max-height: calc(25vh - 48px); /* Account for header height */
   }
 
   .controls-header {
@@ -622,14 +609,25 @@ svg {
     position: relative;
   }
 
+  .controls-content {
+    width: 100%;
+    height: calc(25vh - 48px); /* Fixed height minus header */
+    padding: 10px 15px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Center buttons vertically */
+    overflow-y: auto;
+  }
+
   .edit-controls {
     width: 90%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px; /* Reduced gap between buttons */
-    padding: 10px 0;
-    margin: auto 0; /* Center in available space */
+    gap: 8px;
+    margin: auto; /* Center in available space */
   }
 
   .edit-controls button,
@@ -638,19 +636,19 @@ svg {
   .add-relationship-button,
   .delete-button {
     width: 100%;
-    height: 36px; /* Reduced height to match Give Feedback button */
+    height: 36px;
     padding: 0 20px;
-    font-size: 0.9rem; /* Slightly smaller font */
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 18px; /* Half of height for pill shape */
+    border-radius: 18px;
     margin: 0;
   }
 
   /* Ensure graph doesn't get covered by controls */
   .graph-visualization-container {
-    padding-bottom: 25vh; /* Match panel height */
+    padding-bottom: 25vh;
   }
 }
 
