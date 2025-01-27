@@ -589,7 +589,7 @@ svg {
     flex-direction: column;
     align-items: center;
     transition: transform 0.3s ease;
-    max-height: 80vh;
+    max-height: 25vh; /* Reduced from 80vh to 25vh */
   }
 
   .controls-panel.collapsed {
@@ -598,14 +598,15 @@ svg {
 
   .controls-content {
     width: 100%;
-    padding: 15px;
+    padding: 10px 15px;
     overflow-y: auto;
     background: white;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Center content vertically */
-    min-height: 300px; /* Give enough space for buttons */
+    justify-content: center;
+    min-height: auto; /* Remove fixed min-height */
+    max-height: calc(25vh - 48px); /* Account for header height */
   }
 
   .controls-header {
@@ -649,7 +650,7 @@ svg {
 
   /* Ensure graph doesn't get covered by controls */
   .graph-visualization-container {
-    padding-bottom: 80vh;
+    padding-bottom: 25vh; /* Match panel height */
   }
 }
 
@@ -666,11 +667,12 @@ svg {
 
 @media (max-width: 768px) {
   .visualization-header {
-    padding: 8px 12px;
+    padding: 4px 8px; /* Reduced padding */
   }
 
   .visualization-header h3 {
-    font-size: 1rem;
+    font-size: 0.8rem; /* Smaller font size */
+    margin: 0;
   }
 
   .graph-container {
