@@ -589,11 +589,12 @@ svg {
     flex-direction: column;
     align-items: center;
     transition: transform 0.3s ease;
-    height: 25vh; /* Fixed height instead of max-height */
+    height: 25vh;
+    transform: translateY(0);
   }
 
   .controls-panel.collapsed {
-    transform: translateY(calc(100% - 48px)); /* Leave header visible */
+    transform: translateY(calc(100% - 48px));
   }
 
   .controls-header {
@@ -607,27 +608,29 @@ svg {
     justify-content: center;
     align-items: center;
     position: relative;
+    flex-shrink: 0;
   }
 
   .controls-content {
     width: 100%;
-    height: calc(25vh - 48px); /* Fixed height minus header */
-    padding: 10px 15px;
+    flex: 1;
+    padding: 10px 0;
     background: white;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Center buttons vertically */
+    justify-content: center;
     overflow-y: auto;
   }
 
   .edit-controls {
-    width: 90%;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    margin: auto; /* Center in available space */
+    margin: auto;
+    padding: 0 15px;
   }
 
   .edit-controls button,
@@ -635,7 +638,7 @@ svg {
   .add-node-button,
   .add-relationship-button,
   .delete-button {
-    width: 100%;
+    width: 80%;
     height: 36px;
     padding: 0 20px;
     font-size: 0.9rem;
@@ -643,7 +646,7 @@ svg {
     align-items: center;
     justify-content: center;
     border-radius: 18px;
-    margin: 0;
+    margin: 0 auto;
   }
 
   /* Ensure graph doesn't get covered by controls */
