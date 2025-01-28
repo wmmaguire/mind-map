@@ -68,6 +68,12 @@ function App() {
                 )}
               </div>
               <Landing />
+              <button 
+                className="feedback-button-home"
+                onClick={() => window.open('https://forms.gle/YSFGAYDPSxpDJFGZ8', '_blank')}
+              >
+                Give Feedback
+              </button>
             </div>
           } 
         />

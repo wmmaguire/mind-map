@@ -177,15 +177,17 @@ h1 {
   }
 
   .feedback-button-home {
+    position: fixed;
     bottom: 20px;
     right: 20px;
     padding: 8px 12px;
     font-size: 12px;
-    z-index: 1000;
+    z-index: 9999;
+    display: block;
   }
 }
 
-/* Add feedback button styles */
+/* Feedback button styles */
 .feedback-button-home {
   position: fixed;
   bottom: 20px;
@@ -199,5 +201,17 @@ h1 {
   font-size: 14px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: all 0.2s ease;
-  z-index: 1000;
+  z-index: 9999;
+}
+
+@media (max-width: 768px) {
+  .feedback-button-home {
+    position: fixed;
+    bottom: calc(25vh + 20px); /* Position above the controls panel */
+    right: 20px;
+    padding: 8px 12px;
+    font-size: 12px;
+    z-index: 9999;
+    display: block;
+  }
 }
