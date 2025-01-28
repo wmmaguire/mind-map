@@ -698,12 +698,11 @@ svg {
   }
 }
 
-/* Add or update these styles */
+/* Feedback button styles */
 .feedback-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 1010; /* Increased z-index to be higher than everything else */
   padding: 8px 16px;
   background-color: #4a90e2;
   color: white;
@@ -711,15 +710,24 @@ svg {
   border-radius: 20px;
   cursor: pointer;
   font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: all 0.2s ease;
 }
 
+/* Mobile styles for feedback button */
 @media (max-width: 768px) {
   .feedback-button {
-    bottom: calc(25vh + 20px); /* Increased spacing from controls panel */
+    position: absolute;
+    top: -48px; /* Position above the controls panel header */
     right: 10px;
-    z-index: 1010; /* Explicitly set for mobile too */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* Enhanced shadow for better visibility */
+    bottom: auto;
+  }
+
+  .controls-panel {
+    position: relative; /* Make it a positioning context for feedback button */
+  }
+
+  .controls-content {
+    position: relative; /* Ensure proper stacking context */
   }
 }
