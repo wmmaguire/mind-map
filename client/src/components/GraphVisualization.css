@@ -703,6 +703,7 @@ svg {
   position: fixed;
   bottom: 20px;
   right: 20px;
+  z-index: 9999; /* Much higher z-index */
   padding: 8px 16px;
   background-color: #4a90e2;
   color: white;
@@ -717,17 +718,15 @@ svg {
 /* Mobile styles for feedback button */
 @media (max-width: 768px) {
   .feedback-button {
-    position: absolute;
-    top: -48px; /* Position above the controls panel header */
-    right: 10px;
-    bottom: auto;
+    position: fixed !important; /* Force position */
+    bottom: 30vh !important; /* Position well above the controls panel */
+    right: 10px !important;
+    z-index: 9999 !important; /* Force highest z-index */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
+  /* Ensure controls panel doesn't overlap */
   .controls-panel {
-    position: relative; /* Make it a positioning context for feedback button */
-  }
-
-  .controls-content {
-    position: relative; /* Ensure proper stacking context */
+    z-index: 1001;
   }
 }
