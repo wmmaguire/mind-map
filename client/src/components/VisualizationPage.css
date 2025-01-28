@@ -51,4 +51,22 @@ button:hover {
 button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .visualization-page {
+    padding: 10px;
+    height: 100vh;
+    padding-bottom: 0;
+  }
+
+  .visualization-content {
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 10px;
+    height: calc(100vh - 60px);
+  }
+
+  .visualization-header {
+    margin-bottom: 0;
+  }
 } 
