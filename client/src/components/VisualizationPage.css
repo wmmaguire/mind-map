@@ -62,7 +62,7 @@ button:disabled {
 
   .visualization-content {
     border-radius: 8px 8px 0 0;
-    margin-bottom: 10px;
+    margin-bottom: 0;
     height: calc(100vh - 60px);
   }
 

@@ -16,7 +16,7 @@ function LibraryVisualize() {
   const [graphDescription, setGraphDescription] = useState('');
   const [showContextModal, setShowContextModal] = useState(false);
   const [additionalContext, setAdditionalContext] = useState('');
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
@@ -369,8 +369,79 @@ function LibraryVisualize() {
     <div className="library-visualize">
       {/* Mobile-friendly layout structure */}
       <div className={`sidebar ${dimensions.width <= 768 ? 'mobile' : ''} ${showSidebar ? 'visible' : 'hidden'}`}>
-        <div className="sidebar-header">
-          <h2>File Library</h2>
+        <div className="sidebar-content">
+          <div className="file-list">
+            <h2>Files</h2>
+            {files.length === 0 ? (
+              <p className="no-files">No files available</p>
+            ) : (
+              <>
+                <div className="file-list-header">
+                  <span>Selected: {selectedFiles.size} files</span>
+                  <button
+                    className="analyze-button"
+                    onClick={handleAnalyzeClick}
+                    disabled={analyzing || selectedFiles.size === 0}
+                  >
+                    {analyzing ? 'Analyzing...' : 'Analyze Selected'}
+                  </button>
+                </div>
+                <ul>
+                  {files.map((file, index) => (
+                    <li 
+                      key={file.id || index}
+                      className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
+                    >
+                      <label className="file-label">
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.has(file)}
+                          onChange={() => handleFileSelect(file)}
+                        />
+                        <span className="file-name">
+                          {file.customName || file.originalName}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div> 
+          <div className="saved-graphs-section">
+            <h2>Graphs</h2>
+            {graphData && (
+              <button 
+                onClick={handleSaveClick}
+                disabled={saving}
+                className="save-current-button"
+              >
+                {saving ? 'Saving...' : 'Save Current Graph'}
+              </button>
+            )}
+            <div className="saved-graphs">
+              {savedGraphs.map((graph, index) => (
+                <div key={index} className="saved-graph-item">
+                  <div className="graph-info">
+                    <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
+                    <small>
+                      Nodes: {graph.metadata.nodeCount} | 
+                      Edges: {graph.metadata.edgeCount}
+                    </small>
+                    <small>Saved: {new Date(graph.metadata.savedAt).toLocaleDateString()}</small>
+                  </div>
+                  <button 
+                    onClick={() => handleLoadGraph(graph.filename)}
+                    className="load-button"
+                  >
+                    Load
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="sidebar-footer">
           {dimensions.width <= 768 && (
             <button 
               className="toggle-sidebar"
@@ -379,6 +450,7 @@ function LibraryVisualize() {
               {showSidebar ? '×' : '☰'}
             </button>
           )}
+          <h3>Library</h3>
         </div>
         {error && (
           <div className="error">
@@ -388,76 +460,6 @@ function LibraryVisualize() {
             </button>
           </div>
         )}
-        <div className="file-list">
-          {files.length === 0 ? (
-            <p className="no-files">No files available</p>
-          ) : (
-            <>
-              <div className="file-list-header">
-                <span>Selected: {selectedFiles.size} files</span>
-                <button
-                  className="analyze-button"
-                  onClick={handleAnalyzeClick}
-                  disabled={analyzing || selectedFiles.size === 0}
-                >
-                  {analyzing ? 'Analyzing...' : 'Analyze Selected'}
-                </button>
-              </div>
-              <ul>
-                {files.map((file, index) => (
-                  <li 
-                    key={file.id || index}
-                    className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
-                  >
-                    <label className="file-label">
-                      <input
-                        type="checkbox"
-                        checked={selectedFiles.has(file)}
-                        onChange={() => handleFileSelect(file)}
-                      />
-                      <span className="file-name">
-                        {file.customName || file.originalName}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-        
-        <div className="saved-graphs-section">
-          <h2>Saved Graphs</h2>
-          {graphData && (
-            <button 
-              onClick={handleSaveClick}
-              disabled={saving}
-              className="save-current-button"
-            >
-              {saving ? 'Saving...' : 'Save Current Graph'}
-            </button>
-          )}
-          <div className="saved-graphs">
-            {savedGraphs.map((graph, index) => (
-              <div key={index} className="saved-graph-item">
-                <div className="graph-info">
-                  <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
-                  <small>
-                    Nodes: {graph.metadata.nodeCount} | 
-                    Edges: {graph.metadata.edgeCount}
-                  </small>
-                  <small>Saved: {new Date(graph.metadata.savedAt).toLocaleDateString()}</small>
-                </div>
-                <button 
-                  onClick={() => handleLoadGraph(graph.filename)}
-                  className="load-button"
-                >
-                  Load
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Add floating button for mobile */}
@@ -474,7 +476,7 @@ function LibraryVisualize() {
 
       <div className="visualization-panel">
         <div className="visualization-header">
-          <h3>Visualization: {currentSource?.name || 'Unnamed Graph'}</h3>
+          <h3>Visualization: {currentSource?.sourceFile || 'Unnamed Graph'}</h3>
         </div>
         <div className="graph-container">
           <GraphVisualization 

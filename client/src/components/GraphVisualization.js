@@ -30,11 +30,28 @@ function GraphVisualization({ data, onDataUpdate }) {
     relationship: ''
   });
   const [isDeleteMode, setIsDeleteMode] = useState(false);
-  const [isControlsPanelOpen, setIsControlsPanelOpen] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
 
   // Add width and height constants
   const width = 800;
   const height = 600;
+
+  // Add resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
@@ -631,18 +648,23 @@ function GraphVisualization({ data, onDataUpdate }) {
 
   return (
     <div className="graph-visualization-container">
-      <div className={`controls-panel ${!isControlsPanelOpen ? 'collapsed' : ''}`}>
+      <div className={`controls-panel ${dimensions.width <= 768 ? 'mobile' : ''} ${showSidebar ? 'visible' : 'hidden'}`}>
         <div 
           className="controls-header"
-          onClick={() => setIsControlsPanelOpen(!isControlsPanelOpen)}
+          onClick={() => dimensions.width <= 768 && setShowSidebar(!showSidebar)}
         >
           <h3>Graph Controls</h3>
-          <button 
-            className={`controls-toggle ${!isControlsPanelOpen ? 'collapsed' : ''}`}
-            aria-label={isControlsPanelOpen ? 'Collapse Controls' : 'Expand Controls'}
-          >
-            ▼
-          </button>
+          {dimensions.width <= 768 && (
+            <button 
+              className="controls-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSidebar(!showSidebar);
+              }}
+            >
+              {showSidebar ? '×' : '☰'}
+            </button>
+          )}
         </div>
         
         <div className="controls-content">

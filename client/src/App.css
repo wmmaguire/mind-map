@@ -28,20 +28,6 @@
   width: 90%;
 }
 
-h1 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-  font-size: 2.5rem;
-  animation: fadeIn 0.8s ease-out;
-}
-  
-.description {
-    color: #666;
-    font-size: 1.2rem;
-  line-height: 1.6;
-  animation: fadeIn 0.8s ease-out 0.2s backwards;
-}
-
 .features-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -71,21 +57,6 @@ h1 {
 .feature-icon {
   font-size: 2rem;
   margin-bottom: 1rem;
-}
-
-h1 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-  font-size: 2.5rem;
-  animation: fadeIn 0.8s ease-out;
-}
-
-.description {
-  color: #666;
-  margin-bottom: 2rem;
-  font-size: 1.2rem;
-  line-height: 1.6;
-  animation: fadeIn 0.8s ease-out 0.2s backwards;
 }
 
 .feature-card h3 {
