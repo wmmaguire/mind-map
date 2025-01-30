@@ -22,7 +22,7 @@
 .feedback-button {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 50%;
   padding: 12px 24px;
   background: #4299e1;
   color: white;
@@ -35,9 +35,17 @@
   z-index: 1000;
 }
 
+/* Mobile styles for feedback button */
+@media (max-width: 768px) {
+  .feedback-button {
+    bottom: 100px; /* Keep bottom positioning */
+    transform: translate(-50%, 20px); /* Move up by 100px while maintaining horizontal center */
+    z-index: 1002;
+  }
+}
+
 .feedback-button:hover {
   background: #3182ce;
-  transform: translateY(-1px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 

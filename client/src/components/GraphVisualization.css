@@ -692,32 +692,8 @@ svg {
   }
 }
 
-/* Feedback button styles */
-.feedback-button {
-  position: fixed;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
-  padding: 8px 16px;
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-/* Mobile styles for feedback button */
+/* Mobile styles for controls panel t*/
 @media (max-width: 768px) {
-  .feedback-button {
-    bottom: 100px; /* Keep bottom positioning */
-    transform: translate(-50%, -60px); /* Move up by 100px while maintaining horizontal center */
-    z-index: 1002;
-  }
-
   .controls-panel {
     z-index: 1001;
   }
