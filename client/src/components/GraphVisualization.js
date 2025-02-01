@@ -47,10 +47,7 @@ function GraphVisualization({ data, onDataUpdate }) {
 
   // Add new refs for tracking thresholds
   const mergeThresholdRef = useRef(0.8);  // Initial merge threshold
-  const splitThresholdRef = useRef(1.25);  // Initial split threshold (1/0.8)
-
-  // Add color scale
-  const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+  const splitThresholdRef = useRef(1.2);  // Initial split threshold (1/0.8)
 
   // Add resize listener
   useEffect(() => {
@@ -74,20 +71,20 @@ function GraphVisualization({ data, onDataUpdate }) {
     // Initialize hierarchical communities with individual nodes
     const initializeCommunities = () => {
       const communities = new Map();
+      
       data.nodes.forEach(node => {
-        console.log('Initializing node:', node); // Debug log
         communities.set(node.id, {
           id: node.id,
-          nodes: [{ ...node }], // Make sure we copy all node properties
+          nodes: [{ ...node }],
           parent: null,
           children: [],
           level: 0,
           x: node.x || width/2,
           y: node.y || height/2,
-          // Preserve the original node's properties at the community level
           label: node.label,
           description: node.description,
-          wikiUrl: node.wikiUrl
+          wikiUrl: node.wikiUrl,
+          color: '#4a90e2' // All initial nodes should be blue
         });
       });
       return communities;
@@ -100,8 +97,8 @@ function GraphVisualization({ data, onDataUpdate }) {
       const communityArray = Array.from(currentCommunities.values());
       const newCommunities = new Map();
       const merged = new Set();
+      const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-      // Find communities to merge based on proximity
       for (let i = 0; i < communityArray.length; i++) {
         if (merged.has(communityArray[i].id)) continue;
 
@@ -133,12 +130,7 @@ function GraphVisualization({ data, onDataUpdate }) {
         if (closestCommunity && minDistance < 100) {
           const mergedNodes = [...community1.nodes, ...closestCommunity.nodes];
           
-          // Determine which community is larger
-          const largerCommunity = community1.nodes.length >= closestCommunity.nodes.length 
-            ? community1 
-            : closestCommunity;
-
-          // Create merged community with color inheritance
+          // Create merged community with new unique color
           const mergedCommunity = {
             id: `merged-${community1.id}-${closestCommunity.id}`,
             nodes: mergedNodes,
@@ -149,17 +141,13 @@ function GraphVisualization({ data, onDataUpdate }) {
             y: d3.mean(mergedNodes, n => n.y || 0),
             label: `Group ${i}`,
             description: `Contains ${mergedNodes.length} nodes: ${mergedNodes.map(n => n.label).join(', ')}`,
-            color: largerCommunity.color || colorScale(largerCommunity.id) // Inherit color from larger community
+            color: colorScale(Math.random()) // Assign new unique color to merged community
           };
 
           merged.add(community1.id);
           merged.add(closestCommunity.id);
           newCommunities.set(mergedCommunity.id, mergedCommunity);
         } else if (!merged.has(community1.id)) {
-          // Assign color to unmerged community if it doesn't have one
-          if (!community1.color) {
-            community1.color = colorScale(community1.id);
-          }
           newCommunities.set(community1.id, community1);
         }
       }
@@ -167,9 +155,6 @@ function GraphVisualization({ data, onDataUpdate }) {
       // Add remaining unmerged communities
       communityArray.forEach(community => {
         if (!merged.has(community.id)) {
-          if (!community.color) {
-            community.color = colorScale(community.id);
-          }
           newCommunities.set(community.id, community);
         }
       });
@@ -218,7 +203,8 @@ function GraphVisualization({ data, onDataUpdate }) {
           // Preserve original node properties
           label: node.label || 'Unnamed Node',
           description: node.description || '',
-          wikiUrl: node.wikiUrl || ''
+          wikiUrl: node.wikiUrl || '',
+          color: '#4a90e2', // All initial nodes should be blue
         };
         newCommunities.set(node.id, restoredNode);
       });
@@ -308,24 +294,16 @@ function GraphVisualization({ data, onDataUpdate }) {
         });
 
         // Update node sizes and appearance
-        g.selectAll('.node circle')
+        updateHighlighting();
+
+        // Update link visibility
+        g.selectAll('.link')
           .transition()
           .duration(300)
-          .attr('r', d => {
-            const community = Array.from(visibleCommunities.values())
-              .find(c => c.nodes.some(n => n.id === d.id));
-            if (community?.nodes.length > 1) {
-              const sizeMultiplier = Math.sqrt(community.nodes.length);
-              return Math.min(200, Math.max(30, baseSize * sizeMultiplier));
-            }
-            return 20; // Base size for individual nodes
-          })
-          .attr('fill', d => {
-            const community = Array.from(visibleCommunities.values())
-              .find(c => c.nodes.some(n => n.id === d.id));
-            return community?.nodes.length > 1 ? '#69b3a2' : '#4a90e2';
-          });
+          .style('opacity', Math.max(0.2, Math.min(0.6, currentZoom)))
+          .attr('stroke-width', Math.max(1, 3 * (1 / currentZoom)));
 
+          
         // Update labels
         g.selectAll('.node text')
           .transition()
@@ -353,12 +331,6 @@ function GraphVisualization({ data, onDataUpdate }) {
               `${Math.max(12, baseSize/2)}px` : '12px';
           });
 
-        // Update link visibility
-        g.selectAll('.link')
-          .transition()
-          .duration(300)
-          .style('opacity', Math.max(0.2, Math.min(0.6, currentZoom)))
-          .attr('stroke-width', Math.max(1, 3 * (1 / currentZoom)));
 
         previousZoomRef.current = currentZoom;
       }));
@@ -451,7 +423,8 @@ function GraphVisualization({ data, onDataUpdate }) {
             nodes: [d],
             label: d.label,
             description: d.description,
-            wikiUrl: d.wikiUrl
+            wikiUrl: d.wikiUrl,
+            color: '#4a90e2' // Assign initial color
           };
         }
 
@@ -718,15 +691,30 @@ function GraphVisualization({ data, onDataUpdate }) {
           return;
         }
 
+        // Wrap raw nodes in community structure if needed
+        const wrappedNode = node.nodes ? node : {
+          id: node.id,
+          nodes: [{ ...node }],
+          parent: null,
+          children: [],
+          level: 0,
+          x: node.x || width/2,
+          y: node.y || height/2,
+          label: node.label,
+          description: node.description,
+          wikiUrl: node.wikiUrl,
+          color: '#4a90e2'
+        };
+
         // Regular node selection toggle
-        if (selectedNodeIds.current.has(node.id)) {
-          selectedNodeIds.current.delete(node.id);
-          if (selectedNodeId.current === node.id) {
+        if (selectedNodeIds.current.has(wrappedNode.id)) {
+          selectedNodeIds.current.delete(wrappedNode.id);
+          if (selectedNodeId.current === wrappedNode.id) {
             selectedNodeId.current = null;
           }
         } else {
-          selectedNodeId.current = node.id;
-          selectedNodeIds.current.add(node.id);
+          selectedNodeId.current = wrappedNode.id;
+          selectedNodeIds.current.add(wrappedNode.id);
         }
 
         updateHighlighting();
@@ -734,7 +722,7 @@ function GraphVisualization({ data, onDataUpdate }) {
         // Only show tooltip if the node is selected
         const tooltip = d3.select('.tooltip');
         
-        if (!selectedNodeIds.current.has(node.id)) {
+        if (!selectedNodeIds.current.has(wrappedNode.id)) {
           tooltip.transition()
             .duration(200)
             .style('opacity', 0);
@@ -745,42 +733,52 @@ function GraphVisualization({ data, onDataUpdate }) {
           .duration(200)
           .style('opacity', .9);
 
-        // Build tooltip content
-        let tooltipContent = `
-          <strong>${node.label || 'Unnamed Node'}</strong><br/>
-          ${node.description ? `${node.description}<br/>` : ''}
-          ${node.wikiUrl ? `<a href="${node.wikiUrl}" target="_blank">Learn more</a><br/>` : ''}
-        `;
+        // Build tooltip content based on node type
+        let tooltipContent;
+        if (node.nodes && node.nodes.length > 1) {
+          // For community nodes
+          tooltipContent = `
+            <strong>${node.label || 'Group'}</strong><br/>
+            ${node.description || `Contains ${node.nodes.length} nodes`}<br/>
+          `;
+        } else {
+          // For single nodes
+          const nodeToShow = node.nodes ? node.nodes[0] : node;
+          tooltipContent = `
+            <strong>${nodeToShow.label || 'Unnamed Node'}</strong><br/>
+            ${nodeToShow.description ? `${nodeToShow.description}<br/>` : ''}
+            ${nodeToShow.wikiUrl ? `<a href="${nodeToShow.wikiUrl}" target="_blank">Learn more</a><br/>` : ''}
+          `;
 
-        // Find connected links for tooltip info
-        const connectedLinks = data.links ? data.links.filter(link => {
-          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-          return sourceId === node.id || targetId === node.id;
-        }) : [];
+          // Find connected links for single nodes
+          const connectedLinks = data.links ? data.links.filter(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            return sourceId === nodeToShow.id || targetId === nodeToShow.id;
+          }) : [];
 
-        // Add related nodes section if there are any
-        if (connectedLinks && connectedLinks.length > 0) {
-          tooltipContent += '<br/><strong>Related Concepts:</strong><br/>';
-          const relatedNodes = connectedLinks
-            .map(link => {
-              try {
-                const otherNodeId = typeof link.source === 'object' 
-                  ? (link.source.id === node.id ? link.target.id : link.source.id)
-                  : (link.source === node.id ? link.target : link.source);
-                
-                const otherNode = data.nodes.find(n => n.id === otherNodeId);
-                return otherNode 
-                  ? `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'}`
-                  : '';
-              } catch (e) {
-                console.error('Error processing related node:', e);
-                return '';
-              }
-            })
-            .filter(Boolean)
-            .join('<br/>');
-          tooltipContent += relatedNodes;
+          // Add related nodes section if there are any
+          if (connectedLinks && connectedLinks.length > 0) {
+            tooltipContent += '<br/><strong>Related Concepts:</strong><br/>';
+            const relatedNodes = connectedLinks
+              .map(link => {
+                try {
+                  const otherNodeId = typeof link.source === 'object' 
+                    ? (link.source.id === nodeToShow.id ? link.target.id : link.source.id)
+                    : (link.source === nodeToShow.id ? link.target : link.source);
+                  
+                  const otherNode = data.nodes.find(n => n.id === otherNodeId);
+                  return otherNode 
+                    ? `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'}`
+                    : '';
+                } catch (e) {
+                  return '';
+                }
+              })
+              .filter(Boolean)
+              .join('<br/>');
+            tooltipContent += relatedNodes;
+          }
         }
 
         tooltip.html(tooltipContent)
@@ -800,57 +798,33 @@ function GraphVisualization({ data, onDataUpdate }) {
     }
 
     function updateHighlighting() {
-      // Update nodes
-      node.selectAll('circle')
-        .attr('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : '#4a90e2')
-        .attr('stroke', d => selectedNodeIds.current.has(d.id) ? '#f1c40f' : '#fff')
-        .attr('stroke-width', d => selectedNodeIds.current.has(d.id) ? 4 : 2)
-        .attr('r', d => selectedNodeIds.current.has(d.id) ? 25 : 20);
+      // Highlight selected nodes
+      g.selectAll('.node circle')
+        .style('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : d.color)
+        .style('stroke', d => selectedNodeIds.current.has(d.id) ?  '#f1c40f' : '#fff')
+        .style('stroke-width', d => selectedNodeIds.current.has(d.id) ?  4 : 2)
+        .style('r', d => selectedNodeIds.current.has(d.id) ?  25 : (d && d.nodes && d.nodes.length > 1) ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length)) : 20);
 
-      // Update links
       linkGroups.selectAll('.link-line')
-        .attr('stroke', l => {
-          if (selectedNodeIds.current.size === 0) return '#999';
-          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
-            ? '#e74c3c' 
-            : '#999';
-        })
-        .attr('stroke-width', l => {
-          if (selectedNodeIds.current.size === 0) return 2;
-          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
-            ? 3 
-            : 1;
-        })
-        .attr('stroke-opacity', l => {
-          if (selectedNodeIds.current.size === 0) return 0.6;
-          return (selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)) 
-            ? 1 
-            : 0.3;
-        });
+        .style('stroke-opacity', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? 1 : 0.6)
+        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? '#e74c3c' : '#999')
+        .style('stroke-width', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)?  3 : 1);
 
-      // Update connected nodes
-      if (selectedNodeIds.current.size > 0) {
-        const connectedNodeIds = new Set();
-        data.links.forEach(link => {
-          if (selectedNodeIds.current.has(link.source.id)) connectedNodeIds.add(link.target.id);
-          if (selectedNodeIds.current.has(link.target.id)) connectedNodeIds.add(link.source.id);
-        });
+      // Reset all nodes and links to default state
+      if (selectedNodeIds.current.size === 0) {
+        g.selectAll('.node circle')
+          .style('fill', d => d.color)
+          .style('stroke', '#fff')
+          .style('stroke-width', 2)
+          .style('r', d => (d && d.nodes && d.nodes.length > 1) ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length)) : 20);
+      
+        linkGroups.selectAll('.link-line')
+          .style('stroke-opacity', 0.6) 
+          .style('stroke', '#999')
+          .style('stroke-width', 1);
 
-        node.selectAll('circle')
-          .attr('fill', d => {
-            if (selectedNodeIds.current.has(d.id)) return '#e74c3c';
-            return connectedNodeIds.has(d.id) ? '#4a90e2' : '#4a90e2';
-          })
-          .attr('opacity', d => {
-            if (selectedNodeIds.current.has(d.id)) return 1;
-            return connectedNodeIds.has(d.id) ? 1 : 0.5;
-          });
-      } else {
-        // Reset all nodes when nothing is selected
-        node.selectAll('circle')
-          .attr('fill', '#4a90e2')
-          .attr('opacity', 1);
       }
+      
     }
 
     // Add click handler to svg to deselect
@@ -971,7 +945,8 @@ function GraphVisualization({ data, onDataUpdate }) {
               nodes: [d],
               label: d.label,
               description: d.description,
-              wikiUrl: d.wikiUrl
+              wikiUrl: d.wikiUrl,
+              color: '#4a90e2' // All initial nodes should be blue
             };
           }
 
@@ -1110,13 +1085,7 @@ function GraphVisualization({ data, onDataUpdate }) {
             ? Math.min(100, Math.max(30, 20 * Math.sqrt(d.nodes.length)))
             : 20;
         })
-        .attr('fill', d => {
-          if (!d || !d.nodes) return '#4a90e2';
-          if (d.nodes.length > 1) {
-            return d.color || colorScale(d.id); // Use assigned color or generate new one
-          }
-          return '#4a90e2'; // Original nodes stay blue
-        })
+        .attr('fill', d => d.color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.5);
 
