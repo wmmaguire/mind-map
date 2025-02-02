@@ -259,7 +259,7 @@ function GraphVisualization({ data, onDataUpdate }) {
             updateVisualization();
             // Update merge threshold based on current zoom
           }
-          mergeThresholdRef.current = currentZoom * MERGE_THRESHOLD;
+          mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
           splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
         } else if (currentZoom > splitThresholdRef.current) {
           console.log('Attempting split with', communitiesRef.current.size, 'communities');
@@ -269,8 +269,8 @@ function GraphVisualization({ data, onDataUpdate }) {
             updateVisualization();
             // Update split threshold based on current zoom
           }
+          mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
           splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
-          mergeThresholdRef.current = currentZoom * MERGE_THRESHOLD;
         }
 
         // Update positions and visuals based on current communities
@@ -490,6 +490,7 @@ function GraphVisualization({ data, onDataUpdate }) {
 
         let tooltipContent = '';
         try {
+          console.log(d);
           if (d.nodes.length > 1) {
             // For community nodes
             const communityLabel = d.label || 'Group';
@@ -625,51 +626,31 @@ function GraphVisualization({ data, onDataUpdate }) {
         .style('opacity', 0);
     }
 
-    function handleLinkClick(event, d) {
+    function handleLinkClick(event, link) {
       event.stopPropagation();
       
       if (isDeleteMode) {
-        handleDeleteLink(d);
+        handleDeleteLink(link);
       } else {
-        if (selectedNodeIds.current.has(d.source.id) || selectedNodeIds.current.has(d.target.id)) {
-          selectedNodeIds.current.clear();
-          selectedNodeId.current = null;
-          updateHighlighting();
-          tooltip.transition().duration(200).style('opacity', 0);
-        } else {
-          selectedNodeIds.current.add(d.source.id);
-          selectedNodeIds.current.add(d.target.id);
-          selectedNodeId.current = d.source.id;
-          updateHighlighting();
-          
-          // Show tooltip with Wikipedia link if available
-          tooltip.transition()
-            .duration(200)
-            .style('opacity', 0.9);
-          
-          let tooltipContent = '';
-          if (d.nodes.length > 1) {
-            tooltipContent = `
-              <strong>${d.label}</strong><br/>
-              <br/>
-              ${d.description}<br/>
-            `;
-          } else {
-            const relatedNodes = data.links.filter(l => l.source.id === d.id || l.target.id === d.id).map(l => l.source.id === d.id ? l.target : l.source);
-            const selectedNode = data.nodes.find(n => n.id === d.id);
-            tooltipContent = `
-              <strong>${selectedNode.label}</strong><br/>
-              ${selectedNode.description ? `${selectedNode.description}<br/>` : ''}
-              ${selectedNode.wikiUrl ? `<a href="${selectedNode.wikiUrl}" target="_blank">Learn more</a><br/>` : ''}
-              ${relatedNodes.length > 0 ? '<br/><strong>Related Concepts:</strong><br/>' : ''}
-              ${relatedNodes.map(n => `${n.label} - ${n.relationship}`).join('<br/>')}
-            `;
-          }
-          
-          tooltip.html(tooltipContent)
-            .style('left', (event.pageX + 10) + 'px')
-            .style('top', (event.pageY - 10) + 'px');
-        }
+        selectedNodeIds.current.add(link.source.id);
+        selectedNodeIds.current.add(link.target.id);
+        updateHighlighting();
+
+        const sourceLabel = link.source.label || 'Unnamed Node';
+        const targetLabel = link.target.label || 'Unnamed Node';
+        const relationship = link.relationship || 'related to';
+  
+        const tooltipContent = `
+          <strong>${sourceLabel}</strong>
+          <br/>
+          ${relationship}
+          <br/>
+          <strong>${targetLabel}</strong>
+        `;
+  
+        tooltip.html(tooltipContent)
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px');
       }
     }
 
@@ -812,6 +793,7 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       // Reset all nodes and links to default state
       if (selectedNodeIds.current.size === 0) {
+        console.log('Resetting all nodes and links to default state');
         g.selectAll('.node circle')
           .style('fill', d => d.color)
           .style('stroke', '#fff')
@@ -823,6 +805,20 @@ function GraphVisualization({ data, onDataUpdate }) {
           .style('stroke', '#999')
           .style('stroke-width', 1);
 
+      } else {
+        // If no nodes are selected, show everything normally
+        console.log('Highlighting nodes and links based on selection');
+        g.selectAll('.node circle')
+          .style('opacity', 1)
+          .style('stroke', '#fff')
+          .style('stroke-width', 1.5)
+          .attr('fill', d => {
+            if (!d || !d.nodes) {
+              console.log('No nodes found in:', d);
+              return '#4a90e2';
+            }
+            return d.nodes.length > 1 ? d.color : '#4a90e2';
+          });
       }
       
     }

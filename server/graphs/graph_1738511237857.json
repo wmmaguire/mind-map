@@ -1,0 +1,255 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": 1,
+        "label": "Mind map",
+        "description": "A diagram used to visually organize information into a hierarchy, showing relationships among pieces of the whole.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Mind_map",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 0,
+        "x": 394.5385171562749,
+        "y": 326.85966522337077,
+        "vy": 0.015903963652778436,
+        "vx": -0.0025856139257664024,
+        "fx": null,
+        "fy": null
+      },
+      {
+        "id": 2,
+        "label": "Diagram",
+        "description": "A symbolic representation of information using visualization techniques.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Diagram",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 1,
+        "x": 329.49242168118826,
+        "y": 415.5710054165145,
+        "vy": 0.013793391096870266,
+        "vx": -0.0031468777839559364
+      },
+      {
+        "id": 3,
+        "label": "Hierarchy",
+        "description": "An arrangement of items in which the items are represented as being above, below, or at the same level as one another.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Hierarchy",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 2,
+        "x": 502.36917396552735,
+        "y": 186.7368826448112,
+        "vy": 0.01264593412886676,
+        "vx": -0.0038271718702654754
+      },
+      {
+        "id": 4,
+        "label": "Tree structure",
+        "description": "A way of representing the hierarchical nature of a structure in a graphical form.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Tree_structure",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 3,
+        "x": 411.43241587781455,
+        "y": 228.33273236064625,
+        "vy": 0.015043228544203372,
+        "vx": -0.002768085595852804
+      },
+      {
+        "id": 5,
+        "label": "Tony Buzan",
+        "description": "British popular psychology author and television personality who popularized the term \"mind map\".",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Tony_Buzan",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 4,
+        "x": 265.86148677642507,
+        "y": 338.450831872542,
+        "vy": 0.013691419094582819,
+        "vx": -0.0036792096706492845
+      },
+      {
+        "id": 6,
+        "label": "Concept map",
+        "description": "A type of diagram that depicts suggested relationships between concepts.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Concept_map",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 5,
+        "x": 492.8555011264169,
+        "y": 286.2811487413479,
+        "vy": 0.01309826794428731,
+        "vx": 0.0003690443995505513,
+        "fx": null,
+        "fy": null
+      },
+      {
+        "id": 7,
+        "label": "Memory",
+        "description": "The faculty by which the brain encodes, stores, and retrieves information.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Memory",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 6,
+        "x": 428.5989535882791,
+        "y": 428.7332867870069,
+        "vy": 0.015385088201170283,
+        "vx": -0.0028118979779466324
+      },
+      {
+        "id": 8,
+        "label": "Brainstorming",
+        "description": "A group creativity technique by which efforts are made to find a conclusion for a specific problem by gathering a list of ideas spontaneously contributed by its members.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Brainstorming",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 7,
+        "x": 343.22827433187535,
+        "y": 155.1913008825651,
+        "vy": 0.013933752934358664,
+        "vx": -0.0013263248053703893
+      },
+      {
+        "id": 9,
+        "label": "Problem solving",
+        "description": "The process of finding solutions to difficult or complex issues.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Problem_solving",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 8,
+        "x": 517.6129619834305,
+        "y": 383.1645880210051,
+        "vy": 0.014151966180174076,
+        "vx": -0.0034431554131608547
+      },
+      {
+        "id": 10,
+        "label": "Mind-mapping software",
+        "description": "Software used to create mind maps, graphical representations of information.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/List_of_concept-_and_mind-mapping_software",
+        "sources": [
+          "unknown"
+        ],
+        "size": null,
+        "color": "#4a90e2",
+        "index": 9,
+        "x": 313.98415734925516,
+        "y": 250.81965242506178,
+        "vy": 0.013447363093753318,
+        "vx": -0.0029168708691135704
+      }
+    ],
+    "links": [
+      {
+        "source": 1,
+        "target": 2,
+        "relationship": "A mind map is a type of diagram.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 3,
+        "relationship": "A mind map organizes information into a hierarchy.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 4,
+        "relationship": "A mind map uses a tree structure for organizing information.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 5,
+        "relationship": "The term \"mind map\" was popularized by Tony Buzan.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 6,
+        "relationship": "Mind maps differ from concept maps in their structure and use.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 7,
+        "relationship": "Mind maps aid in memory recall.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 8,
+        "relationship": "Mind maps are often used as a tool in brainstorming sessions.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 9,
+        "relationship": "Mind maps can be used as a problem-solving tool.",
+        "sources": [
+          1
+        ]
+      },
+      {
+        "source": 1,
+        "target": 10,
+        "relationship": "Mind maps can be created using mind-mapping software.",
+        "sources": [
+          1
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "name": "MindMap",
+    "description": "This is an sample mind map for demonstration purposes",
+    "sourceFiles": [
+      "MindMap.md"
+    ],
+    "generatedAt": "2025-02-02T15:47:17.839Z",
+    "nodeCount": 10,
+    "edgeCount": 9,
+    "savedAt": "2025-02-02T15:47:17.857Z"
+  }
+}
