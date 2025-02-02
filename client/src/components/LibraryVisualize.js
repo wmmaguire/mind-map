@@ -24,6 +24,7 @@ function LibraryVisualize() {
     height: window.innerHeight
   });
 
+  const defaultNodeColor = '#4a90e2'; // default node color is blue
   // Add resize handler
   useEffect(() => {
     function handleResize() {
@@ -49,7 +50,6 @@ function LibraryVisualize() {
     // In production, use the full domain
     return 'https://talk-graph.onrender.com';
   };
-
   const handleApiRequest = async (url, options = {}) => {
     const baseUrl = getBaseUrl();
     const fullUrl = `${baseUrl}${url}`;
@@ -303,8 +303,8 @@ function LibraryVisualize() {
     const nodes = Array.from(nodeMap.values()).map(node => ({
       ...node,
       sources: Array.from(node.sources),
-      size: 20 + (node.sources.length * 5),
-      color: node.sources.length > 1 ? '#e74c3c' : '#69b3a2'
+      size: 20,
+      color: defaultNodeColor
     }));
 
     const combinedLinks = Array.from(links).map(link => JSON.parse(link));

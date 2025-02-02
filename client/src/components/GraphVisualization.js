@@ -49,6 +49,9 @@ function GraphVisualization({ data, onDataUpdate }) {
   const mergeThresholdRef = useRef(0.8);  // Initial merge threshold
   const splitThresholdRef = useRef(1.2);  // Initial split threshold (1/0.8)
 
+  const defaultNodeColor = '#4a90e2';  // default node color is blue
+  const highlightedColor = '#e74c3c' ; // highlighted node color is red
+
   // Add resize listener
   useEffect(() => {
     const handleResize = () => {
@@ -84,7 +87,7 @@ function GraphVisualization({ data, onDataUpdate }) {
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
-          color: '#4a90e2' // All initial nodes should be blue
+          color: defaultNodeColor // All initial nodes should be blue
         });
       });
       return communities;
@@ -204,7 +207,7 @@ function GraphVisualization({ data, onDataUpdate }) {
           label: node.label || 'Unnamed Node',
           description: node.description || '',
           wikiUrl: node.wikiUrl || '',
-          color: '#4a90e2', // All initial nodes should be blue
+          color: defaultNodeColor, // All initial nodes should be blue
         };
         newCommunities.set(node.id, restoredNode);
       });
@@ -424,7 +427,7 @@ function GraphVisualization({ data, onDataUpdate }) {
             label: d.label,
             description: d.description,
             wikiUrl: d.wikiUrl,
-            color: '#4a90e2' // Assign initial color
+            color: defaultNodeColor
           };
         }
 
@@ -569,7 +572,7 @@ function GraphVisualization({ data, onDataUpdate }) {
       .data(d => [d])
       .join('circle')
       .attr('r', 20)
-      .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? '#e74c3c' : '#4a90e2')
+      .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? highlightedColor : defaultNodeColor)
       .classed('selectable', isAddingRelationship)
       .classed('selected', d => selectedNodes.some(n => n.id === d.id))
       .classed('deletable', isDeleteMode);
@@ -684,7 +687,7 @@ function GraphVisualization({ data, onDataUpdate }) {
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
-          color: '#4a90e2'
+          color: defaultNodeColor
         };
 
         // Regular node selection toggle
@@ -781,15 +784,22 @@ function GraphVisualization({ data, onDataUpdate }) {
     function updateHighlighting() {
       // Highlight selected nodes
       g.selectAll('.node circle')
-        .style('fill', d => selectedNodeIds.current.has(d.id) ? '#e74c3c' : d.color)
+        .style('fill', d => selectedNodeIds.current.has(d.id) ? highlightedColor : d.color)
         .style('stroke', d => selectedNodeIds.current.has(d.id) ?  '#f1c40f' : '#fff')
         .style('stroke-width', d => selectedNodeIds.current.has(d.id) ?  4 : 2)
         .style('r', d => selectedNodeIds.current.has(d.id) ?  25 : (d && d.nodes && d.nodes.length > 1) ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length)) : 20);
 
+      console.log(selectedNodeIds.current);
+      // both required for the links to be highlighted (pre/post updateVisualization)
       linkGroups.selectAll('.link-line')
         .style('stroke-opacity', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? 1 : 0.6)
-        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? '#e74c3c' : '#999')
+        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? highlightedColor : '#999')
         .style('stroke-width', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)?  3 : 1);
+      g.selectAll('.link')
+        .style('stroke-opacity', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? 1 : 0.6)
+        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? highlightedColor : '#999')
+        .style('stroke-width', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)?  3 : 1);
+
 
       // Reset all nodes and links to default state
       if (selectedNodeIds.current.size === 0) {
@@ -800,25 +810,16 @@ function GraphVisualization({ data, onDataUpdate }) {
           .style('stroke-width', 2)
           .style('r', d => (d && d.nodes && d.nodes.length > 1) ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length)) : 20);
       
+        // both required for the links to be highlighted (pre/post updateVisualization)
         linkGroups.selectAll('.link-line')
           .style('stroke-opacity', 0.6) 
           .style('stroke', '#999')
           .style('stroke-width', 1);
+        g.selectAll('.link')
+          .style('stroke-opacity', 0.6) 
+          .style('stroke', '#999')
+          .style('stroke-width', 1);
 
-      } else {
-        // If no nodes are selected, show everything normally
-        console.log('Highlighting nodes and links based on selection');
-        g.selectAll('.node circle')
-          .style('opacity', 1)
-          .style('stroke', '#fff')
-          .style('stroke-width', 1.5)
-          .attr('fill', d => {
-            if (!d || !d.nodes) {
-              console.log('No nodes found in:', d);
-              return '#4a90e2';
-            }
-            return d.nodes.length > 1 ? d.color : '#4a90e2';
-          });
       }
       
     }
@@ -942,7 +943,7 @@ function GraphVisualization({ data, onDataUpdate }) {
               label: d.label,
               description: d.description,
               wikiUrl: d.wikiUrl,
-              color: '#4a90e2' // All initial nodes should be blue
+              color: defaultNodeColor
             };
           }
 
@@ -1081,7 +1082,7 @@ function GraphVisualization({ data, onDataUpdate }) {
             ? Math.min(100, Math.max(30, 20 * Math.sqrt(d.nodes.length)))
             : 20;
         })
-        .attr('fill', d => d.color)
+        .attr('fill', d => d.nodes.length > 1 ? d.color : defaultNodeColor)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.5);
 
