@@ -89,4 +89,22 @@ router.post('/:sessionId', async (req, res) => {
   }
 });
 
+// Get current session
+router.get('/current', async (req, res) => {
+  try {
+    const session = await Session.findOne({
+      $expr: { $eq: ["$sessionEnd", "$sessionStart"] }  // Find where sessionEnd equals sessionStart
+    }).sort({ sessionStart: -1 });  // Get the most recent one
+
+    if (!session) {
+      return res.status(404).json({ error: 'No active session found' });
+    }
+
+    res.json({ sessionId: session.sessionId });
+  } catch (error) {
+    console.error('Error getting current session:', error);
+    res.status(500).json({ error: 'Failed to get current session' });
+  }
+});
+
 export default router; 

@@ -1,6 +1,7 @@
 // ... previous imports ...
 import { useState, useEffect, useRef } from 'react';
 import './Landing.css';
+import FileUpload from './FileUpload';
 
 function Landing() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -12,35 +13,63 @@ function Landing() {
   const [submitting, setSubmitting] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
   const [sessionId, setSessionId] = useState(null);
-  const [sessionStart] = useState(new Date());
-  const sessionInitialized = useRef(false);
+  const [sessionStart, setSessionStart] = useState(null);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const initializationRef = useRef(false);
 
-  // Initialize session when component mounts
   useEffect(() => {
     const initSession = async () => {
+      if (initializationRef.current || sessionId) return;
+      initializationRef.current = true;
+      
       try {
-        // Only initialize session once
-        if (sessionInitialized.current) return;
-        sessionInitialized.current = true;
+        const startTime = new Date();
+        setSessionStart(startTime);
+        
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? window.location.origin 
+          : 'http://localhost:5001';
+         
+        // Helper function to detect browser - match enum values exactly
+        const detectBrowser = () => {
+          const userAgent = navigator.userAgent.toLowerCase();
+          if (userAgent.includes('chrome')) return 'chrome';
+          if (userAgent.includes('firefox')) return 'firefox';
+          if (userAgent.includes('safari')) return 'safari';
+          if (userAgent.includes('edge')) return 'edge';
+          return 'other';
+        };
 
-        const userMetadata = getUserMetadata();
-        const baseUrl = getBaseUrl();
-        
-        console.log('Initializing session with:', {
-          userMetadata,
-          sessionStart: new Date(),
-        });
-        
-        const response = await fetch(`${baseUrl}/sessions`, {
+        // Helper function to detect OS - match enum values exactly
+        const detectOS = () => {
+          const platform = navigator.platform.toLowerCase();
+          if (platform.includes('win')) return 'windows';
+          if (platform.includes('mac')) return 'macos';
+          if (platform.includes('linux')) return 'linux';
+          if (/iphone|ipad|ipod/.test(platform)) return 'ios';
+          if (platform.includes('android')) return 'android';
+          return 'other';
+        };
+
+        const userMetadata = {
+          browser: detectBrowser(),
+          os: detectOS(),
+          screenResolution: {
+            width: window.screen.width,
+            height: window.screen.height
+          },
+          language: navigator.language,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const response = await fetch(`${baseUrl}/api/sessions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userMetadata,
-            sessionStart: new Date(),
-            sessionEnd: new Date(),
-            sessionDuration: 0
+            sessionStart: startTime.toISOString(),
+            userMetadata
           })
         });
 
@@ -49,9 +78,11 @@ function Landing() {
         }
 
         const data = await response.json();
+        console.log('Session initialized successfully:', data);
         setSessionId(data.sessionId);
       } catch (error) {
         console.error('Error initializing session:', error);
+        initializationRef.current = false;
       }
     };
 
@@ -60,40 +91,39 @@ function Landing() {
 
   // Separate useEffect for cleanup
   useEffect(() => {
-    // Add beforeunload event listener
-    const handleBeforeUnload = () => {
-      if (sessionId) {
-        const sessionEnd = new Date();
-        const sessionDuration = Math.floor((sessionEnd - sessionStart) / 1000);
+    const handleBeforeUnload = (event) => {
+      if (sessionId && sessionStart) {
+        const endTime = new Date();
+        const duration = Math.floor((endTime - sessionStart) / 1000);
         
-        const blob = new Blob([JSON.stringify({
-          sessionEnd: sessionEnd.toISOString(),
-          sessionDuration
-        })], {
-          type: 'application/json'
-        });
-        
-        navigator.sendBeacon(
-          `${getBaseUrl()}/sessions/${sessionId}`,
-          blob
-        );
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? 'https://talk-graph.onrender.com/api' 
+          : 'http://localhost:5001/api';
 
-        console.log('Session ended:', {
-          sessionId,
-          sessionEnd,
-          sessionDuration
-        });
+        // Use sendBeacon for more reliable delivery
+        const blob = new Blob([JSON.stringify({
+          sessionEnd: endTime.toISOString(),
+          sessionDuration: duration
+        })], { type: 'application/json' });
+
+        navigator.sendBeacon(`${baseUrl}/sessions/${sessionId}`, blob);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Cleanup function
+    // Only clean up the event listener, don't end the session
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      handleBeforeUnload(); // Call the handler on component unmount as well
     };
   }, [sessionId, sessionStart]);
+
+  // Make sessionId available globally for the current user
+  useEffect(() => {
+    if (sessionId) {
+      window.currentSessionId = sessionId;
+    }
+  }, [sessionId]);
 
   const getBaseUrl = () => {
     if (process.env.NODE_ENV === 'development') {
@@ -101,38 +131,6 @@ function Landing() {
     }
     // In production, use the full domain with /api
     return 'https://talk-graph.onrender.com/api';
-  };
-
-  const getUserMetadata = () => {
-    try {
-      const userAgent = navigator.userAgent;
-      let browser = 'other';
-      if (userAgent.includes('Chrome')) browser = 'chrome';
-      else if (userAgent.includes('Firefox')) browser = 'firefox';
-      else if (userAgent.includes('Safari')) browser = 'safari';
-      else if (userAgent.includes('Edge')) browser = 'edge';
-
-      let os = 'other';
-      if (userAgent.includes('Windows')) os = 'windows';
-      else if (userAgent.includes('Mac')) os = 'macos';
-      else if (userAgent.includes('Linux')) os = 'linux';
-      else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'ios';
-      else if (userAgent.includes('Android')) os = 'android';
-
-      return {
-        browser,
-        os,
-        screenResolution: {
-          width: window.screen.width,
-          height: window.screen.height
-        },
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      };
-    } catch (error) {
-      console.error('Error getting user metadata:', error);
-      return null;
-    }
   };
 
   const handleAddTag = (e) => {
@@ -359,6 +357,16 @@ function Landing() {
           </div>
         </div>
       )}
+
+      {showFileUpload && sessionId ? (
+        <FileUpload
+          onClose={() => {
+            console.log('Closing FileUpload with sessionId:', sessionId);
+            setShowFileUpload(false);
+          }}
+          sessionId={sessionId}
+        />
+      ) : null}
     </>
   );
 }

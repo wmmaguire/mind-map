@@ -15,9 +15,16 @@ function FileUpload({ onClose }) {
       return;
     }
 
+    const currentSessionId = window.currentSessionId;
+    if (!currentSessionId) {
+      setUploadStatus('No active session. Please try again.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('customName', customName.trim());
+    formData.append('sessionId', currentSessionId);
 
     try {
       setUploadStatus('Uploading...');
@@ -35,15 +42,9 @@ function FileUpload({ onClose }) {
         throw new Error(errorData.error || 'Upload failed');
       }
 
-      const data = await response.json();
-      console.log('Upload successful:', data);
       setUploadStatus('File uploaded successfully!');
-      
-      // Clear the form
       setFile(null);
       setCustomName('');
-      
-      // Close the modal after a short delay
       setTimeout(onClose, 1500);
     } catch (error) {
       console.error('Upload error:', error);

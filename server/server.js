@@ -8,9 +8,10 @@ import { dirname } from 'path';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import Feedback from './models/feedback.js';
 import sessionRoutes from './routes/sessions.js';
 import feedbackRoutes from './routes/feedback.js';
+import File from './models/file.js';
+import { Session } from './models/session.js';
 
 // Load environment variables
 dotenv.config();
@@ -164,20 +165,55 @@ app.post('/api/upload', (req, res, next) => {
     }
 
     try {
+      // Validate sessionId
+      if (!req.body.sessionId) {
+        return res.status(400).json({
+          error: 'No sessionId provided'
+        });
+      }
+
+      // Verify session exists in database
+      const session = await Session.findOne({ sessionId: req.body.sessionId });
+      if (!session) {
+        return res.status(400).json({
+          error: 'Invalid session ID'
+        });
+      }
+
       // Create metadata for the file
       const metadata = {
         originalName: req.file.originalname,
         customName: req.body.customName || req.file.originalname.replace(/\.[^/.]+$/, ""),
         uploadDate: new Date().toISOString(),
         fileType: req.file.mimetype,
-        size: req.file.size
+        size: req.file.size,
+        sessionId: req.body.sessionId  // Add sessionId to metadata
       };
 
-      // Save metadata
+      // Save metadata to file system
       await fs.writeFile(
         path.join(metadataDir, `${req.file.filename}.json`),
         JSON.stringify(metadata, null, 2)
       );
+
+      // Add this new section: Save to database
+      try {
+        const fileRecord = new File({
+          sessionId: req.body.sessionId,
+          customName: metadata.customName,
+          originalName: metadata.originalName,
+          uploadTime: new Date(metadata.uploadDate),
+          fileType: metadata.fileType,
+          fileSize: metadata.size,
+          path: req.file.path
+        });
+
+        await fileRecord.save();
+        console.log('File metadata saved to database:', fileRecord);
+      } catch (dbError) {
+        // Log database error but don't fail the upload
+        console.error('Error saving to database:', dbError);
+      }
 
       console.log('File uploaded successfully:', {
         filename: req.file.filename,
