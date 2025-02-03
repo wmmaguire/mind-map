@@ -104,12 +104,12 @@ function FileUpload({ onClose }) {
             <div className="upload-prompt">
               <span className="upload-icon">📁</span>
               <p>Drag & drop a file here or click to browse</p>
-              <p className="file-types">Supported formats: .mp3, .txt, .md</p>
+              <p className="file-types">Supported formats: .txt, .md</p>
             </div>
           )}
           <input
             type="file"
-            accept=".mp3,.txt,.md"
+            accept=".txt,.md"
             onChange={handleFileChange}
             className="file-input"
           />
