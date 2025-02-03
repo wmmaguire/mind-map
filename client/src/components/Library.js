@@ -69,7 +69,7 @@ function Library({ onClose }) {
       }
 
       console.log('File content received, length:', data.content.length);
-      await analyzeContent(data.content);
+      await analyzeContent(data.content, file);
     } catch (error) {
       console.error('File fetch error:', error);
       setError('Failed to load file: ' + error.message);
@@ -77,7 +77,7 @@ function Library({ onClose }) {
     }
   };
 
-  const analyzeContent = async (content) => {
+  const analyzeContent = async (content, file) => {
     try {
       const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
       console.log('Sending content for analysis, length:', content.length);
@@ -88,7 +88,11 @@ function Library({ onClose }) {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ 
+          content,
+          sessionId: window.currentSessionId,
+          sourceFiles: [file._id || file.filename]
+        })
       });
 
       // First get response as text for debugging

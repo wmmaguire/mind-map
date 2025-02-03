@@ -4,6 +4,8 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import Graph from '../models/graph.js';  // Import Graph model
+import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -109,37 +111,102 @@ router.post('/graphs/save', async (req, res) => {
       });
     }
 
-    const graphData = {
-      graph,
+    // Generate a unique prefix for this graph's nodes
+    const uniquePrefix = Date.now().toString(36) + '-';
+
+    // First create nodes to get their ObjectIds
+    const nodeMap = new Map();
+    const processedNodes = graph.nodes.map(node => ({
+      id: uniquePrefix + node.id.toString(), // Make node IDs unique across all graphs
+      label: node.label || '',
+      description: node.description || '',
+      wikiUrl: node.wikiUrl || '',
+      size: node.size || 20,
+      color: node.color || '#4a90e2'
+    }));
+
+    // Create temporary Node documents to get ObjectIds
+    for (const node of processedNodes) {
+      const tempNode = new mongoose.Types.ObjectId();
+      nodeMap.set(node.id.split('-').pop(), tempNode); // Store mapping without prefix
+    }
+
+    // Process links using the node ObjectIds
+    const processedLinks = graph.links.map(link => ({
+      source: nodeMap.get(link.source.toString()),
+      target: nodeMap.get(link.target.toString()),
+      relationship: link.relationship || ''
+    }));
+
+    // Convert sourceFiles to ObjectIds if they exist
+    const sourceFiles = metadata.sourceFiles?.map(fileId => {
+      try {
+        return new mongoose.Types.ObjectId(fileId);
+      } catch (error) {
+        return null;
+      }
+    }).filter(id => id !== null) || [];
+
+    // Create a deterministic ObjectId from the UUID sessionId
+    const sessionObjectId = new mongoose.Types.ObjectId(
+      parseInt(metadata.sessionId.replace(/-/g, '').slice(0, 12), 16)
+    );
+
+    // Create the graph document
+    const dbGraph = new Graph({
       metadata: {
-        ...metadata,
-        nodeCount: graph.nodes.length,
-        edgeCount: graph.links.length,
-        savedAt: new Date().toISOString()
+        name: metadata.name || 'Untitled Graph',
+        description: metadata.description || '',
+        sourceFiles: sourceFiles,
+        generatedAt: new Date(metadata.generatedAt) || new Date(),
+        lastModified: new Date(),
+        nodeCount: processedNodes.length,
+        edgeCount: processedLinks.length,
+        sessionId: sessionObjectId
+      },
+      nodes: processedNodes,
+      links: processedLinks
+    });
+
+    // Save to filesystem for backup
+    const graphData = {
+      graph: {
+        nodes: processedNodes,
+        links: processedLinks.map(link => ({
+          ...link,
+          source: link.source.toString(),
+          target: link.target.toString()
+        }))
+      },
+      metadata: {
+        ...dbGraph.metadata,
+        sessionId: metadata.sessionId // Keep original UUID in file backup
       }
     };
 
     const filename = `graph_${Date.now()}.json`;
     const graphsDir = path.join(__dirname, '../graphs');
     
-    // Ensure graphs directory exists
     await fs.mkdir(graphsDir, { recursive: true });
-    
     await fs.writeFile(
       path.join(graphsDir, filename),
       JSON.stringify(graphData, null, 2)
     );
 
+    // Save to database
+    await dbGraph.save();
+
     res.json({
       success: true,
       filename,
-      metadata: graphData.metadata
+      metadata: dbGraph.metadata,
+      graphId: dbGraph._id
     });
   } catch (error) {
     console.error('Error saving graph:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to save graph'
+      error: 'Failed to save graph: ' + error.message
     });
   }
 });
@@ -183,12 +250,31 @@ router.get('/graphs/:filename', async (req, res) => {
     const graphsDir = path.join(__dirname, '../graphs');
     const filePath = path.join(graphsDir, req.params.filename);
     
+    // Existing file system load
     const content = await fs.readFile(filePath, 'utf8');
-    const data = JSON.parse(content);
+    const fileData = JSON.parse(content);
+
+    // Add database load (as backup or for additional metadata)
+    try {
+      const dbGraph = await Graph.findOne({
+        'metadata.savedAt': fileData.metadata.savedAt
+      });
+      
+      if (dbGraph) {
+        // Merge any additional database metadata if needed
+        fileData.metadata = {
+          ...fileData.metadata,
+          dbId: dbGraph._id
+        };
+      }
+    } catch (dbError) {
+      console.warn('Database load warning:', dbError);
+      // Continue with file system data if database load fails
+    }
 
     res.json({
       success: true,
-      data
+      data: fileData
     });
   } catch (error) {
     console.error('Error loading graph:', error);

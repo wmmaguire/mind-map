@@ -145,6 +145,7 @@ function LibraryVisualize() {
       const metadata = {
         name: graphName.trim(),
         description: graphDescription.trim(),
+        sessionId: window.currentSessionId,  // Use global sessionId
         sourceFiles: Array.from(selectedFiles).map(f => f.originalName),
         generatedAt: new Date().toISOString(),
         nodeCount: graphData.nodes.length,
@@ -231,34 +232,29 @@ function LibraryVisualize() {
       
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
-          try {
-            console.log('Fetching file:', file.filename);
-            const fileData = await handleApiRequest(`/api/files/${file.filename}`);
-            if (!fileData.success || !fileData.content) {
-              throw new Error(`Failed to read file: ${file.originalName}`);
-            }
-
-            console.log('Analyzing file:', file.originalName);
-            const analysisData = await handleApiRequest('/api/analyze', {
-              method: 'POST',
-              body: JSON.stringify({ 
-                content: fileData.content,
-                context: context
-              })
-            });
-
-            if (!analysisData.success || !analysisData.data) {
-              throw new Error(`Analysis failed for: ${file.originalName}`);
-            }
-
-            return {
-              filename: file.originalName,
-              data: analysisData.data
-            };
-          } catch (error) {
-            console.error('Error processing file:', file.originalName, error);
-            throw new Error(`Error processing ${file.originalName}: ${error.message}`);
+          const fileData = await handleApiRequest(`/api/files/${file.filename}`);
+          if (!fileData.success || !fileData.content) {
+            throw new Error(`Failed to read file: ${file.originalName}`);
           }
+
+          const analysisData = await handleApiRequest('/api/analyze', {
+            method: 'POST',
+            body: JSON.stringify({ 
+              content: fileData.content,
+              context: context,
+              sessionId: window.currentSessionId,  // Use global sessionId
+              sourceFiles: [file._id || file.filename]  // Use file ID or filename
+            })
+          });
+
+          if (!analysisData.success || !analysisData.data) {
+            throw new Error(`Analysis failed for: ${file.originalName}`);
+          }
+
+          return {
+            filename: file.originalName,
+            data: analysisData.data
+          };
         })
       );
 

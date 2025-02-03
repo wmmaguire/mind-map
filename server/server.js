@@ -12,6 +12,8 @@ import sessionRoutes from './routes/sessions.js';
 import feedbackRoutes from './routes/feedback.js';
 import File from './models/file.js';
 import { Session } from './models/session.js';
+import Graph from './models/graph.js';
+import GraphTransform from './models/graphTransform.js';
 
 // Load environment variables
 dotenv.config();
@@ -316,6 +318,7 @@ app.get('/api/files/:filename', async (req, res) => {
 });
 
 // Import the router
+// These contain the api/graphs calls for saving/loading graphs
 import uploadRouter from './routes/upload.js';
 
 // Use the router BEFORE your other routes
@@ -360,10 +363,55 @@ app.use((err, req, res, next) => {
 
 // Update the analyze endpoint
 app.post('/api/analyze', async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-
+  let graphTransform;
   try {
-    const { content, context } = req.body;
+    const { content, context, sessionId, sourceFiles } = req.body;
+    console.log('Analyze request:', { sessionId, sourceFiles });
+    
+    // Find the session by UUID
+    const session = await Session.findOne({ sessionId });
+    if (!session) {
+      console.log('Session not found:', sessionId);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session ID'
+      });
+    }
+    console.log('Found session:', session._id);
+
+    // Look up the file records
+    const fileRecords = await Promise.all(
+      sourceFiles.map(async (fileIdentifier) => {
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(fileIdentifier);
+        const query = isObjectId 
+          ? { _id: fileIdentifier }
+          : { 
+              $or: [
+                { path: { $regex: fileIdentifier } },
+                { filename: fileIdentifier },
+                { originalName: fileIdentifier }
+              ]
+            };
+        const file = await File.findOne(query);
+        return file?._id;
+      })
+    );
+
+    const validFileIds = fileRecords.filter(id => id);
+    
+    if (validFileIds.length > 0) {
+      graphTransform = new GraphTransform({
+        sessionId: session._id,
+        sourceFiles: validFileIds,
+        context,
+        status: 'pending'
+      });
+      await graphTransform.save();
+      console.log('Created GraphTransform:', graphTransform._id);
+    }
+
+    // Rest of the analyze logic...
+    console.log('Analyzing content:', { content, context, sessionId, sourceFiles });
 
     if (!content) {
       return res.json({
@@ -426,13 +474,38 @@ app.post('/api/analyze', async (req, res) => {
     const graphData = JSON.parse(completion.choices[0].message.content);
     console.log('Analysis completed successfully');
     
+    // Before saving the results, transform numeric IDs to ObjectIds
+    if (graphData && graphTransform) {
+      // Update the GraphTransform with generate graphData
+      graphTransform.result = graphData;
+      graphTransform.status = 'completed';
+      graphTransform.completedAt = new Date();
+      await graphTransform.save();
+      console.log('UpdatedGraphTransform:', graphTransform._id);
+
+      // Send back the original format for the client
+      return res.json({
+        success: true,
+        data: graphData,  // Send original numeric IDs to client
+        transformId: graphTransform._id
+      });
+    }
+
     return res.json({
       success: true,
-      data: graphData
+      data: graphData,
+      transformId: graphTransform?._id
     });
   } catch (error) {
     console.error('Analysis error:', error);
-    return res.json({
+    
+    if (graphTransform) {
+      graphTransform.status = 'failed';
+      graphTransform.error = error.message;
+      await graphTransform.save();
+    }
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to analyze content',
       details: error.message

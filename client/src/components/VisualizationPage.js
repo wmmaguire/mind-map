@@ -20,8 +20,9 @@ function VisualizationPage() {
           data: graphData,
           filename,
           metadata: {
+            sessionId: window.currentSessionId,  // Use global sessionId
             createdAt: new Date().toISOString(),
-            sourceFile: filename
+            sourceFiles: [filename],
           }
         })
       });
