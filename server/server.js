@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Feedback from './models/feedback.js';
+import sessionRoutes from './routes/sessions.js';
+import feedbackRoutes from './routes/feedback.js';
 
 // Load environment variables
 dotenv.config();
@@ -69,6 +71,18 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Add this middleware to log all incoming requests
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    headers: req.headers
+  });
+  next();
+});
 
 // Ensure directories exist
 (async () => {
@@ -262,91 +276,6 @@ app.get('/api/files/:filename', async (req, res) => {
       error: 'Server error',
       details: error.message
     });
-  }
-});
-
-// Feedback endpoint with explicit CORS handling
-app.post('/api/feedback', cors(corsOptions), async (req, res) => {
-  try {
-    const { rating, feedback } = req.body;
-    console.log('Received feedback request:', { rating, feedback });
-
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid rating'
-      });
-    }
-
-    const newFeedback = new Feedback({
-      rating,
-      feedback
-    });
-
-    await newFeedback.save();
-    console.log('Feedback saved successfully:', newFeedback);
-
-    res.json({
-      success: true,
-      message: 'Feedback saved successfully'
-    });
-  } catch (error) {
-    console.error('Error saving feedback:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to save feedback'
-    });
-  }
-});
-
-// Optional: Add endpoint to retrieve feedback
-app.get('/api/feedback', async (req, res) => {
-  try {
-    const feedbacks = await Feedback.find().sort({ timestamp: -1 });
-    res.json({ 
-      success: true, 
-      feedbacks 
-    });
-  } catch (error) {
-    console.error('Error fetching feedback:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch feedback'
-    });
-  }
-});
-
-// Add this route to view feedback
-app.get('/api/feedback/view', async (req, res) => {
-  try {
-    const feedbacks = await Feedback.find().sort({ timestamp: -1 });
-    // Send as formatted HTML for better browser viewing
-    res.send(`
-      <html>
-        <head>
-          <title>Feedback Results</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .feedback { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
-            .rating { font-weight: bold; }
-            .timestamp { color: #666; }
-          </style>
-        </head>
-        <body>
-          <h1>Feedback Results</h1>
-          ${feedbacks.map(f => `
-            <div class="feedback">
-              <div class="rating">Rating: ${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</div>
-              <div>Feedback: ${f.feedback || 'No comment provided'}</div>
-              <div class="timestamp">Submitted: ${new Date(f.timestamp).toLocaleString()}</div>
-            </div>
-          `).join('')}
-        </body>
-      </html>
-    `);
-  } catch (error) {
-    console.error('Error fetching feedback:', error);
-    res.status(500).send('Error fetching feedback');
   }
 });
 
@@ -659,6 +588,10 @@ app.post('/api/generate-node', async (req, res) => {
   }
 });
 
+// Use the router BEFORE your other routes
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/feedback', feedbackRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
@@ -765,3 +698,5 @@ process.on('SIGINT', async () => {
     process.exit(1);
   }
 });
+
+export default app;

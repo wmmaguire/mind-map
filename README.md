@@ -60,6 +60,25 @@ npm run start
 - The backend will automatically restart when changes are made to the backend code.
 - The frontend will automatically restart when changes are made to the frontend code.
 
+#### Database Migrations
+
+- To save a backup of your current database, run `mongodump --db <database-name> --collection <collection-name> --out <backup-directory>`.
+- To run the migrations, run `node server/scripts/migrate.js`.
+- To test the migrations, open a `mongosh` shell and inspect the database:
+```bash
+show dbs
+use <database-name> //mind-map
+show collections
+db.getCollection('<collection-name>').find().pretty()
+```
+- To restore the database from a backup, run `mongorestore --db <database-name> <backup-directory>`.
+- To delete the database, open a `mongosh` shell and then 
+```bash
+use <database-name> // mind-map
+db.sessions.drop() // drop the sessions collection
+db.dropDatabase() // drop the database
+```
+
 ### Additional Notes
 
 - Ensure that the backend server is running before starting the frontend.
