@@ -183,6 +183,7 @@ function LibraryVisualize() {
       const data = await response.json();
       
       if (data.success) {
+        console.log('Graph data:', data.data);
         const graphData = data.data.graph;
         const nodeMap = new Map();
         graphData.nodes.forEach(node => {
@@ -195,13 +196,28 @@ function LibraryVisualize() {
           target: nodeMap.get(typeof link.target === 'object' ? link.target.id : link.target)
         }));
 
+        console.log('Reconstructed nodes:', graphData.nodes);
+        console.log('Reconstructed links:', reconstructedLinks);
         setGraphData({
           nodes: graphData.nodes,
           links: reconstructedLinks
         });
         
         setSelectedFiles(new Set());
-        setCurrentSource(data.data.metadata);
+        setCurrentSource({
+          ...data.data.metadata,
+          sourceFile: filename
+        });
+
+        // If there's a dbId in the metadata, fetch view stats
+        if (data.data.metadata.dbId) {
+          try {
+            const viewStats = await handleApiRequest(`/api/graphs/${data.data.metadata.dbId}/views`);
+            console.log('Graph view stats:', viewStats);
+          } catch (statsError) {
+            console.warn('Failed to fetch view stats:', statsError);
+          }
+        }
       } else {
         throw new Error(data.error);
       }
@@ -424,7 +440,7 @@ function LibraryVisualize() {
                       Nodes: {graph.metadata.nodeCount} | 
                       Edges: {graph.metadata.edgeCount}
                     </small>
-                    <small>Saved: {new Date(graph.metadata.savedAt).toLocaleDateString()}</small>
+                    <small>Saved: {new Date(graph.metadata.generatedAt).toLocaleDateString()}</small>
                   </div>
                   <button 
                     onClick={() => handleLoadGraph(graph.filename)}

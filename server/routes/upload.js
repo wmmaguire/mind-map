@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import Graph from '../models/graph.js';  // Import Graph model
 import mongoose from 'mongoose';
+import GraphView from '../models/graphView.js';  // Add this import at the top
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -125,27 +126,24 @@ router.post('/graphs/save', async (req, res) => {
       color: node.color || '#4a90e2'
     }));
 
-    // Create temporary Node documents to get ObjectIds
-    for (const node of processedNodes) {
-      const tempNode = new mongoose.Types.ObjectId();
-      nodeMap.set(node.id.split('-').pop(), tempNode); // Store mapping without prefix
-    }
+    // Store mapping between original IDs and prefixed IDs
+    const originalToNewId = new Map();
+    processedNodes.forEach(node => {
+      const originalId = node.id.split('-').pop();
+      originalToNewId.set(originalId, node.id);
+    });
 
-    // Process links using the node ObjectIds
-    const processedLinks = graph.links.map(link => ({
-      source: nodeMap.get(link.source.toString()),
-      target: nodeMap.get(link.target.toString()),
-      relationship: link.relationship || ''
-    }));
-
-    // Convert sourceFiles to ObjectIds if they exist
-    const sourceFiles = metadata.sourceFiles?.map(fileId => {
-      try {
-        return new mongoose.Types.ObjectId(fileId);
-      } catch (error) {
-        return null;
-      }
-    }).filter(id => id !== null) || [];
+    // Process links using the prefixed IDs
+    const processedLinks = graph.links.map(link => {
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      
+      return {
+        source: originalToNewId.get(sourceId.toString()),
+        target: originalToNewId.get(targetId.toString()),
+        relationship: link.relationship || ''
+      };
+    });
 
     // Create a deterministic ObjectId from the UUID sessionId
     const sessionObjectId = new mongoose.Types.ObjectId(
@@ -157,7 +155,7 @@ router.post('/graphs/save', async (req, res) => {
       metadata: {
         name: metadata.name || 'Untitled Graph',
         description: metadata.description || '',
-        sourceFiles: sourceFiles,
+        sourceFiles: metadata.sourceFiles || [],
         generatedAt: new Date(metadata.generatedAt) || new Date(),
         lastModified: new Date(),
         nodeCount: processedNodes.length,
@@ -168,15 +166,11 @@ router.post('/graphs/save', async (req, res) => {
       links: processedLinks
     });
 
-    // Save to filesystem for backup
+    // Save to filesystem with the same IDs used in nodes
     const graphData = {
       graph: {
         nodes: processedNodes,
-        links: processedLinks.map(link => ({
-          ...link,
-          source: link.source.toString(),
-          target: link.target.toString()
-        }))
+        links: processedLinks // Use the same processed links with prefixed IDs
       },
       metadata: {
         ...dbGraph.metadata,
@@ -254,10 +248,19 @@ router.get('/graphs/:filename', async (req, res) => {
     const content = await fs.readFile(filePath, 'utf8');
     const fileData = JSON.parse(content);
 
+    console.log('Loading graph from file:', {
+      nodes: fileData.graph.nodes.length,
+      links: fileData.graph.links.map(l => ({
+        source: l.source,
+        target: l.target,
+        relationship: l.relationship
+      }))
+    });
+
     // Add database load (as backup or for additional metadata)
     try {
       const dbGraph = await Graph.findOne({
-        'metadata.savedAt': fileData.metadata.savedAt
+        'metadata.generatedAt': fileData.metadata.generatedAt
       });
       
       if (dbGraph) {
@@ -266,11 +269,39 @@ router.get('/graphs/:filename', async (req, res) => {
           ...fileData.metadata,
           dbId: dbGraph._id
         };
+
+        // Record the view
+        const sessionId = new mongoose.Types.ObjectId(
+          parseInt(fileData.metadata.sessionId.replace(/-/g, '').slice(0, 12), 16)
+        );
+
+        const graphView = new GraphView({
+          graphId: dbGraph._id,
+          sessionId: sessionId,
+          metadata: {
+            loadSource: 'file',
+            filename: req.params.filename
+          }
+        });
+
+        // Save view asynchronously - don't wait for it
+        graphView.save().catch(err => {
+          console.warn('Failed to save graph view:', err);
+        });
       }
     } catch (dbError) {
       console.warn('Database load warning:', dbError);
       // Continue with file system data if database load fails
     }
+
+    console.log('Sending graph data:', {
+      nodes: fileData.graph.nodes.length,
+      links: fileData.graph.links.map(l => ({
+        source: l.source,
+        target: l.target,
+        relationship: l.relationship
+      }))
+    });
 
     res.json({
       success: true,
@@ -281,6 +312,34 @@ router.get('/graphs/:filename', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to load graph'
+    });
+  }
+});
+
+// Add endpoint to get view statistics for a graph
+router.get('/graphs/:graphId/views', async (req, res) => {
+  try {
+    const views = await GraphView.find({ graphId: req.params.graphId })
+      .sort({ viewedAt: -1 })
+      .limit(100);  // Limit to last 100 views
+
+    const viewStats = {
+      totalViews: await GraphView.countDocuments({ graphId: req.params.graphId }),
+      recentViews: views.map(view => ({
+        viewedAt: view.viewedAt,
+        loadSource: view.metadata.loadSource
+      }))
+    };
+
+    res.json({
+      success: true,
+      stats: viewStats
+    });
+  } catch (error) {
+    console.error('Error getting view stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get view statistics'
     });
   }
 });
