@@ -115,32 +115,39 @@ router.post('/graphs/save', async (req, res) => {
     // Generate a unique prefix for this graph's nodes
     const uniquePrefix = Date.now().toString(36) + '-';
 
-    // First create nodes to get their ObjectIds
+    // First create nodes and store their ObjectIds
     const nodeMap = new Map();
-    const processedNodes = graph.nodes.map(node => ({
-      id: uniquePrefix + node.id.toString(), // Make node IDs unique across all graphs
-      label: node.label || '',
-      description: node.description || '',
-      wikiUrl: node.wikiUrl || '',
-      size: node.size || 20,
-      color: node.color || '#4a90e2'
-    }));
-
-    // Store mapping between original IDs and prefixed IDs
-    const originalToNewId = new Map();
-    processedNodes.forEach(node => {
-      const originalId = node.id.split('-').pop();
-      originalToNewId.set(originalId, node.id);
+    const processedNodes = graph.nodes.map(node => {
+      const nodeId = uniquePrefix + node.id.toString();
+      const objectId = new mongoose.Types.ObjectId();
+      nodeMap.set(nodeId, objectId);
+      return {
+        id: nodeId,
+        label: node.label || '',
+        description: node.description || '',
+        wikiUrl: node.wikiUrl || '',
+        size: node.size || 20,
+        color: node.color || '#4a90e2'
+      };
     });
 
-    // Process links using the prefixed IDs
+    // Process sourceFiles to ObjectIds if they exist
+    const sourceFiles = metadata.sourceFiles?.map(fileId => {
+      try {
+        return new mongoose.Types.ObjectId();
+      } catch (error) {
+        return null;
+      }
+    }).filter(id => id !== null) || [];
+
+    // Process links using the node ObjectIds
     const processedLinks = graph.links.map(link => {
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
       const targetId = typeof link.target === 'object' ? link.target.id : link.target;
       
       return {
-        source: originalToNewId.get(sourceId.toString()),
-        target: originalToNewId.get(targetId.toString()),
+        source: nodeMap.get(uniquePrefix + sourceId.toString()),
+        target: nodeMap.get(uniquePrefix + targetId.toString()),
         relationship: link.relationship || ''
       };
     });
@@ -155,7 +162,7 @@ router.post('/graphs/save', async (req, res) => {
       metadata: {
         name: metadata.name || 'Untitled Graph',
         description: metadata.description || '',
-        sourceFiles: metadata.sourceFiles || [],
+        sourceFiles: sourceFiles,
         generatedAt: new Date(metadata.generatedAt) || new Date(),
         lastModified: new Date(),
         nodeCount: processedNodes.length,
@@ -166,15 +173,25 @@ router.post('/graphs/save', async (req, res) => {
       links: processedLinks
     });
 
-    // Save to filesystem with the same IDs used in nodes
+    // Save to filesystem with string IDs for visualization
     const graphData = {
       graph: {
         nodes: processedNodes,
-        links: processedLinks // Use the same processed links with prefixed IDs
+        links: graph.links.map(link => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          
+          return {
+            source: uniquePrefix + sourceId.toString(),
+            target: uniquePrefix + targetId.toString(),
+            relationship: link.relationship || ''
+          };
+        })
       },
       metadata: {
         ...dbGraph.metadata,
-        sessionId: metadata.sessionId // Keep original UUID in file backup
+        sessionId: metadata.sessionId, // Keep original UUID in file backup
+        sourceFiles: metadata.sourceFiles || [] // Keep original sourceFiles in file backup
       }
     };
 
