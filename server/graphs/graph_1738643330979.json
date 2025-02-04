@@ -1,0 +1,145 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "m6pzck2e-1",
+        "label": "Mind Map",
+        "description": "A diagram used to visually organize information into a hierarchy, showing relationships among pieces of the whole.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Mind_map",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-2",
+        "label": "Diagram",
+        "description": "A symbolic representation of information using visualization techniques.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Diagram",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-3",
+        "label": "Hierarchy",
+        "description": "A system or organization in which people or groups are ranked one above the other according to status or authority.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Hierarchy",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-4",
+        "label": "Tree Structure",
+        "description": "A way of representing the hierarchical nature of a structure in a graphical form.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Tree_structure",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-5",
+        "label": "Tony Buzan",
+        "description": "British popular psychology author and television personality who popularized the term 'mind map'.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Tony_Buzan",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-6",
+        "label": "Concept Map",
+        "description": "A type of diagram that depicts suggested relationships between concepts.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Concept_map",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-7",
+        "label": "Personal Knowledge Base",
+        "description": "An information management system used to store, organize, and retrieve personal information.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Personal_knowledge_base",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-8",
+        "label": "Mind-mapping Software",
+        "description": "Software used to create, represent, and organize information visually and hierarchically.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/List_of_concept-_and_mind-mapping_software",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-9",
+        "label": "Note-taking",
+        "description": "The practice of recording information from different sources and platforms.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Note-taking",
+        "size": 20,
+        "color": "#4a90e2"
+      },
+      {
+        "id": "m6pzck2e-10",
+        "label": "Radial Map",
+        "description": "A method of displaying data that starts from a central point and extends outward.",
+        "wikiUrl": "https://en.wikipedia.org/wiki/Radial_tree",
+        "size": 20,
+        "color": "#4a90e2"
+      }
+    ],
+    "links": [
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-2",
+        "relationship": "A mind map is a type of diagram."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-3",
+        "relationship": "A mind map organizes information into a hierarchy."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-4",
+        "relationship": "A mind map uses a tree structure to show relationships among ideas."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-5",
+        "relationship": "The term 'mind map' was popularized by Tony Buzan."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-6",
+        "relationship": "A mind map is a type of concept map."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-7",
+        "relationship": "A mind map can be part of a personal knowledge base system."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-8",
+        "relationship": "Mind maps can be created using mind-mapping software."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-9",
+        "relationship": "Mind maps can be used as a method of note-taking."
+      },
+      {
+        "source": "m6pzck2e-1",
+        "target": "m6pzck2e-10",
+        "relationship": "Mind maps are based on a radial map denoting relationships with a central concept."
+      }
+    ]
+  },
+  "metadata": {
+    "name": "MindMap",
+    "description": "This is a generated graph from the mind map wikipedia entry.",
+    "sourceFiles": [
+      "MindMap.md"
+    ],
+    "generatedAt": "2025-02-04T04:28:50.948Z",
+    "lastModified": "2025-02-04T04:28:50.969Z",
+    "nodeCount": 10,
+    "edgeCount": 9,
+    "sessionId": "0f5991fb-9cc6-4157-af99-043e9d29fe64"
+  }
+}
