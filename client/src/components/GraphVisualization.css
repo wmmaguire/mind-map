@@ -145,11 +145,11 @@ svg {
 }
 
 .add-relationship-button.active {
-  background-color: #e74c3c;
+  background-color: #3562bd;
 }
 
 .add-relationship-button.active:hover {
-  background-color: #c0392b;
+  background-color: #3562bd;
 }
 
 .delete-button.active {
