@@ -10,6 +10,46 @@ const getBaseUrl = () => {
     : 'http://localhost:5001';
 };
 
+// Add this function at the top of the file with getBaseUrl
+const trackOperation = async (operationType, details, startTime = Date.now(), error = null) => {
+  try {
+    const duration = Date.now() - startTime;
+    const status = error ? 'FAILURE' : 'SUCCESS';
+
+    console.log('Tracking operation:', {
+      graphId: window.currentGraphId,
+      sessionId: window.currentSessionId,
+      operationType,
+      status,
+      duration,
+      details
+    });
+
+    const response = await fetch(`${getBaseUrl()}/api/operations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        graphId: window.currentGraphId,
+        sessionId: window.currentSessionId,
+        operationType,
+        status,
+        duration,
+        error: error?.message,
+        details
+      })
+    });
+    
+    const data = await response.json();
+    if (!data.success) {
+      console.warn('Failed to track operation:', data.error);
+    }
+  } catch (error) {
+    console.warn('Error tracking operation:', error);
+  }
+};
+
 function GraphVisualization({ data, onDataUpdate }) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
@@ -630,34 +670,75 @@ function GraphVisualization({ data, onDataUpdate }) {
     }
 
     function handleLinkClick(event, link) {
-      event.stopPropagation();
-      
       if (isDeleteMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        const startTime = Date.now();
+        
         handleDeleteLink(link);
-      } else {
-        selectedNodeIds.current.add(link.source.id);
-        selectedNodeIds.current.add(link.target.id);
-        updateHighlighting();
-
-        const sourceLabel = link.source.label || 'Unnamed Node';
-        const targetLabel = link.target.label || 'Unnamed Node';
-        const relationship = link.relationship || 'related to';
-  
-        const tooltipContent = `
-          <strong>${sourceLabel}</strong>
-          <br/>
-          ${relationship}
-          <br/>
-          <strong>${targetLabel}</strong>
-        `;
-  
-        tooltip.html(tooltipContent)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 10) + 'px');
+        
+        // Track the deletion operation
+        trackOperation('DELETE_LINK', {
+          deletedLink: {
+            source: {
+              id: link.source.id,
+              label: link.source.label
+            },
+            target: {
+              id: link.target.id,
+              label: link.target.label
+            },
+            relationship: link.relationship
+          }
+        }, startTime);
+        return;
       }
+
+      selectedNodeIds.current.add(link.source.id);
+      selectedNodeIds.current.add(link.target.id);
+      updateHighlighting();
+
+      const sourceLabel = link.source.label || 'Unnamed Node';
+      const targetLabel = link.target.label || 'Unnamed Node';
+      const relationship = link.relationship || 'related to';
+  
+      const tooltipContent = `
+        <strong>${sourceLabel}</strong>
+        <br/>
+        ${relationship}
+        <br/>
+        <strong>${targetLabel}</strong>
+      `;
+  
+      tooltip.html(tooltipContent)
+        .style('left', (event.pageX + 10) + 'px')
+        .style('top', (event.pageY - 10) + 'px');
     }
 
     function handleNodeClick(event, node) {
+      if (isDeleteMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        const startTime = Date.now();
+        
+        // Count affected relationships before deletion
+        const affectedLinks = data.links.filter(l => 
+          l.source.id === node.id || l.target.id === node.id
+        );
+        
+        handleDeleteNode(node);
+        
+        // Track the deletion operation
+        trackOperation('DELETE_NODE', {
+          deletedNode: {
+            id: node.id,
+            label: node.label
+          },
+          affectedRelationships: affectedLinks.length
+        }, startTime);
+        return;
+      }
+
       try {
         if (!node) {
           console.log('No node provided to handleNodeClick');
@@ -1132,6 +1213,10 @@ function GraphVisualization({ data, onDataUpdate }) {
   const handleGenerate = async (event) => {
     event.preventDefault();
     setIsGenerating(true);
+    const startTime = Date.now();
+    let operationStatus = 'SUCCESS';
+    let operationError = null;
+    let generatedNodes = [];
 
     try {
       const selectedNodes = Array.from(selectedNodeIds.current).map(id => 
@@ -1154,8 +1239,13 @@ function GraphVisualization({ data, onDataUpdate }) {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to generate nodes');
+        operationStatus = 'FAILURE';
+        operationError = result.error || 'Failed to generate nodes';
+        throw new Error(operationError);
       }
+
+      // Store generated nodes for operation tracking
+      generatedNodes = result.data.nodes;
 
       // Create a map of all existing nodes with string IDs
       const nodeMap = new Map();
@@ -1267,14 +1357,33 @@ function GraphVisualization({ data, onDataUpdate }) {
 
     } catch (error) {
       console.error('Error generating nodes:', error);
+      operationStatus = 'FAILURE';
+      operationError = error.message;
       alert('Error generating nodes: ' + error.message);
     } finally {
       setIsGenerating(false);
+
+      // Track the operation with its final status
+      await trackOperation('GENERATE', {
+        numNodesRequested: numNodesToAdd,
+        selectedNodes: Array.from(selectedNodeIds.current).map(id => {
+          const node = data.nodes.find(n => n.id === id);
+          return { 
+            id: node?.id || id,
+            label: node?.label || 'Unknown Node'
+          };
+        }),
+        generatedNodes: generatedNodes.map(node => ({
+          id: node.id,
+          label: node.label
+        }))
+      }, startTime, operationStatus === 'FAILURE' ? new Error(operationError) : null);
     }
   };
 
-  const handleAddNodeSubmit = (e) => {
+  const handleAddNodeSubmit = async (e) => {
     e.preventDefault();
+    const startTime = Date.now();
     
     const newNode = {
       id: `node_${Date.now()}`,
@@ -1295,10 +1404,20 @@ function GraphVisualization({ data, onDataUpdate }) {
     onDataUpdate(newData);
     setShowAddForm(false);
     setNewNodeData({ label: '', description: '', wikiUrl: '' });
+
+    await trackOperation('ADD_NODE', {
+      addedNode: {
+        id: newNode.id,
+        label: newNode.label,
+        description: newNode.description,
+        wikiUrl: newNode.wikiUrl
+      }
+    }, startTime);
   };
 
-  const handleAddRelationship = (e) => {
+  const handleAddRelationship = async (e) => {
     e.preventDefault();
+    const startTime = Date.now();
     
     const newLink = {
       source: selectedNodes[0],
@@ -1317,6 +1436,20 @@ function GraphVisualization({ data, onDataUpdate }) {
     setRelationshipForm({ show: false, relationship: '' });
     setSelectedNodes([]);
     setIsAddingRelationship(false);
+
+    await trackOperation('ADD_RELATIONSHIP', {
+      relationship: {
+        sourceNode: {
+          id: selectedNodes[0].id,
+          label: selectedNodes[0].label
+        },
+        targetNode: {
+          id: selectedNodes[1].id,
+          label: selectedNodes[1].label
+        },
+        relationshipType: relationshipForm.relationship
+      }
+    }, startTime);
   };
 
   const handleDeleteNode = (node) => {
@@ -1324,12 +1457,13 @@ function GraphVisualization({ data, onDataUpdate }) {
     const connectedLinks = data.links.filter(l => 
       l.source.id === node.id || l.target.id === node.id
     );
-
+  
     const confirmMessage = `Are you sure you want to delete the node "${node.label}"?\n\n` + 
       (connectedLinks.length > 0 
         ? `This will also delete ${connectedLinks.length} connected relationship${connectedLinks.length === 1 ? '' : 's'}`
         : 'This node has no connected relationships.');
 
+  
     if (window.confirm(confirmMessage)) {
       // Remove the node
       const newNodes = data.nodes.filter(n => n.id !== node.id);
@@ -1338,7 +1472,8 @@ function GraphVisualization({ data, onDataUpdate }) {
       const newLinks = data.links.filter(l => 
         l.source.id !== node.id && l.target.id !== node.id
       );
-      
+
+      // Update the data
       onDataUpdate({
         nodes: newNodes,
         links: newLinks

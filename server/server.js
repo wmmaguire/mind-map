@@ -12,8 +12,8 @@ import sessionRoutes from './routes/sessions.js';
 import feedbackRoutes from './routes/feedback.js';
 import File from './models/file.js';
 import { Session } from './models/session.js';
-import Graph from './models/graph.js';
 import GraphTransform from './models/graphTransform.js';
+import graphOperationsRouter from './routes/graphOperations.js';  // Add this import
 
 // Load environment variables
 dotenv.config();
@@ -323,6 +323,7 @@ import uploadRouter from './routes/upload.js';
 
 // Use the router BEFORE your other routes
 app.use('/api', uploadRouter);
+app.use('/api', graphOperationsRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
