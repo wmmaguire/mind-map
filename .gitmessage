@@ -1,0 +1,15 @@
+
+
+# Subject: imperative, ~50–72 characters. Use a type prefix, e.g. feat|fix|docs|refactor|chore|test:
+# (Write on line 1 above. Lines starting with # are removed from the final commit.)
+
+# Body (optional): what changed and why; wrap at ~72 columns.
+# (Leave one blank line after the subject, then write the body above this comment block.)
+
+# Issue tracking — add one line after the body (that line must NOT start with #):
+#   Refs: #123              link to GitHub issue only
+#   Fixes: #123             closes issue when merged to the default branch
+#   Closes: #123            same as Fixes
+#   See also: #123 #124
+
+# Remove anything you don’t need before committing; unused # lines are stripped automatically.
