@@ -1,70 +1,137 @@
-# Getting Started with Create React App
+# Client architecture & data flow
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This document describes the **frontend (React)** portion of the project as implemented under `client/`.
 
-## Available Scripts
+## Tech + runtime dependencies
 
-In the project directory, you can run:
+Client runtime and tooling are defined in `client/package.json`.
+
+- **react / react-dom**: UI runtime
+- **react-router-dom**: client-side routing (`client/src/App.js`)
+- **d3**: interactive graph visualization and editing (`client/src/components/GraphVisualization.js`)
+- **react-scripts**: Create React App build/dev/test toolchain
+- **web-vitals**: performance measurement hooks (CRA default)
+
+## High-level architecture
+
+The client is a Create React App (CRA) single-page application with:
+
+- A landing flow that **initializes a session** on load.
+- A library flow that **lists uploaded files** and **runs analysis**.
+- A D3-driven visualization that supports **interactive graph editing** and **AI-assisted expansion**.
+
+The client communicates with the backend via fetch calls to the `/api/*` endpoints. In development, CRA uses a proxy to the backend (see `client/package.json`).
+
+## Key modules
+
+- `client/src/App.js`
+  - Top-level router and page composition.
+- `client/src/components/Landing.js`
+  - Session initialization, session end reporting, and feedback UI.
+- `client/src/components/FileUpload.js`
+  - Upload modal; posts `multipart/form-data` to the backend and associates uploads with the current session.
+- `client/src/components/LibraryVisualize.js`
+  - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization.
+- `client/src/components/GraphVisualization.js`
+  - D3 force graph rendering + interaction model (select, zoom, edit, delete, generate).
+
+## Request/data flows
+
+### 1) Session initialization + lifecycle
+
+**Goal**: create a backend session and make its UUID available to other client flows.
+
+1. On initial load, `Landing` calls `POST /api/sessions` with:
+   - `sessionStart`
+   - `userMetadata` (browser, OS, screen size, language, timezone)
+2. The response contains a `sessionId` (UUID).
+3. The client stores this globally as `window.currentSessionId`.
+4. On unload, the client reports end time/duration via `navigator.sendBeacon` to:
+   - `POST /api/sessions/:sessionId`
+
+Why it matters: uploads, analysis, and telemetry all reference the session UUID.
+
+### 2) Upload flow (file + metadata)
+
+**Goal**: upload a source file and associate it with the current session.
+
+1. User opens the upload modal (`FileUpload`) and selects a `.txt` or `.md` file.
+2. `FileUpload` posts to `POST /api/upload` with form fields:
+   - `file`
+   - `customName`
+   - `sessionId` (from `window.currentSessionId`)
+3. On success, the server writes the upload to disk and records metadata.
+
+### 3) Library list → analyze → graph render
+
+**Goal**: transform selected source files into a graph and render it.
+
+1. `LibraryVisualize` fetches the available uploads:
+   - `GET /api/files` → list of uploaded file metadata
+2. For each selected file, it requests the raw content:
+   - `GET /api/files/:filename` → `{ success, content }`
+3. It calls analysis for each file:
+   - `POST /api/analyze` with `content`, optional `context`, `sessionId`, and `sourceFiles`
+4. It merges the returned graphs client-side into a combined graph and renders via:
+   - `GraphVisualization`
+
+### 4) Save/load graphs
+
+**Goal**: persist and restore graphs across sessions.
+
+- Save current graph:
+  - `POST /api/graphs/save` with `{ graph, metadata }`
+- List saved graphs:
+  - `GET /api/graphs`
+- Load a saved graph:
+  - `GET /api/graphs/:filename`
+
+### 5) Interactive editing + telemetry
+
+**Goal**: allow editing graph structure and track user operations.
+
+In `GraphVisualization` users can:
+
+- Select nodes/links and inspect relationships
+- Add nodes and relationships
+- Delete nodes/links
+- Use “Generate Nodes” to request AI expansion:
+  - `POST /api/generate-node`
+
+Key operations are logged via:
+
+- `POST /api/operations` (includes `sessionId`, operation type, status, duration, and details)
+
+## API base URLs (dev vs prod)
+
+Multiple components compute base URLs. In general:
+
+- **Development**: calls go to `http://localhost:5001` (or through CRA proxy)
+- **Production**: calls go to the deployed domain (currently referenced as `https://talk-graph.onrender.com` in several places)
+
+If you change the backend host or deploy environment, prefer centralizing this base URL logic to avoid drift.
+
+## Scripts (CRA)
+
+In the `client/` directory:
 
 ### `npm start`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Runs the app in development mode on `http://localhost:3000`.
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Runs the test watcher (CRA/Jest).
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Builds the production bundle to `client/build`.
 
 ### `npm run eject`
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+One-way eject of CRA configuration.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Learn more
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
