@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ⚠️  ONE-OFF: creates ~29 GitHub issues. Do not re-run; you will get duplicates.
-# Source: docs/todo.md — requires: gh auth, repo wmmaguire/mind-map, milestones M—Server/M—Client + NF—*.
+# Historical: mirrored former docs/todo.md — requires: gh auth, milestones M—Server/M—Client + NF—*.
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"

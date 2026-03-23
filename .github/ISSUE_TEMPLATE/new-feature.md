@@ -14,7 +14,7 @@ assignees: []
 
 ## Proposed solution
 
-<!-- Scope, UX/API sketch, milestones. Out-of-scope for this issue. Link design docs or docs/todo.md sections. -->
+<!-- Scope, UX/API sketch, milestones. Out-of-scope for this issue. Link design docs or GitHub project/milestone. -->
 
 ## Validation steps
 

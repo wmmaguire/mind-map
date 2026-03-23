@@ -14,7 +14,7 @@ assignees: []
 
 ## Proposed solution
 
-<!-- What will change (scope, approach, out-of-scope). Link related code paths, PRs, or docs (e.g. docs/todo.md). -->
+<!-- What will change (scope, approach, out-of-scope). Link related code paths, PRs, or docs (e.g. docs/status.md). -->
 
 ## Validation steps
 

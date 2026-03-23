@@ -14,7 +14,7 @@ assignees: []
 
 ## Proposed solution
 
-<!-- Concrete deliverables: files, APIs, UI behavior. Link docs/todo.md or specs if applicable. -->
+<!-- Concrete deliverables: files, APIs, UI behavior. Link docs/status.md or specs if applicable. -->
 
 ## Validation steps
 
