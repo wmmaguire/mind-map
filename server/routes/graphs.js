@@ -42,7 +42,7 @@ router.post('/graphs/save', async (req, res) => {
 
     const sourceFiles =
       metadata.sourceFiles
-        ?.map((fileId) => {
+        ?.map(() => {
           try {
             return new mongoose.Types.ObjectId();
           } catch (error) {
@@ -71,7 +71,9 @@ router.post('/graphs/save', async (req, res) => {
         name: metadata.name || 'Untitled Graph',
         description: metadata.description || '',
         sourceFiles,
-        generatedAt: new Date(metadata.generatedAt) || new Date(),
+        generatedAt: metadata.generatedAt
+          ? new Date(metadata.generatedAt)
+          : new Date(),
         lastModified: new Date(),
         nodeCount: processedNodes.length,
         edgeCount: processedLinks.length,
