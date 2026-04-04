@@ -110,12 +110,36 @@
 }
 
 .error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   padding: 12px;
   margin-bottom: 16px;
   background-color: #ffebee;
   color: #d32f2f;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.error .error-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.retry-button {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: #fff;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  background: #ffcdd2;
 }
 
 .save-button {

@@ -96,7 +96,12 @@ function LibraryVisualize() {
       }
     } catch (error) {
       console.error('Error fetching files:', error);
-      setError(`Failed to fetch files: ${error.message}`);
+      const base = `Failed to fetch files: ${error.message}`;
+      const hint =
+        error.message === 'Failed to fetch'
+          ? ' Check that the API server is running (e.g. port 5001).'
+          : '';
+      setError(`${base}${hint}`);
     }
   };
 
@@ -110,6 +115,12 @@ function LibraryVisualize() {
       console.warn('Error fetching saved graphs:', error);
       setSavedGraphs([]);
     }
+  };
+
+  const handleRetryLibraryFetch = () => {
+    setError(null);
+    fetchFiles();
+    fetchSavedGraphs();
   };
 
   const handleSaveClick = () => {
@@ -459,9 +470,13 @@ function LibraryVisualize() {
           <h3>Library</h3>
         </div>
         {error && (
-          <div className="error">
-            {error}
-            <button onClick={fetchFiles} className="retry-button">
+          <div className="error" role="alert">
+            <span className="error-text">{error}</span>
+            <button
+              type="button"
+              className="retry-button"
+              onClick={handleRetryLibraryFetch}
+            >
               Retry
             </button>
           </div>
