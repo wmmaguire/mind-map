@@ -61,8 +61,10 @@ There is intentional **hybrid persistence**:
 ## Project layout (server/)
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
-- `server.js`: main entrypoint (Express app + routes + OpenAI + DB connect)
-- `routes/`: route modules (sessions, feedback, graph operations; plus graph save/load endpoints)
+- `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below
+- `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
+- `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats)
+- `routes/`: other modules (sessions, feedback, graph operations)
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, etc.)
 - `scripts/migrate.js`: migration script (see root README for how it’s used)
 - `uploads/`: uploaded raw files (written by multer)
@@ -107,7 +109,7 @@ Relevant code:
 
 Relevant code:
 
-- `server/server.js` (`/api/upload`)
+- `server/routes/files.js` (`POST /upload` → `POST /api/upload` when mounted)
 - `server/models/file.js`
 
 ### 3) File listing + file content retrieval
@@ -119,7 +121,7 @@ Relevant code:
 
 Relevant code:
 
-- `server/server.js` (`/api/files`, `/api/files/:filename`)
+- `server/routes/files.js`
 
 ### 4) AI analysis → graph JSON (OpenAI) + transform tracking
 
@@ -173,7 +175,7 @@ Relevant code:
 
 Relevant code:
 
-- `server/routes/upload.js` (despite the name, it also implements graph save/load)
+- `server/routes/graphs.js`
 - `server/models/graph.js`
 - `server/models/graphView.js`
 
@@ -213,8 +215,8 @@ Relevant code:
 
 ## Notes / current caveats (as implemented)
 
-- Some endpoints are implemented directly in `server/server.js` *and* related functionality exists in `server/routes/upload.js`. Route ownership is not fully centralized.
-- The server favors availability: some DB write failures are logged but do not necessarily fail the request (notably in upload).
+- **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
+- Other hybrid paths (e.g. graph save writes disk then Mongo) may still need explicit failure semantics—see open issues / backlog.
 
 ## Quick reference: scripts
 

@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
-import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import OpenAI from 'openai';
@@ -13,8 +12,9 @@ import feedbackRoutes from './routes/feedback.js';
 import File from './models/file.js';
 import { Session } from './models/session.js';
 import GraphTransform from './models/graphTransform.js';
-import graphOperationsRouter from './routes/graphOperations.js';  // Add this import
-import uploadRouter from './routes/upload.js';
+import graphOperationsRouter from './routes/graphOperations.js';
+import filesRouter from './routes/files.js';
+import graphsRouter from './routes/graphs.js';
 import {
   dataDir,
   uploadsDir,
@@ -118,177 +118,10 @@ app.use((req, res, next) => {
   }
 })();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueId = Date.now();
-    const extension = path.extname(file.originalname);
-    cb(null, `${uniqueId}${extension}`);
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// API Routes - Define these BEFORE static file serving
-app.get('/api/files', async (req, res) => {
-  try {
-    console.log('Reading metadata directory:', metadataDir);
-    const metadataFiles = await fs.readdir(metadataDir);
-    console.log('Found metadata files:', metadataFiles);
-    
-    const fileList = await Promise.all(
-      metadataFiles
-        .filter(file => file.endsWith('.json'))
-        .map(async (metaFile) => {
-          try {
-            const metadata = JSON.parse(
-              await fs.readFile(path.join(metadataDir, metaFile), 'utf8')
-            );
-            return {
-              ...metadata,
-              filename: metaFile.replace('.json', '')
-            };
-          } catch (error) {
-            console.error('Error reading metadata file:', metaFile, error);
-            return null;
-          }
-        })
-    );
-
-    const validFiles = fileList.filter(file => file !== null);
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.json({ files: validFiles });
-  } catch (error) {
-    console.error('Error reading metadata directory:', error);
-    res.status(500).json({ 
-      error: 'Failed to read files',
-      details: error.message,
-      path: metadataDir
-    });
-  }
-});
-
-/** Remove multer file + sidecar metadata JSON when persistence fails mid-request. */
-async function removeSessionUploadArtifacts(uploadedFilePath, metadataBasename) {
-  try {
-    await fs.unlink(uploadedFilePath);
-  } catch (e) {
-    console.error('Failed to remove uploaded file after persist error:', e);
-  }
-  try {
-    await fs.unlink(path.join(metadataDir, metadataBasename));
-  } catch (e) {
-    console.error('Failed to remove metadata file after persist error:', e);
-  }
-}
-
-app.post('/api/upload', (req, res, next) => {
-  upload.single('file')(req, res, async (err) => {
-    if (err) {
-      console.error('Upload Error:', err);
-      return res.status(400).json({ 
-        error: err.message || 'Error uploading file'
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ 
-        error: 'No file uploaded'
-      });
-    }
-
-    try {
-      // Validate sessionId
-      if (!req.body.sessionId) {
-        return res.status(400).json({
-          error: 'No sessionId provided'
-        });
-      }
-
-      // Verify session exists in database
-      const session = await Session.findOne({ sessionId: req.body.sessionId });
-      if (!session) {
-        return res.status(400).json({
-          error: 'Invalid session ID'
-        });
-      }
-
-      // Create metadata for the file
-      const metadata = {
-        originalName: req.file.originalname,
-        customName: req.body.customName || req.file.originalname.replace(/\.[^/.]+$/, ""),
-        uploadDate: new Date().toISOString(),
-        fileType: req.file.mimetype,
-        size: req.file.size,
-        sessionId: req.body.sessionId  // Add sessionId to metadata
-      };
-
-      const metadataBasename = `${req.file.filename}.json`;
-      const metadataPath = path.join(metadataDir, metadataBasename);
-
-      try {
-        await fs.writeFile(
-          metadataPath,
-          JSON.stringify(metadata, null, 2)
-        );
-      } catch (metaErr) {
-        console.error('Metadata write error:', metaErr);
-        await removeSessionUploadArtifacts(req.file.path, metadataBasename);
-        return res.status(500).json({
-          success: false,
-          error: 'Could not save file metadata on disk.',
-          code: 'METADATA_WRITE_FAILED'
-        });
-      }
-
-      try {
-        const fileRecord = new File({
-          sessionId: req.body.sessionId,
-          customName: metadata.customName,
-          originalName: metadata.originalName,
-          uploadTime: new Date(metadata.uploadDate),
-          fileType: metadata.fileType,
-          fileSize: metadata.size,
-          path: req.file.path
-        });
-
-        await fileRecord.save();
-        console.log('File metadata saved to database:', fileRecord);
-      } catch (dbError) {
-        console.error('Error saving to database:', dbError);
-        await removeSessionUploadArtifacts(req.file.path, metadataBasename);
-        const isDup = dbError.code === 11000;
-        return res.status(isDup ? 409 : 503).json({
-          success: false,
-          error: isDup
-            ? 'This session already has an uploaded file. Remove or replace it before uploading again.'
-            : 'Upload could not be recorded in the database. The file was not kept.',
-          code: isDup ? 'SESSION_FILE_EXISTS' : 'DATABASE_PERSIST_FAILED'
-        });
-      }
-
-      console.log('File uploaded successfully:', {
-        filename: req.file.filename,
-        metadata: metadata
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'File uploaded successfully',
-        filename: req.file.filename,
-        metadata,
-        persistedToDatabase: true
-      });
-    } catch (error) {
-      console.error('Metadata Error:', error);
-      next(error); // Pass error to error handling middleware
-    }
-  });
-});
+// Library files + uploads + graph snapshots (see routes/files.js, routes/graphs.js)
+app.use('/api', filesRouter);
+app.use('/api', graphsRouter);
+app.use('/api', graphOperationsRouter);
 
 app.get('/api/test', (req, res) => {
   try {
@@ -303,79 +136,6 @@ app.get('/api/test', (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// API Routes - Must come BEFORE the production static/catch-all routes
-app.get('/api/files/:filename', async (req, res) => {
-  console.log('File request received:', {
-    filename: req.params.filename,
-    path: req.path,
-    method: req.method,
-    uploadsDir: uploadsDir
-  });
-  
-  try {
-    const filename = decodeURIComponent(req.params.filename);
-    const filePath = path.join(uploadsDir, filename);
-    
-    console.log('File access attempt:', {
-      requestedFile: filename,
-      fullPath: filePath,
-      exists: await fs.access(filePath).then(() => true).catch(() => false)
-    });
-
-    // List all files in uploads directory for debugging
-    const files = await fs.readdir(uploadsDir);
-    console.log('Files in uploads directory:', files);
-    
-    // Check if file exists before trying to read it
-    try {
-      await fs.access(filePath);
-    } catch (error) {
-      console.log('File not found:', {
-        filePath,
-        error: error.message,
-        uploadsDir,
-        availableFiles: files
-      });
-      return res.status(404).json({
-        success: false,
-        error: 'File not found',
-        details: {
-          requested: filename,
-          path: filePath,
-          availableFiles: files
-        }
-      });
-    }
-
-    const content = await fs.readFile(filePath, 'utf8');
-    console.log('File read successfully:', {
-      filename,
-      contentLength: content.length,
-      preview: content.substring(0, 100)
-    });
-
-    return res.json({
-      success: true,
-      content: content
-    });
-  } catch (error) {
-    console.error('Server error:', {
-      error: error.message,
-      stack: error.stack,
-      filename: req.params.filename
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Server error',
-      details: error.message
-    });
-  }
-});
-
-// Use the router BEFORE your other routes
-app.use('/api', uploadRouter);
-app.use('/api', graphOperationsRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -795,7 +555,6 @@ app.post('/api/generate-node', async (req, res) => {
   }
 });
 
-// Use the router BEFORE your other routes
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/feedback', feedbackRoutes);
 

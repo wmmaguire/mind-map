@@ -149,8 +149,8 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 ### Known inconsistencies / risks (current state signals)
 - **Naming drift**: many references use “talk-graph” (including production URL), while repo is “mind-map”.
-- **Route duplication risk**:
-  - `server/server.js` defines `/api/upload` and `/api/files` directly and also mounts `uploadRouter` which defines similar endpoints. This can cause confusion depending on route order.
+- **Route layout (updated)**:
+  - Library uploads and file listing live in `server/routes/files.js`; persisted graphs in `server/routes/graphs.js`. `server/server.js` mounts these and still defines `/api/analyze` and `/api/generate-node` inline.
 - **Potential data modeling issue**:
   - `File` schema has `sessionId` marked `unique: true` while product direction may allow multiple files per session; second uploads can hit **409** `SESSION_FILE_EXISTS` when the server enforces DB + disk consistency (see `POST /api/upload` behavior in `server/READEME.md`).
 - **Hard-coded base URLs**:
