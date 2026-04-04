@@ -5,6 +5,7 @@ import React, {
   useEffect
 } from 'react';
 import PropTypes from 'prop-types';
+import { apiUrl } from '../config';
 import { apiRequest } from '../api/http';
 
 const SessionContext = createContext(null);
