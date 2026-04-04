@@ -59,3 +59,9 @@ Templates live in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/). Each tem
 - **Organization template repository** (GitHub feature for new repos only—“Use this template”—not automatic sync for existing repos).
 
 Labels referenced in YAML (e.g. `bug fix`, `Priority Level- MEDIUM`) must **exist** on that GitHub repo or creation may warn or skip labels.
+
+---
+
+## Frontend tests
+
+From `client/`, run `npm test` (interactive watcher) or `npm test -- --watchAll=false` for a single pass. Matchers come from **`@testing-library/jest-dom`**; Jest tweaks for **React Router v7** and **d3** are documented in **`client/README.md`** under *Testing (Jest)*.

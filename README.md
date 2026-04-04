@@ -16,6 +16,7 @@ mind-map/
 │   ├── src/
 │   ├── .env
 │   ├── package.json
+│   ├── package-lock.json
 │   └── README.md
 ├── server/
 │   ├── server.js
@@ -38,7 +39,7 @@ mind-map/
 1. Clone the repository:
 ```bash
 git clone https://github.com/wmmaguire/mind-map.git
-cd talk-graph
+cd mind-map
 ```
 
 2. Install dependencies:
@@ -57,6 +58,7 @@ npm run start
 
 - Frontend code can be modified in the `client/src` directory.
 - Backend code can be modified in the `server` directory.
+- Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or `npm test -- --watchAll=false` once. See **`client/README.md`** → *Testing (Jest)* for router/d3 setup details.
 - The backend will automatically restart when changes are made to the backend code.
 - The frontend will automatically restart when changes are made to the frontend code.
 

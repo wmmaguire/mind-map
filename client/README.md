@@ -12,6 +12,8 @@ Client runtime and tooling are defined in `client/package.json`.
 - **react-scripts**: Create React App build/dev/test toolchain
 - **web-vitals**: performance measurement hooks (CRA default)
 
+**Dev dependencies** (see `client/package.json`): **`@testing-library/jest-dom`**, **`@testing-library/react`**, **`@testing-library/user-event`** — DOM matchers and component testing helpers for Jest. The lockfile **`client/package-lock.json`** pins client installs for reproducible CI.
+
 ## High-level architecture
 
 The client is a Create React App (CRA) single-page application with:
@@ -38,6 +40,8 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
   - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization.
 - `client/src/components/GraphVisualization.js`
   - D3 force graph rendering + interaction model (select, zoom, edit, delete, generate).
+- `client/src/setupPolyfills.js`
+  - Loaded first in **`App.test.js`** so **`TextEncoder` / `TextDecoder`** exist in the Jest environment before **React Router v7** is imported (Router relies on them during module load).
 
 ## Request/data flows
 
@@ -132,7 +136,11 @@ Runs the app in development mode on `http://localhost:3000`.
 
 ### `npm test`
 
-Runs the test watcher (CRA/Jest).
+Runs the CRA/Jest test runner in **watch** mode. For a **single non-interactive run** (e.g. CI):
+
+```bash
+npm test -- --watchAll=false
+```
 
 ### `npm run build`
 
@@ -141,6 +149,19 @@ Builds the production bundle to `client/build`.
 ### `npm run eject`
 
 One-way eject of CRA configuration.
+
+## Testing (Jest)
+
+Tests live under `client/src` (e.g. `App.test.js`). **`setupTests.js`** imports **`@testing-library/jest-dom`** for matchers like `toBeInTheDocument()`.
+
+Because this app uses **React Router v7** and **d3** (ESM), `client/package.json` includes a **`jest`** section (supported CRA overrides only):
+
+| Option | Purpose |
+|--------|---------|
+| **`moduleNameMapper`** | Maps `react-router`, `react-router/dom`, and `react-router-dom` to their published `dist` entry files so Jest can resolve them. |
+| **`transformIgnorePatterns`** | Allows Babel to transform the **`d3`** package (otherwise Jest hits untranspiled `export` syntax in `node_modules`). |
+
+`App.test.js` **must** import `./setupPolyfills` **before** `react-router-dom` so encoding globals exist when the router bundle loads.
 
 ## Learn more
 
