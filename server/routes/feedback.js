@@ -1,5 +1,7 @@
 import express from 'express';
 import Feedback from '../models/feedback.js';
+import { Session } from '../models/session.js';
+import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
@@ -41,6 +43,19 @@ router.post('/', async (req, res) => {
     const savedFeedback = await feedback.save();
 
     console.log('Saved feedback:', savedFeedback);
+
+    const session = await Session.findOne({ sessionId: feedbackDoc.sessionId });
+    if (session) {
+      await recordUserActivity({
+        sessionObjectId: session._id,
+        sessionUuid: session.sessionId,
+        action: 'FEEDBACK_SUBMIT',
+        status: 'SUCCESS',
+        resourceType: 'Feedback',
+        resourceId: savedFeedback._id,
+        summary: `Feedback (${feedbackDoc.category})`
+      });
+    }
 
     res.status(201).json({
       success: true,

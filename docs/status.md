@@ -1,12 +1,12 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-03-15
+Last updated: 2026-04-04
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
 - **React (Create React App)** frontend for uploading, selecting files, and visualizing/editing graphs with D3
 - **Node.js / Express** backend for file upload, content retrieval, graph generation via OpenAI, and persistence
-- **MongoDB (Mongoose)** for sessions, metadata, transforms, graphs, feedback, and telemetry
+- **MongoDB (Mongoose)** for sessions, metadata, transforms, graphs, feedback, telemetry, and a **`UserActivity`** audit collection for cross-cutting session/upload/analyze/graph/feedback outcomes (see **`server/READEME.md`**, GitHub **#16**)
 - **Filesystem persistence** as a parallel/backup store for uploads + metadata + saved graphs
 
 The README describes the stack correctly but there is some naming drift: the repo is `mind-map`, while package/app names and production URL references still use `talk-graph`.

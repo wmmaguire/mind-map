@@ -2,6 +2,7 @@ import express from 'express';
 import { Session } from '../models/session.js';
 import { UserMetadata } from '../models/userMetadata.js';
 import { v4 as uuidv4 } from 'uuid';
+import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
@@ -36,6 +37,16 @@ router.post('/', async (req, res) => {
 
     await session.save();
     console.log('Session created:', session);
+
+    await recordUserActivity({
+      sessionObjectId: session._id,
+      sessionUuid: session.sessionId,
+      action: 'SESSION_CREATE',
+      status: 'SUCCESS',
+      resourceType: 'Session',
+      resourceId: session._id,
+      summary: 'Session initialized'
+    });
 
     res.status(200).json({ 
       message: 'Session created successfully',
@@ -75,6 +86,17 @@ router.post('/:sessionId', async (req, res) => {
     
     console.log('Saving updated session:', session);
     await session.save();
+
+    await recordUserActivity({
+      sessionObjectId: session._id,
+      sessionUuid: session.sessionId,
+      action: 'SESSION_UPDATE',
+      status: 'SUCCESS',
+      resourceType: 'Session',
+      resourceId: session._id,
+      summary: 'Session end / duration updated',
+      meta: { sessionDuration: session.sessionDuration }
+    });
 
     // sendBeacon doesn't care about the response
     res.status(200).json({ message: 'Session updated successfully' });

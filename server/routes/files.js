@@ -9,6 +9,7 @@ import { promises as fs } from 'fs';
 import File from '../models/file.js';
 import { Session } from '../models/session.js';
 import { uploadsDir, metadataDir } from '../config.js';
+import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
@@ -143,6 +144,16 @@ router.post('/upload', (req, res, next) => {
 
         await fileRecord.save();
         console.log('File metadata saved to database:', fileRecord);
+
+        await recordUserActivity({
+          sessionObjectId: session._id,
+          sessionUuid: req.body.sessionId,
+          action: 'FILE_UPLOAD',
+          status: 'SUCCESS',
+          resourceType: 'File',
+          resourceId: fileRecord._id,
+          summary: `Uploaded ${metadata.customName || metadata.originalName}`
+        });
       } catch (dbError) {
         console.error('Error saving to database:', dbError);
         await removeSessionUploadArtifacts(req.file.path, metadataBasename);

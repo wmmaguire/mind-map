@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import Graph from '../models/graph.js';
 import GraphView from '../models/graphView.js';
 import { graphsDir } from '../config.js';
+import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
@@ -110,6 +111,16 @@ router.post('/graphs/save', async (req, res) => {
     await fs.writeFile(path.join(graphsDir, filename), JSON.stringify(graphData, null, 2));
 
     await dbGraph.save();
+
+    await recordUserActivity({
+      sessionObjectId,
+      sessionUuid: metadata.sessionId,
+      action: 'GRAPH_SNAPSHOT_SAVE',
+      status: 'SUCCESS',
+      resourceType: 'Graph',
+      resourceId: dbGraph._id,
+      summary: `Saved graph "${dbGraph.metadata.name}" (${processedNodes.length} nodes)`
+    });
 
     res.json({
       success: true,
@@ -225,9 +236,29 @@ router.get('/graphs/:filename', async (req, res) => {
           }
         });
 
-        graphView.save().catch((err) => {
-          console.warn('Failed to save graph view:', err);
-        });
+        try {
+          await graphView.save();
+          await recordUserActivity({
+            sessionObjectId: sessionId,
+            sessionUuid: fileData.metadata.sessionId,
+            action: 'GRAPH_VIEW_RECORD',
+            status: 'SUCCESS',
+            resourceType: 'GraphView',
+            resourceId: graphView._id,
+            summary: `Loaded graph file ${req.params.filename}`,
+            meta: { graphId: String(dbGraph._id) }
+          });
+        } catch (viewErr) {
+          console.error('Failed to save graph view:', viewErr);
+          await recordUserActivity({
+            sessionObjectId: sessionId,
+            sessionUuid: fileData.metadata.sessionId,
+            action: 'GRAPH_VIEW_RECORD',
+            status: 'FAILURE',
+            summary: `Graph view not persisted for ${req.params.filename}`,
+            errorMessage: viewErr.message
+          });
+        }
       }
     } catch (dbError) {
       console.warn('Database load warning:', dbError);

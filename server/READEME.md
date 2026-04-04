@@ -58,6 +58,8 @@ There is intentional **hybrid persistence**:
 - The filesystem provides durable artifacts (`uploads/`, `metadata/`, `graphs/`).
 - MongoDB stores structured records for querying and tracking user activity.
 
+**User activity audit:** `UserActivity` (`server/models/userActivity.js`) records high-level outcomes (session, upload, analyze, graph save/load tracking, feedback) with links to domain documents where useful. **`POST /api/operations`** remains represented only by **`GraphOperation`** documents (no duplicate audit row).
+
 ## Project layout (server/)
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
@@ -65,7 +67,8 @@ There is intentional **hybrid persistence**:
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
 - `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats)
 - `routes/`: other modules (sessions, feedback, graph operations)
-- `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, etc.)
+- `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, UserActivity, etc.)
+- `lib/`: shared helpers (`recordUserActivity.js`, `sessionObjectId.js`)
 - `scripts/migrate.js`: migration script (see root README for how it’s used)
 - `uploads/`: uploaded raw files (written by multer)
 - `metadata/`: metadata JSON files describing uploads (written by server code)
@@ -137,17 +140,31 @@ Relevant code:
    - `sessionId` (UUID)
    - `sourceFiles` (identifiers for files)
 2. Server looks up the `Session` by UUID.
-3. Server resolves `sourceFiles` to `File` IDs when possible and creates a `GraphTransform` document with `status: pending`.
-4. Server calls OpenAI Chat Completions (model from **`OPENAI_ANALYZE_MODEL`**, default **`gpt-4o`**) and **expects JSON** with:
+3. If `content` is missing, responds **400** (no `GraphTransform` is created).
+4. Server resolves `sourceFiles` to `File` IDs when possible and creates a `GraphTransform` document with `status: pending` (including an **empty** `sourceFiles` array when nothing matched).
+5. Server calls OpenAI Chat Completions (model from **`OPENAI_ANALYZE_MODEL`**, default **`gpt-4o`**) and **expects JSON** with:
    - `nodes[]` (concept nodes: id, label, description, wikiUrl, etc.)
    - `links[]` (relationships: source, target, relationship)
-5. Server parses the reply with the same helper used for generate-node: strips common markdown code fences, extracts a `{ ... }` object, then validates `nodes` and `links` arrays.
-6. On success, server updates `GraphTransform` with `result` and marks it `completed`, then returns the graph JSON. On failure (OpenAI **429** / **401**, parse errors, etc.), returns a non-2xx JSON body with `details` and `code` (e.g. `OPENAI_QUOTA`, `ANALYSIS_FAILED`) and marks the transform `failed` when a transform record exists.
+6. Server parses the reply with the same helper used for generate-node: strips common markdown code fences, extracts a `{ ... }` object, then validates `nodes` and `links` arrays.
+7. On success, server updates `GraphTransform` with `result`, marks it `completed`, writes `UserActivity` **`ANALYZE_COMPLETE`** **`SUCCESS`**, then returns the graph JSON. On failure (OpenAI **429** / **401**, parse errors, etc.), returns a non-2xx JSON body with `details` and `code` (e.g. `OPENAI_QUOTA`, `ANALYSIS_FAILED`), marks the transform `failed`, and writes **`ANALYZE_COMPLETE`** **`FAILURE`** when a transform record exists.
 
 Relevant code:
 
 - `server/server.js` (`/api/analyze`)
 - `server/models/graphTransform.js`
+
+**Persistence matrix (audit vs domain):**
+
+| Handler | Primary Mongo document(s) | `UserActivity` action (when applicable) |
+|--------|---------------------------|------------------------------------------|
+| `POST /api/sessions` | `Session`, `UserMetadata` | `SESSION_CREATE` |
+| `POST /api/sessions/:sessionId` | `Session` | `SESSION_UPDATE` |
+| `POST /api/upload` | `File` | `FILE_UPLOAD` |
+| `POST /api/analyze` | `GraphTransform` | `ANALYZE_COMPLETE` |
+| `POST /api/graphs/save` | `Graph` | `GRAPH_SNAPSHOT_SAVE` |
+| `GET /api/graphs/:filename` | `GraphView` (if DB graph matched) | `GRAPH_VIEW_RECORD` |
+| `POST /api/feedback` | `Feedback` | `FEEDBACK_SUBMIT` (if session row exists) |
+| `POST /api/operations` | `GraphOperation` | *(use `GraphOperation` only)* |
 
 ### 5) “Generate node(s)” graph expansion (OpenAI)
 
@@ -220,7 +237,7 @@ Relevant code:
 ## Notes / current caveats (as implemented)
 
 - **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
-- Other hybrid paths (e.g. graph save writes disk then Mongo) may still need explicit failure semantics—see open issues / backlog.
+- Graph snapshot save: filesystem write happens before Mongo `Graph` save; if `Graph` save fails, the JSON file may exist without a matching document (see backlog / future hardening if you need atomicity).
 - **Legacy DB:** If uploads still fail with duplicate key on `sessionId`, drop the old `sessionId` unique index on `files` (see upload flow above).
 
 ## Quick reference: scripts

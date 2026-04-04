@@ -58,6 +58,8 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
 
 Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 
+The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SESSION_UPDATE`** (end/duration) so session lifecycle is auditable in Mongo (see **`server/READEME.md`**, GitHub **#16**).
+
 ### 2) Upload flow (file + metadata)
 
 **Goal**: upload source file(s) and associate each with the current session.
@@ -67,7 +69,7 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
    - `file`
    - `customName`
    - `sessionId` (from `useSession()`)
-3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo. Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
+3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo. A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
 4. On failure, the API may return structured JSON (`error`, `details`, `code`). If a **legacy Mongo index** still enforces one file per session, see **`server/READEME.md`** (GitHub **#42**).
 
 ### 3) Library list → analyze → graph render
@@ -88,7 +90,7 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 **Goal**: persist and restore graphs across sessions.
 
 - Save current graph:
-  - `POST /api/graphs/save` with `{ graph, metadata }`
+  - `POST /api/graphs/save` with `{ graph, metadata }` (server records **`UserActivity`** **`GRAPH_SNAPSHOT_SAVE`** on successful Mongo save)
 - List saved graphs:
   - `GET /api/graphs`
 - Load a saved graph:
@@ -110,6 +112,8 @@ In `GraphVisualization` users can:
 Key operations are logged via:
 
 - `POST /api/operations` (includes `sessionId`, operation type, status, duration, and details)
+
+The landing feedback form posts to **`POST /api/feedback`**; when the session exists in Mongo, the server also records **`UserActivity`** **`FEEDBACK_SUBMIT`** (see **`server/READEME.md`**).
 
 ## API base URL
 

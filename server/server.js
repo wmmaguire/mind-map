@@ -15,6 +15,7 @@ import GraphTransform from './models/graphTransform.js';
 import graphOperationsRouter from './routes/graphOperations.js';
 import filesRouter from './routes/files.js';
 import graphsRouter from './routes/graphs.js';
+import { recordUserActivity } from './lib/recordUserActivity.js';
 import {
   dataDir,
   uploadsDir,
@@ -177,8 +178,10 @@ app.use((err, req, res, next) => {
 // Update the analyze endpoint
 app.post('/api/analyze', async (req, res) => {
   let graphTransform;
+  let analyzeSessionUuid;
   try {
     const { content, context, sessionId } = req.body;
+    analyzeSessionUuid = sessionId;
     const sourceFiles = Array.isArray(req.body.sourceFiles) ? req.body.sourceFiles : [];
     console.log('Analyze request:', { sessionId, sourceFiles });
     
@@ -212,27 +215,25 @@ app.post('/api/analyze', async (req, res) => {
     );
 
     const validFileIds = fileRecords.filter(id => id);
-    
-    if (validFileIds.length > 0) {
-      graphTransform = new GraphTransform({
-        sessionId: session._id,
-        sourceFiles: validFileIds,
-        context,
-        status: 'pending'
-      });
-      await graphTransform.save();
-      console.log('Created GraphTransform:', graphTransform._id);
-    }
 
-    // Rest of the analyze logic...
     console.log('Analyzing content:', { content, context, sessionId, sourceFiles });
 
     if (!content) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         error: 'No content provided'
       });
     }
+
+    // Always persist analyze attempts (including zero linked files) for durable activity (#16).
+    graphTransform = new GraphTransform({
+      sessionId: session._id,
+      sourceFiles: validFileIds,
+      context,
+      status: 'pending'
+    });
+    await graphTransform.save();
+    console.log('Created GraphTransform:', graphTransform._id);
 
     console.log('Analyzing content length:', content.length);
     console.log('Content preview:', content.substring(0, 100));
@@ -290,28 +291,27 @@ app.post('/api/analyze', async (req, res) => {
     const rawMessage = completion.choices[0]?.message?.content;
     const graphData = parseGraphJsonFromCompletion(rawMessage);
     console.log('Analysis completed successfully');
-    
-    // Before saving the results, transform numeric IDs to ObjectIds
-    if (graphData && graphTransform) {
-      // Update the GraphTransform with generate graphData
-      graphTransform.result = graphData;
-      graphTransform.status = 'completed';
-      graphTransform.completedAt = new Date();
-      await graphTransform.save();
-      console.log('UpdatedGraphTransform:', graphTransform._id);
 
-      // Send back the original format for the client
-      return res.json({
-        success: true,
-        data: graphData,  // Send original numeric IDs to client
-        transformId: graphTransform._id
-      });
-    }
+    graphTransform.result = graphData;
+    graphTransform.status = 'completed';
+    graphTransform.completedAt = new Date();
+    await graphTransform.save();
+    console.log('UpdatedGraphTransform:', graphTransform._id);
+
+    await recordUserActivity({
+      sessionObjectId: session._id,
+      sessionUuid: sessionId,
+      action: 'ANALYZE_COMPLETE',
+      status: 'SUCCESS',
+      resourceType: 'GraphTransform',
+      resourceId: graphTransform._id,
+      summary: `Analyze completed (${graphData.nodes?.length ?? 0} nodes)`
+    });
 
     return res.json({
       success: true,
       data: graphData,
-      transformId: graphTransform?._id
+      transformId: graphTransform._id
     });
   } catch (error) {
     console.error('Analysis error:', error);
@@ -337,6 +337,16 @@ app.post('/api/analyze', async (req, res) => {
       graphTransform.status = 'failed';
       graphTransform.error = error.message;
       await graphTransform.save();
+      await recordUserActivity({
+        sessionObjectId: graphTransform.sessionId,
+        sessionUuid: analyzeSessionUuid,
+        action: 'ANALYZE_COMPLETE',
+        status: 'FAILURE',
+        resourceType: 'GraphTransform',
+        resourceId: graphTransform._id,
+        summary: 'Analyze failed',
+        errorMessage: error.message
+      });
     }
 
     return res.status(statusCode).json({

@@ -23,6 +23,8 @@ mind-map/
 │   ├── routes/
 │   │   ├── files.js      # /api/files, /api/upload, file content
 │   │   └── graphs.js     # /api/graphs/* (save, list, load, views)
+│   ├── models/           # Mongoose schemas (Session, File, Graph, UserActivity, …)
+│   ├── lib/              # shared helpers (e.g. recordUserActivity)
 │   ├── package.json
 │   └── READEME.md        # server architecture (not README.md)
 ├── .env
@@ -69,6 +71,7 @@ npm run start
 
 - Full detail: **`server/READEME.md`** (env vars, flows, OpenAI, persistence).
 - **Library uploads** (`GET/POST /api/files`, `POST /api/upload`) and **persisted graphs** (`/api/graphs/*`) are implemented in **`server/routes/files.js`** and **`server/routes/graphs.js`** (mounted from `server.js`).
+- **User activity audit:** the server writes **`UserActivity`** documents for high-level outcomes (session lifecycle, uploads, analyze completion, graph save/view, feedback) alongside domain collections (`File`, `GraphTransform`, `GraphOperation`, etc.). See **`server/READEME.md`** → “User activity audit” and the persistence matrix (GitHub **#16**).
 - **Multiple files per session** are allowed; older MongoDB databases may still have a legacy **unique index on `sessionId`** in the `files` collection—drop it if second uploads fail (see **server/READEME.md** upload section, and GitHub **#42**).
 
 #### Database Migrations
