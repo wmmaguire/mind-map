@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -8,6 +8,7 @@ This repo implements a full-stack web app that turns uploaded text/markdown into
 - **Node.js / Express** backend for file upload, content retrieval, graph generation via OpenAI, and persistence
 - **MongoDB (Mongoose)** for sessions, metadata, transforms, graphs, feedback, telemetry, and a **`UserActivity`** audit collection for cross-cutting session/upload/analyze/graph/feedback outcomes (see **`server/READEME.md`**, GitHub **#16**)
 - **Filesystem persistence** as a parallel/backup store for uploads + metadata + saved graphs; **which store is authoritative per feature** is summarized under **`server/READEME.md`** → *Data consistency (hybrid persistence)* (GitHub **#20**)
+- **Client multi-file library flow:** per-file `POST /api/analyze` plus **`mergeGraphs`** namespaced union in **`client/src/utils/`** (GitHub **#21**); roadmap for connected fusion / splitting in **#47**
 
 The README describes the stack correctly but there is some naming drift: the repo is `mind-map`, while package/app names and production URL references still use `talk-graph`.
 

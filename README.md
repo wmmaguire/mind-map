@@ -70,6 +70,7 @@ npm run start
 #### Backend API layout
 
 - Full detail: **`server/READEME.md`** (env vars, flows, OpenAI, persistence).
+- **Multi-file analyze (library):** the backend still runs **one** `POST /api/analyze` per file; the React app merges JSON graphs client-side with **`client/src/utils/mergeGraphs.js`** (GitHub **#21**). Optional fusion of subgraphs into one connected graph (or splitting large graphs) is **#47**.
 - **Hybrid persistence / source of truth:** **`server/READEME.md`** → **Data consistency (hybrid persistence)** — what lives on disk vs Mongo, and known divergence cases (GitHub **#20**, **#44**).
 - **Library uploads** (`GET/POST /api/files`, `POST /api/upload`) and **persisted graphs** (`/api/graphs/*`) are implemented in **`server/routes/files.js`** and **`server/routes/graphs.js`** (mounted from `server.js`).
 - **User activity audit:** the server writes **`UserActivity`** documents for high-level outcomes (session lifecycle, uploads, analyze completion, graph save/view, feedback) alongside domain collections (`File`, `GraphTransform`, `GraphOperation`, etc.). See **`server/READEME.md`** → “User activity audit” and the persistence matrix (GitHub **#16**).

@@ -80,10 +80,11 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
    - `GET /api/files` → list of uploaded file metadata
 2. For each selected file, it requests the raw content:
    - `GET /api/files/:filename` → `{ success, content }`
-3. It calls analysis for each file:
-   - `POST /api/analyze` with `content`, optional `context`, `sessionId`, and `sourceFiles`
-4. It merges the returned graphs client-side into a combined graph and renders via:
-   - `GraphVisualization`
+3. It calls analysis **once per selected file** (parallel requests):
+   - `POST /api/analyze` with `content`, optional `context`, `sessionId`, and **`sourceFiles`** listing that file only (each response is one graph and one server **`GraphTransform`**).
+4. It merges the returned graphs **client-side** for the library view only:
+   - **`client/src/utils/mergeGraphs.js`** namespaces node ids per file (`namespace__<localId>`) so ids from different analyzes cannot collide, then unions nodes and links. Unit tests: **`mergeGraphs.test.js`**.
+   - Renders via **`GraphVisualization`**.
 
 ### 4) Save/load graphs
 
@@ -168,6 +169,8 @@ Because this app uses **React Router v7** and **d3** (ESM), `client/package.json
 | **`transformIgnorePatterns`** | Allows Babel to transform the **`d3`** package (otherwise Jest hits untranspiled `export` syntax in `node_modules`). |
 
 `App.test.js` **must** import `./setupPolyfills` **before** `react-router-dom` so encoding globals exist when the router bundle loads.
+
+Pure utilities such as **`src/utils/mergeGraphs.test.js`** (multi-file graph merge / id namespacing, GitHub **#21**) do not need the router polyfill order.
 
 ## Learn more
 

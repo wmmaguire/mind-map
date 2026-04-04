@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import GraphVisualization from './GraphVisualization';
 import { apiUrl } from '../config';
 import { useSession } from '../context/SessionContext';
+import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import './LibraryVisualize.css';
 
 function LibraryVisualize() {
@@ -292,14 +293,27 @@ function LibraryVisualize() {
           }
 
           return {
+            file,
             filename: file.originalName,
             data: analysisData.data
           };
         })
       );
 
-      const combinedGraph = combineGraphs(fileResults.map(r => r.data));
-      setGraphData(combinedGraph);
+      const combinedGraph = mergeAnalyzedGraphs(
+        fileResults.map((r) => ({
+          namespace: buildAnalyzeNamespace(r.file),
+          graph: r.data,
+        }))
+      );
+      setGraphData({
+        ...combinedGraph,
+        nodes: combinedGraph.nodes.map((n) => ({
+          ...n,
+          size: 20,
+          color: defaultNodeColor,
+        })),
+      });
 
     } catch (error) {
       console.error('Analysis error:', error);
@@ -310,42 +324,6 @@ function LibraryVisualize() {
       setShowContextModal(false);
       setAdditionalContext('');
     }
-  };
-
-  const combineGraphs = (graphs) => {
-    const nodeMap = new Map();
-    const links = new Set();
-    
-    graphs.forEach(graph => {
-      graph.nodes.forEach(node => {
-        if (!nodeMap.has(node.id)) {
-          nodeMap.set(node.id, {
-            ...node,
-            sources: new Set([node.source || 'unknown'])
-          });
-        } else {
-          nodeMap.get(node.id).sources.add(node.source || 'unknown');
-        }
-      });
-
-      graph.links.forEach(link => {
-        links.add(JSON.stringify({
-          ...link,
-          sources: [link.source || 'unknown']
-        }));
-      });
-    });
-
-    const nodes = Array.from(nodeMap.values()).map(node => ({
-      ...node,
-      sources: Array.from(node.sources),
-      size: 20,
-      color: defaultNodeColor
-    }));
-
-    const combinedLinks = Array.from(links).map(link => JSON.parse(link));
-
-    return { nodes, links: combinedLinks };
   };
 
   const handleAnalyzeClick = () => {

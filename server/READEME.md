@@ -183,6 +183,8 @@ Relevant code:
 - `server/server.js` (`/api/analyze`)
 - `server/models/graphTransform.js`
 
+**Multi-select uploads (library UI):** The client may call **`POST /api/analyze` once per selected file** (one `GraphTransform` per request). For visualization it merges responses in the browser with **namespaced node ids** so OpenAI-local ids do not collide across files — see **`client/src/utils/mergeGraphs.js`** and **`client/README.md`** (GitHub **#21**). The merged graph is a **disjoint union** of per-file subgraphs unless/until optional **fusion** or **split** features land (**#47**).
+
 **Persistence matrix (audit vs domain):**
 
 | Handler | Primary Mongo document(s) | `UserActivity` action (when applicable) |
