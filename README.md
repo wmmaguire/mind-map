@@ -70,6 +70,7 @@ npm run start
 #### Backend API layout
 
 - Full detail: **`server/READEME.md`** (env vars, flows, OpenAI, persistence).
+- **Hybrid persistence / source of truth:** **`server/READEME.md`** → **Data consistency (hybrid persistence)** — what lives on disk vs Mongo, and known divergence cases (GitHub **#20**, **#44**).
 - **Library uploads** (`GET/POST /api/files`, `POST /api/upload`) and **persisted graphs** (`/api/graphs/*`) are implemented in **`server/routes/files.js`** and **`server/routes/graphs.js`** (mounted from `server.js`).
 - **User activity audit:** the server writes **`UserActivity`** documents for high-level outcomes (session lifecycle, uploads, analyze completion, graph save/view, feedback) alongside domain collections (`File`, `GraphTransform`, `GraphOperation`, etc.). See **`server/READEME.md`** → “User activity audit” and the persistence matrix (GitHub **#16**).
 - **Multiple files per session** are allowed; older MongoDB databases may still have a legacy **unique index on `sessionId`** in the `files` collection—drop it if second uploads fail (see **server/READEME.md** upload section, and GitHub **#42**).

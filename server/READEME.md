@@ -60,6 +60,36 @@ There is intentional **hybrid persistence**:
 
 **User activity audit:** `UserActivity` (`server/models/userActivity.js`) records high-level outcomes (session, upload, analyze, graph save/load tracking, feedback) with links to domain documents where useful. **`POST /api/operations`** remains represented only by **`GraphOperation`** documents (no duplicate audit row).
 
+## Data consistency (hybrid persistence)
+
+The server intentionally stores some data **on disk** and related metadata **in MongoDB**. Below: **source of truth per concern**, and **when the two layers can diverge**.
+
+### Source of truth by concern
+
+| Concern | Authoritative record | Secondary / mirror | Code notes |
+|--------|----------------------|--------------------|------------|
+| **Session identity** | MongoDB `Session` (UUID `sessionId` + `_id`) | — | All API flows that need a session validate against `Session` (or fail). |
+| **Raw upload bytes** | `uploads/` under **`DATA_DIR`** | MongoDB `File` document (`path`, names, `sessionId`, etc.) | A successful **`POST /api/upload`** requires **metadata JSON on disk**, **multer file on disk**, and **`File.save()`**. If the DB write fails, artifacts are removed so disk and DB stay aligned (see upload flow). |
+| **Library file list** | **`metadata/*.json`** (one per upload basename) | MongoDB `File` | **`GET /api/files`** reads the **metadata directory** only—it does **not** query `File` for the list. The upload handler writes both; they should match after a 200, but manual edits or partial deletes can desync listing vs Mongo. |
+| **Serving file content** | **`GET /api/files/:filename`** reads **`uploads/`** by filename | `File` optional for validation | Content is served from disk path under `uploadsDir`. |
+| **Saved graph snapshot** | Pair: **`graphs/graph_*.json`** + MongoDB `Graph` | `GraphView` when load tracking runs | **`POST /api/graphs/save`** writes **JSON to disk first**, then **`dbGraph.save()`**. If Mongo fails after the file write, a graph JSON file may exist **without** a matching `Graph` document—see GitHub **#44**. **`GET /api/graphs`** lists files in **`graphs/`**; load uses disk JSON and may join Mongo by `metadata.generatedAt`. |
+| **Analyze runs** | MongoDB `GraphTransform` | `UserActivity` (`ANALYZE_COMPLETE`) | Transform is authoritative; audit is supplementary. |
+| **Graph UI telemetry** | MongoDB `GraphOperation` | — | No duplicate row in `UserActivity` (see persistence matrix). |
+| **Feedback** | MongoDB `Feedback` | `UserActivity` (`FEEDBACK_SUBMIT`) | Feedback doc is authoritative. |
+| **Cross-cutting audit** | MongoDB `UserActivity` | — | Does **not** replace domain collections; used for support/analytics. |
+
+### Divergence scenarios (operators & contributors)
+
+1. **Upload rollback (handled):** DB error after disk writes → handler deletes uploaded file + metadata JSON → **503** / **409**; no orphaned `File` row.
+2. **Graph save partial write (known gap):** DB error after `graphs/` write → orphan JSON on disk; **`UserActivity` `GRAPH_SNAPSHOT_SAVE`** is only written after successful Mongo save, so monitoring will not show a “success” audit for a failed DB row—see **#44** for hardening options.
+3. **Library list vs Mongo:** Corrupt or stray `metadata/*.json` entries are skipped (`null` in list); `File` collection can still contain rows for paths no longer on disk if data was changed outside the app.
+4. **Mongo unavailable:** Session creation, upload, analyze, graph save, and other DB-backed routes fail or return errors; disk-only endpoints are limited—treat Mongo as **required** for normal operation.
+
+### Related documentation
+
+- Persistence matrix (which handlers write what): earlier sections and the **User activity audit** table in this file.
+- Client expectations: **`client/README.md`** (flows assume successful API responses match persisted state).
+
 ## Project layout (server/)
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
@@ -237,7 +267,7 @@ Relevant code:
 ## Notes / current caveats (as implemented)
 
 - **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
-- Graph snapshot save: filesystem write happens before Mongo `Graph` save; if `Graph` save fails, the JSON file may exist without a matching document (see backlog / future hardening if you need atomicity).
+- Disk vs Mongo guarantees and orphan-graph behavior: see **Data consistency (hybrid persistence)** above and GitHub **#44**.
 - **Legacy DB:** If uploads still fail with duplicate key on `sessionId`, drop the old `sessionId` unique index on `files` (see upload flow above).
 
 ## Quick reference: scripts
