@@ -7,6 +7,7 @@ node_modules
 # Testing
 /coverage
 */coverage
+backup_db/
 
 # Production
 /build
@@ -46,6 +47,7 @@ pids
 .env.development.local
 .env.test.local
 .env.production.local
+.cursor/
 
 # Optional npm cache directory
 .npm
