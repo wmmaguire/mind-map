@@ -142,6 +142,20 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
+/** Remove multer file + sidecar metadata JSON when persistence fails mid-request. */
+async function removeSessionUploadArtifacts(uploadedFilePath, metadataBasename) {
+  try {
+    await fs.unlink(uploadedFilePath);
+  } catch (e) {
+    console.error('Failed to remove uploaded file after persist error:', e);
+  }
+  try {
+    await fs.unlink(path.join(metadataDir, metadataBasename));
+  } catch (e) {
+    console.error('Failed to remove metadata file after persist error:', e);
+  }
+}
+
 app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) {
@@ -183,13 +197,24 @@ app.post('/api/upload', (req, res, next) => {
         sessionId: req.body.sessionId  // Add sessionId to metadata
       };
 
-      // Save metadata to file system
-      await fs.writeFile(
-        path.join(metadataDir, `${req.file.filename}.json`),
-        JSON.stringify(metadata, null, 2)
-      );
+      const metadataBasename = `${req.file.filename}.json`;
+      const metadataPath = path.join(metadataDir, metadataBasename);
 
-      // Add this new section: Save to database
+      try {
+        await fs.writeFile(
+          metadataPath,
+          JSON.stringify(metadata, null, 2)
+        );
+      } catch (metaErr) {
+        console.error('Metadata write error:', metaErr);
+        await removeSessionUploadArtifacts(req.file.path, metadataBasename);
+        return res.status(500).json({
+          success: false,
+          error: 'Could not save file metadata on disk.',
+          code: 'METADATA_WRITE_FAILED'
+        });
+      }
+
       try {
         const fileRecord = new File({
           sessionId: req.body.sessionId,
@@ -204,8 +229,16 @@ app.post('/api/upload', (req, res, next) => {
         await fileRecord.save();
         console.log('File metadata saved to database:', fileRecord);
       } catch (dbError) {
-        // Log database error but don't fail the upload
         console.error('Error saving to database:', dbError);
+        await removeSessionUploadArtifacts(req.file.path, metadataBasename);
+        const isDup = dbError.code === 11000;
+        return res.status(isDup ? 409 : 503).json({
+          success: false,
+          error: isDup
+            ? 'This session already has an uploaded file. Remove or replace it before uploading again.'
+            : 'Upload could not be recorded in the database. The file was not kept.',
+          code: isDup ? 'SESSION_FILE_EXISTS' : 'DATABASE_PERSIST_FAILED'
+        });
       }
 
       console.log('File uploaded successfully:', {
@@ -213,10 +246,12 @@ app.post('/api/upload', (req, res, next) => {
         metadata: metadata
       });
 
-      return res.json({ 
+      return res.status(200).json({
+        success: true,
         message: 'File uploaded successfully',
         filename: req.file.filename,
-        metadata
+        metadata,
+        persistedToDatabase: true
       });
     } catch (error) {
       console.error('Metadata Error:', error);

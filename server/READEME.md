@@ -95,7 +95,11 @@ Relevant code:
 3. Server writes:
    - raw file to `server/uploads/` (via multer storage)
    - metadata JSON to `server/metadata/<filename>.json`
-4. Server attempts to write a `File` record to Mongo (errors are logged but do not fail the upload response).
+4. Server saves a `File` record to Mongo. **If that save fails**, the response is an error (no success body implying persistence):
+   - **503** `DATABASE_PERSIST_FAILED` — transient DB / server error; the uploaded file and metadata JSON are **removed** so disk and DB do not diverge.
+   - **409** `SESSION_FILE_EXISTS` — unique constraint (`sessionId` already has a file); artifacts are rolled back the same way.
+   - **500** `METADATA_WRITE_FAILED` — metadata JSON could not be written; the multer file is removed.
+5. **200** responses include `success: true` and `persistedToDatabase: true` when both disk and Mongo are in sync.
 
 Relevant code:
 
