@@ -20,6 +20,16 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router$": "<rootDir>/node_modules/react-router/dist/development/index.js",
+      "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
+      "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!d3)/"
+    ]
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -38,5 +48,10 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5001"
+  "proxy": "http://localhost:5001",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1"
+  }
 }
