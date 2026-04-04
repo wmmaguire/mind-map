@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { apiUrl } from '../config';
 import './Modal.css';
 import './Library.css';
 
@@ -17,8 +18,7 @@ function Library({ onClose }) {
 
   const fetchFiles = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-      const response = await fetch(`${baseUrl}/api/files`);
+      const response = await fetch(apiUrl('/api/files'));
       
       if (!response.ok) {
         throw new Error('Failed to fetch files');
@@ -39,11 +39,10 @@ function Library({ onClose }) {
       setAnalyzing(true);
       setError(null);
 
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
       console.log('Fetching file:', file);
       
       const filename = file.filename || file.originalName;
-      const response = await fetch(`${baseUrl}/api/files/${encodeURIComponent(filename)}`, {
+      const response = await fetch(apiUrl(`/api/files/${encodeURIComponent(filename)}`), {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -79,10 +78,9 @@ function Library({ onClose }) {
 
   const analyzeContent = async (content, file) => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
       console.log('Sending content for analysis, length:', content.length);
       
-      const response = await fetch(`${baseUrl}/api/analyze`, {
+      const response = await fetch(apiUrl('/api/analyze'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

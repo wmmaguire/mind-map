@@ -1,7 +1,7 @@
-// ... previous imports ...
 import { useState, useEffect, useRef } from 'react';
 import './Landing.css';
 import FileUpload from './FileUpload';
+import { apiUrl } from '../config';
 
 function Landing() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -26,10 +26,6 @@ function Landing() {
         const startTime = new Date();
         setSessionStart(startTime);
         
-        const baseUrl = process.env.NODE_ENV === 'production' 
-          ? window.location.origin 
-          : 'http://localhost:5001';
-         
         // Helper function to detect browser - match enum values exactly
         const detectBrowser = () => {
           const userAgent = navigator.userAgent.toLowerCase();
@@ -62,7 +58,7 @@ function Landing() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
 
-        const response = await fetch(`${baseUrl}/api/sessions`, {
+        const response = await fetch(apiUrl('/api/sessions'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -96,17 +92,13 @@ function Landing() {
         const endTime = new Date();
         const duration = Math.floor((endTime - sessionStart) / 1000);
         
-        const baseUrl = process.env.NODE_ENV === 'production' 
-          ? 'https://talk-graph.onrender.com/api' 
-          : 'http://localhost:5001/api';
-
         // Use sendBeacon for more reliable delivery
         const blob = new Blob([JSON.stringify({
           sessionEnd: endTime.toISOString(),
           sessionDuration: duration
         })], { type: 'application/json' });
 
-        navigator.sendBeacon(`${baseUrl}/sessions/${sessionId}`, blob);
+        navigator.sendBeacon(apiUrl(`/api/sessions/${sessionId}`), blob);
       }
     };
 
@@ -124,14 +116,6 @@ function Landing() {
       window.currentSessionId = sessionId;
     }
   }, [sessionId]);
-
-  const getBaseUrl = () => {
-    if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:5001/api';
-    }
-    // In production, use the full domain with /api
-    return 'https://talk-graph.onrender.com/api';
-  };
 
   const handleAddTag = (e) => {
     e.preventDefault();
@@ -170,8 +154,6 @@ function Landing() {
     setFeedbackError(null);
 
     try {
-      const baseUrl = getBaseUrl();
-      
       // Create the feedback data object
       const feedbackData = {
         sessionId: sessionId,
@@ -188,7 +170,7 @@ function Landing() {
 
       console.log('Submitting feedback data:', feedbackData);
 
-      const response = await fetch(`${baseUrl}/feedback`, {
+      const response = await fetch(apiUrl('/api/feedback'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

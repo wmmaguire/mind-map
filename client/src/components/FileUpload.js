@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import { apiUrl } from '../config';
 import './Modal.css';
 import './FileUpload.css';
 
@@ -28,11 +29,8 @@ function FileUpload({ onClose }) {
 
     try {
       setUploadStatus('Uploading...');
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? window.location.origin 
-        : 'http://localhost:5001';
 
-      const response = await fetch(`${baseUrl}/api/upload`, {
+      const response = await fetch(apiUrl('/api/upload'), {
         method: 'POST',
         body: formData,
       });

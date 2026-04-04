@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
+import { apiUrl } from '../config';
 import './VisualizationPage.css';
 
 function VisualizationPage() {
@@ -10,8 +11,7 @@ function VisualizationPage() {
 
   const handleSave = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-      const response = await fetch(`${baseUrl}/api/graphs/save`, {
+      const response = await fetch(apiUrl('/api/graphs/save'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

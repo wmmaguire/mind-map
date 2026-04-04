@@ -1,16 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
+import { apiUrl } from '../config';
 import './GraphVisualization.css';
 
-// Add this function at the top of the file, outside the component
-const getBaseUrl = () => {
-  return process.env.NODE_ENV === 'production'
-    ? 'https://talk-graph.onrender.com'
-    : 'http://localhost:5001';
-};
-
-// Add this function at the top of the file with getBaseUrl
 const trackOperation = async (operationType, details, startTime = Date.now(), error = null) => {
   try {
     const duration = Date.now() - startTime;
@@ -25,7 +18,7 @@ const trackOperation = async (operationType, details, startTime = Date.now(), er
       details
     });
 
-    const response = await fetch(`${getBaseUrl()}/api/operations`, {
+    const response = await fetch(apiUrl('/api/operations'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1225,7 +1218,7 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       console.log('Selected nodes for generation:', selectedNodes.map(n => `${n.label} (${n.id})`));
 
-      const response = await fetch(`${getBaseUrl()}/api/generate-node`, {
+      const response = await fetch(apiUrl('/api/generate-node'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -26,6 +26,8 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
 
 - `client/src/App.js`
   - Top-level router and page composition.
+- `client/src/config.js`
+  - **`getApiOrigin()` / `apiUrl()`** — single module for backend base URL (see [API base URL](#api-base-url) below).
 - `client/src/components/Landing.js`
   - Session initialization, session end reporting, and feedback UI.
 - `client/src/components/FileUpload.js`
@@ -102,14 +104,22 @@ Key operations are logged via:
 
 - `POST /api/operations` (includes `sessionId`, operation type, status, duration, and details)
 
-## API base URLs (dev vs prod)
+## API base URL
 
-Multiple components compute base URLs. In general:
+All fetch targets are built with **`apiUrl('/api/...')`** from `client/src/config.js`.
 
-- **Development**: calls go to `http://localhost:5001` (or through CRA proxy)
-- **Production**: calls go to the deployed domain (currently referenced as `https://talk-graph.onrender.com` in several places)
+| Environment | Default behavior |
+|---------------|------------------|
+| **Development** (`npm start`) | Uses `http://localhost:5001` (matches `proxy` in `client/package.json`). |
+| **Production** (`npm run build`) | If **`REACT_APP_API_URL`** is **not** set, requests use **relative** URLs (`/api/...`), i.e. same origin as the static app. |
 
-If you change the backend host or deploy environment, prefer centralizing this base URL logic to avoid drift.
+Set **`REACT_APP_API_URL`** in `.env` or your host’s build settings when the API lives on a different origin (no trailing slash), for example:
+
+```bash
+REACT_APP_API_URL=https://your-api.example.com
+```
+
+Rebuild after changing env vars; CRA inlines them at build time.
 
 ## Scripts (CRA)
 

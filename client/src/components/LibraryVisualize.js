@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import GraphVisualization from './GraphVisualization';
+import { apiUrl } from '../config';
 import './LibraryVisualize.css';
 
 function LibraryVisualize() {
@@ -43,16 +44,8 @@ function LibraryVisualize() {
     fetchSavedGraphs();
   }, []);
 
-  const getBaseUrl = () => {
-    if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:5001';
-    }
-    // In production, use the full domain
-    return 'https://talk-graph.onrender.com';
-  };
   const handleApiRequest = async (url, options = {}) => {
-    const baseUrl = getBaseUrl();
-    const fullUrl = `${baseUrl}${url}`;
+    const fullUrl = apiUrl(url);
     
     try {
       console.log('Request details:', {
@@ -178,8 +171,7 @@ function LibraryVisualize() {
 
   const handleLoadGraph = async (filename) => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
-      const response = await fetch(`${baseUrl}/api/graphs/${filename}`);
+      const response = await fetch(apiUrl(`/api/graphs/${filename}`));
       const data = await response.json();
       
       if (data.success) {
