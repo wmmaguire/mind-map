@@ -39,4 +39,6 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics.
 
+**Note:** **#48** — **batch analyze** resilience (partial failures, per-file status, retry vs **#22** general error handling).
+
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*
