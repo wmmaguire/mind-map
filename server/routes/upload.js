@@ -2,21 +2,17 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { promises as fs } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import Graph from '../models/graph.js';  // Import Graph model
 import mongoose from 'mongoose';
 import GraphView from '../models/graphView.js';  // Add this import at the top
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { uploadsDir, metadataDir, graphsDir } from '../config.js';
 
 const router = express.Router();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads'));
+    cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
     const uniqueId = Date.now();
@@ -47,7 +43,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     // Save metadata
     await fs.writeFile(
-      path.join(__dirname, '../metadata', `${req.file.filename}.json`),
+      path.join(metadataDir, `${req.file.filename}.json`),
       JSON.stringify(metadata, null, 2)
     );
 
@@ -74,7 +70,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // List files endpoint
 router.get('/files', async (req, res) => {
   try {
-    const metadataDir = path.join(__dirname, '../metadata');
     console.log('Reading metadata from:', metadataDir);
     
     const files = await fs.readdir(metadataDir);
@@ -196,8 +191,7 @@ router.post('/graphs/save', async (req, res) => {
     };
 
     const filename = `graph_${Date.now()}.json`;
-    const graphsDir = path.join(__dirname, '../graphs');
-    
+
     await fs.mkdir(graphsDir, { recursive: true });
     await fs.writeFile(
       path.join(graphsDir, filename),
@@ -225,7 +219,6 @@ router.post('/graphs/save', async (req, res) => {
 // Add endpoint to list saved graphs
 router.get('/graphs', async (req, res) => {
   try {
-    const graphsDir = path.join(__dirname, '../graphs');
     await fs.mkdir(graphsDir, { recursive: true });
     
     const files = await fs.readdir(graphsDir);
@@ -258,7 +251,6 @@ router.get('/graphs', async (req, res) => {
 // Add endpoint to load a specific graph
 router.get('/graphs/:filename', async (req, res) => {
   try {
-    const graphsDir = path.join(__dirname, '../graphs');
     const filePath = path.join(graphsDir, req.params.filename);
     
     // Existing file system load

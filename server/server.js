@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
@@ -6,7 +7,6 @@ import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import sessionRoutes from './routes/sessions.js';
 import feedbackRoutes from './routes/feedback.js';
@@ -14,9 +14,12 @@ import File from './models/file.js';
 import { Session } from './models/session.js';
 import GraphTransform from './models/graphTransform.js';
 import graphOperationsRouter from './routes/graphOperations.js';  // Add this import
-
-// Load environment variables
-dotenv.config();
+import {
+  dataDir,
+  uploadsDir,
+  metadataDir,
+  getAllowedCorsOrigins
+} from './config.js';
 
 // Check for OpenAI API key
 if (!process.env.OPENAI_API_KEY) {
@@ -32,22 +35,10 @@ const openai = new OpenAI({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Define base directory for production
-const baseDir = process.env.NODE_ENV === 'production' 
-  ? '/opt/render/project/src/server'
-  : __dirname;
-
-const uploadsDir = path.join(baseDir, 'uploads');
-const metadataDir = path.join(baseDir, 'metadata');
-
 // Create Express app
 const app = express();
 
-// Define allowed origins
-const allowedOrigins = [
-  'https://talk-graph.onrender.com',
-  'http://localhost:3000'
-];
+const allowedOrigins = getAllowedCorsOrigins();
 
 // Configure CORS options
 const corsOptions = {
@@ -711,7 +702,8 @@ app.listen(PORT, () => {
   console.log(`Test endpoint: http://localhost:${PORT}/test`);
   console.log(`Files endpoint: http://localhost:${PORT}/api/files`);
   console.log('OpenAI configured:', !!openai);
-  console.log('CORS enabled');
+  console.log('CORS enabled, origins:', allowedOrigins);
+  console.log('Data directory:', dataDir);
   console.log('Directories:');
   console.log(`- Uploads: ${uploadsDir}`);
   console.log(`- Metadata: ${metadataDir}`);

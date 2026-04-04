@@ -7,7 +7,7 @@ This document describes the **backend (Node/Express)** portion of the project as
 Server runtime and tooling are defined in `server/package.json`.
 
 - **express**: HTTP server + routing (`server/server.js`)
-- **cors**: CORS policy enforcement (explicit allowlist in `server/server.js`)
+- **cors**: CORS policy enforcement (allowlist from env; see `CORS_ORIGINS` below)
 - **dotenv**: loads environment variables from `.env` at startup
 - **mongoose**: MongoDB ODM, schema definitions under `server/models/`
 - **multer**: `multipart/form-data` file uploads to disk
@@ -25,8 +25,20 @@ The server requires these environment variables at runtime:
 
 - **`OPENAI_API_KEY`**: required; server exits on startup if missing.
 - **`MONGODB_URI`**: required; server will retry connection if missing/unreachable.
-- **`NODE_ENV`**: affects path resolution and static serving behavior (`production` vs dev).
+- **`NODE_ENV`**: affects default data directory (when `DATA_DIR` is unset), static serving, and Mongo options.
 - **`PORT`**: optional; defaults to `5001`.
+
+## Environment variables (optional — configuration)
+
+Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config'` in `server.js`):
+
+- **`CORS_ORIGINS`**: comma-separated browser origins allowed for cross-origin API calls, e.g.  
+  `https://your-app.onrender.com,http://localhost:3000`  
+  If unset, defaults to `https://talk-graph.onrender.com` and `http://localhost:3000`.
+
+- **`DATA_DIR`**: absolute path, or path relative to **current working directory** (when you run `cd server && node server.js`, cwd is `server/`).  
+  This directory holds `uploads/`, `metadata/`, and `graphs/` on disk.  
+  If unset: **development** uses the `server/` folder (same directory as `config.js`); **production** defaults to `/opt/render/project/src/server` (Render layout).
 
 ## High-level architecture
 
@@ -44,6 +56,7 @@ There is intentional **hybrid persistence**:
 
 ## Project layout (server/)
 
+- `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
 - `server.js`: main entrypoint (Express app + routes + OpenAI + DB connect)
 - `routes/`: route modules (sessions, feedback, graph operations; plus graph save/load endpoints)
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, etc.)
@@ -181,13 +194,11 @@ Relevant code:
 
 ## CORS + deployment behavior
 
-- CORS allowlist is implemented in `server/server.js` and currently includes:
-  - `http://localhost:3000`
-  - `https://talk-graph.onrender.com`
+- CORS allowlist comes from **`CORS_ORIGINS`** (see above) or the default pair for local + the current Render URL.
 - In `production`, Express serves the React build from `client/build` and has a catch-all route for non-API requests.
-- Filesystem paths use a `baseDir` that differs between dev and production:
-  - dev: `__dirname` (the `server/` directory)
-  - production: `/opt/render/project/src/server`
+- On-disk data lives under **`DATA_DIR`** (or the defaults described above): `uploads/`, `metadata/`, and `graphs/` are subdirectories of that root.
+
+**Render:** set `OPENAI_API_KEY`, `MONGODB_URI`, and `NODE_ENV=production` in the dashboard. Add **`CORS_ORIGINS`** if the public site URL changes; add **`DATA_DIR`** only if you move persistence off the default path.
 
 ## Notes / current caveats (as implemented)
 
