@@ -14,12 +14,42 @@ import File from './models/file.js';
 import { Session } from './models/session.js';
 import GraphTransform from './models/graphTransform.js';
 import graphOperationsRouter from './routes/graphOperations.js';  // Add this import
+import uploadRouter from './routes/upload.js';
 import {
   dataDir,
   uploadsDir,
   metadataDir,
   getAllowedCorsOrigins
 } from './config.js';
+
+/** OpenAI often wraps JSON in markdown fences; extract `{ nodes, links }` and parse. */
+function parseGraphJsonFromCompletion(raw) {
+  if (raw == null || typeof raw !== 'string') {
+    throw new Error('Empty or invalid model response');
+  }
+  let s = raw.trim();
+  const fence = /^```(?:json)?\s*\r?\n?([\s\S]*?)\r?\n?```$/im.exec(s);
+  if (fence) {
+    s = fence[1].trim();
+  } else {
+    const firstBrace = s.indexOf('{');
+    const lastBrace = s.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      s = s.slice(firstBrace, lastBrace + 1);
+    }
+  }
+  const parsed = JSON.parse(s);
+  if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.links)) {
+    throw new Error('Model response must be JSON with nodes and links arrays');
+  }
+  return parsed;
+}
+
+/** HTTP status from OpenAI SDK errors (e.g. APIError). */
+function openaiErrorHttpStatus(err) {
+  if (!err || typeof err !== 'object') return undefined;
+  return err.status ?? err.response?.status;
+}
 
 // Check for OpenAI API key
 if (!process.env.OPENAI_API_KEY) {
@@ -343,10 +373,6 @@ app.get('/api/files/:filename', async (req, res) => {
   }
 });
 
-// Import the router
-// These contain the api/graphs calls for saving/loading graphs
-import uploadRouter from './routes/upload.js';
-
 // Use the router BEFORE your other routes
 app.use('/api', uploadRouter);
 app.use('/api', graphOperationsRouter);
@@ -392,7 +418,8 @@ app.use((err, req, res, next) => {
 app.post('/api/analyze', async (req, res) => {
   let graphTransform;
   try {
-    const { content, context, sessionId, sourceFiles } = req.body;
+    const { content, context, sessionId } = req.body;
+    const sourceFiles = Array.isArray(req.body.sourceFiles) ? req.body.sourceFiles : [];
     console.log('Analyze request:', { sessionId, sourceFiles });
     
     // Find the session by UUID
@@ -482,8 +509,10 @@ app.post('/api/analyze', async (req, res) => {
       ${context ? `Additional Context:\n${context}\n` : ''}
     `;
 
+    const analyzeModel = process.env.OPENAI_ANALYZE_MODEL || 'gpt-4o';
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: analyzeModel,
       messages: [
         {
           role: "system",
@@ -498,7 +527,8 @@ app.post('/api/analyze', async (req, res) => {
       max_tokens: 2000
     });
 
-    const graphData = JSON.parse(completion.choices[0].message.content);
+    const rawMessage = completion.choices[0]?.message?.content;
+    const graphData = parseGraphJsonFromCompletion(rawMessage);
     console.log('Analysis completed successfully');
     
     // Before saving the results, transform numeric IDs to ObjectIds
@@ -525,17 +555,35 @@ app.post('/api/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('Analysis error:', error);
-    
+
+    const httpStatus = openaiErrorHttpStatus(error);
+    let statusCode = 500;
+    let details = error.message || 'Unknown error';
+    let code = 'ANALYSIS_FAILED';
+
+    if (httpStatus === 429) {
+      statusCode = 429;
+      code = 'OPENAI_QUOTA';
+      details =
+        'OpenAI returned 429 (quota or rate limit). The quickstart shows how to call the API, but each request still consumes account credits or monthly limits. Add billing or credits in the OpenAI dashboard (Billing), or wait and retry if you hit a rate limit.';
+    } else if (httpStatus === 401) {
+      statusCode = 401;
+      code = 'OPENAI_AUTH';
+      details =
+        'OpenAI rejected the API key (401). Check that OPENAI_API_KEY is valid and not revoked.';
+    }
+
     if (graphTransform) {
       graphTransform.status = 'failed';
       graphTransform.error = error.message;
       await graphTransform.save();
     }
 
-    return res.status(500).json({
+    return res.status(statusCode).json({
       success: false,
       error: 'Failed to analyze content',
-      details: error.message
+      details,
+      code
     });
   }
 });

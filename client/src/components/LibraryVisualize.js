@@ -69,9 +69,25 @@ function LibraryVisualize() {
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const ct = response.headers.get('content-type') || '';
+        let detail = `HTTP ${response.status}`;
+        try {
+          if (ct.includes('application/json')) {
+            const errBody = await response.json();
+            detail =
+              errBody.details ||
+              errBody.message ||
+              errBody.error ||
+              detail;
+          } else {
+            const errorText = await response.text();
+            if (errorText) detail = `${detail}: ${errorText.slice(0, 300)}`;
+          }
+        } catch (parseErr) {
+          console.error('Error reading error body:', parseErr);
+        }
+        console.error('API error:', detail);
+        throw new Error(detail);
       }
 
       try {
@@ -117,10 +133,13 @@ function LibraryVisualize() {
     }
   };
 
-  const handleRetryLibraryFetch = () => {
+  const handleErrorBannerAction = () => {
+    const wasFetchError = error?.startsWith('Failed to fetch files');
     setError(null);
-    fetchFiles();
-    fetchSavedGraphs();
+    if (wasFetchError) {
+      fetchFiles();
+      fetchSavedGraphs();
+    }
   };
 
   const handleSaveClick = () => {
@@ -475,9 +494,9 @@ function LibraryVisualize() {
             <button
               type="button"
               className="retry-button"
-              onClick={handleRetryLibraryFetch}
+              onClick={handleErrorBannerAction}
             >
-              Retry
+              {error.startsWith('Failed to fetch files') ? 'Retry' : 'Dismiss'}
             </button>
           </div>
         )}

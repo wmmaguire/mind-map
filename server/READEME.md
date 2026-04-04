@@ -40,6 +40,10 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
   This directory holds `uploads/`, `metadata/`, and `graphs/` on disk.  
   If unset: **development** uses the `server/` folder (same directory as `config.js`); **production** defaults to `/opt/render/project/src/server` (Render layout).
 
+- **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` (default **`gpt-4o`**). Override if your API key only has access to a different model.
+
+**Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
+
 ## High-level architecture
 
 The backend is an **Express app** with:
