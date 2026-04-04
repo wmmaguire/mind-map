@@ -1239,9 +1239,10 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       const result = await response.json();
 
-      if (!result.success) {
+      if (!response.ok || !result.success) {
         operationStatus = 'FAILURE';
-        operationError = result.error || 'Failed to generate nodes';
+        operationError =
+          result.details || result.error || `Request failed (${response.status})`;
         throw new Error(operationError);
       }
 

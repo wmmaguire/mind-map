@@ -40,7 +40,7 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
   This directory holds `uploads/`, `metadata/`, and `graphs/` on disk.  
   If unset: **development** uses the `server/` folder (same directory as `config.js`); **production** defaults to `/opt/render/project/src/server` (Render layout).
 
-- **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` (default **`gpt-4o`**). Override if your API key only has access to a different model.
+- **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` and `POST /api/generate-node` (default **`gpt-4o`**). Override if your API key only has access to a different model.
 
 **Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
 
@@ -132,11 +132,11 @@ Relevant code:
    - `sourceFiles` (identifiers for files)
 2. Server looks up the `Session` by UUID.
 3. Server resolves `sourceFiles` to `File` IDs when possible and creates a `GraphTransform` document with `status: pending`.
-4. Server calls OpenAI Chat Completions and **expects strict JSON** with:
+4. Server calls OpenAI Chat Completions (model from **`OPENAI_ANALYZE_MODEL`**, default **`gpt-4o`**) and **expects JSON** with:
    - `nodes[]` (concept nodes: id, label, description, wikiUrl, etc.)
    - `links[]` (relationships: source, target, relationship)
-5. Server parses the JSON, updates `GraphTransform` with `result`, and marks it `completed` (or `failed` on error).
-6. Server returns the graph JSON to the client.
+5. Server parses the reply with the same helper used for generate-node: strips common markdown code fences, extracts a `{ ... }` object, then validates `nodes` and `links` arrays.
+6. On success, server updates `GraphTransform` with `result` and marks it `completed`, then returns the graph JSON. On failure (OpenAI **429** / **401**, parse errors, etc.), returns a non-2xx JSON body with `details` and `code` (e.g. `OPENAI_QUOTA`, `ANALYSIS_FAILED`) and marks the transform `failed` when a transform record exists.
 
 Relevant code:
 
@@ -148,8 +148,11 @@ Relevant code:
 **Goal**: expand an existing graph by adding new nodes + links connected to selected nodes.
 
 1. Client sends `POST /api/generate-node` with `selectedNodes` and optional `numNodes`.
-2. Server prompts OpenAI to generate new node concepts and links that connect to *all* selected nodes.
-3. Server validates returned JSON and checks connectivity constraints before returning success.
+2. Server prompts OpenAI (same **`OPENAI_ANALYZE_MODEL`** / default **`gpt-4o`** as analyze) to return JSON with `nodes` and `links`.
+3. Server parses the assistant message with **`parseGraphJsonFromCompletion`** (markdown code fences, stray prose, and `{ ... }` extraction—same as **`/api/analyze`**). If parsing or shape checks fail, responds with **502** and `code: INVALID_MODEL_JSON`.
+4. Server validates graph semantics (connectivity of new nodes to all selected nodes). On validation failure, responds with **200** and `{ success: false, error, details }` (legacy shape for this endpoint).
+5. On OpenAI HTTP errors, responds with **429** / **401** and `code` **`OPENAI_QUOTA`** / **`OPENAI_AUTH`** (same semantics as analyze).
+6. On other failures, **500** with `code: GENERATE_NODE_FAILED` when appropriate.
 
 Relevant code:
 

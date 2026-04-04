@@ -98,12 +98,14 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 #### AI graph generation (OpenAI)
 - `POST /api/analyze`
-  - Calls OpenAI chat completions (model `"gpt-4"`)
-  - Expects strict JSON output: `{ nodes: [...], links: [...] }`
+  - Calls OpenAI chat completions; model from **`OPENAI_ANALYZE_MODEL`** (default **`gpt-4o`**)
+  - Parses assistant output with shared JSON extraction (handles markdown fences, validates `nodes` / `links`)
   - Creates/updates a `GraphTransform` record (`pending` → `completed`/`failed`)
+  - Non-2xx + JSON `details` / `code` on quota/auth or analysis failure
 - `POST /api/generate-node`
-  - Calls OpenAI to generate new nodes + links connected to selected nodes
-  - Includes connectivity validation before returning success
+  - Same model env and JSON parsing approach as analyze
+  - **502** + `INVALID_MODEL_JSON` if the model output cannot be parsed to `{ nodes, links }`
+  - **429** / **401** for OpenAI quota/auth; connectivity validation may still return `{ success: false }` with **200** (legacy)
 
 #### Graph persistence + analytics
 - `POST /api/graphs/save`
@@ -150,7 +152,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 - **Route duplication risk**:
   - `server/server.js` defines `/api/upload` and `/api/files` directly and also mounts `uploadRouter` which defines similar endpoints. This can cause confusion depending on route order.
 - **Potential data modeling issue**:
-  - `File` schema has `sessionId` marked `unique: true` while the UI supports multiple uploads per session. That likely causes DB insert failures after the first upload in a session (uploads still succeed because the server doesn’t hard-fail on DB write errors).
+  - `File` schema has `sessionId` marked `unique: true` while product direction may allow multiple files per session; second uploads can hit **409** `SESSION_FILE_EXISTS` when the server enforces DB + disk consistency (see `POST /api/upload` behavior in `server/READEME.md`).
 - **Hard-coded base URLs**:
   - Frontend sometimes uses `window.location.origin`, sometimes hardcodes `https://talk-graph.onrender.com`, and sometimes `http://localhost:5001`, which can make deployment environments brittle.
 

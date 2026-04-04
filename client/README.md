@@ -103,7 +103,8 @@ In `GraphVisualization` users can:
 - Add nodes and relationships
 - Delete nodes/links
 - Use “Generate Nodes” to request AI expansion:
-  - `POST /api/generate-node`
+  - `POST /api/generate-node` (same OpenAI model env as analyze: `OPENAI_ANALYZE_MODEL` on the server)
+  - On failure, the UI prefers the API’s `details` field (quota/auth messages, invalid JSON, etc.) when present
 
 Key operations are logged via:
 

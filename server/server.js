@@ -642,8 +642,10 @@ app.post('/api/generate-node', async (req, res) => {
       Return ONLY the JSON object.
     `;
 
+    const generateModel = process.env.OPENAI_ANALYZE_MODEL || 'gpt-4o';
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: generateModel,
       messages: [
         {
           role: "system",
@@ -664,17 +666,19 @@ app.post('/api/generate-node', async (req, res) => {
       max_tokens: 2000
     });
 
+    const rawMessage = completion.choices[0]?.message?.content;
     let newData;
     try {
-      newData = JSON.parse(completion.choices[0].message.content);
+      newData = parseGraphJsonFromCompletion(rawMessage);
       console.log('Generated data:', JSON.stringify(newData, null, 2));
-    } catch (error) {
-      console.error('Failed to parse GPT response:', error);
-      console.log('Raw response:', completion.choices[0].message.content);
-      return res.json({
+    } catch (parseErr) {
+      console.error('Failed to parse model response:', parseErr);
+      console.log('Raw response:', rawMessage);
+      return res.status(502).json({
         success: false,
-        error: 'Invalid JSON response from GPT',
-        details: error.message
+        error: 'Invalid JSON response from model',
+        details: parseErr.message || String(parseErr),
+        code: 'INVALID_MODEL_JSON'
       });
     }
 
@@ -764,10 +768,29 @@ app.post('/api/generate-node', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating graph:', error);
-    return res.json({
+
+    const httpStatus = openaiErrorHttpStatus(error);
+    let statusCode = 500;
+    let details = error.message || 'Unknown error';
+    let code = 'GENERATE_NODE_FAILED';
+
+    if (httpStatus === 429) {
+      statusCode = 429;
+      code = 'OPENAI_QUOTA';
+      details =
+        'OpenAI returned 429 (quota or rate limit). The quickstart shows how to call the API, but each request still consumes account credits or monthly limits. Add billing or credits in the OpenAI dashboard (Billing), or wait and retry if you hit a rate limit.';
+    } else if (httpStatus === 401) {
+      statusCode = 401;
+      code = 'OPENAI_AUTH';
+      details =
+        'OpenAI rejected the API key (401). Check that OPENAI_API_KEY is valid and not revoked.';
+    }
+
+    return res.status(statusCode).json({
       success: false,
       error: 'Failed to generate graph',
-      details: error.message
+      details,
+      code
     });
   }
 });
