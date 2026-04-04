@@ -151,8 +151,8 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 - **Naming drift**: many references use “talk-graph” (including production URL), while repo is “mind-map”.
 - **Route layout (updated)**:
   - Library uploads and file listing live in `server/routes/files.js`; persisted graphs in `server/routes/graphs.js`. `server/server.js` mounts these and still defines `/api/analyze` and `/api/generate-node` inline.
-- **Potential data modeling issue**:
-  - `File` schema has `sessionId` marked `unique: true` while product direction may allow multiple files per session; second uploads can hit **409** `SESSION_FILE_EXISTS` when the server enforces DB + disk consistency (see `POST /api/upload` behavior in `server/READEME.md`).
+- **File ↔ session**:
+  - Multiple `File` documents per `sessionId` are allowed; `path` is unique per stored artifact. Older DBs may still have a legacy unique index on `sessionId`—drop it if second uploads fail with duplicate key (see `server/READEME.md`).
 - **Hard-coded base URLs**:
   - Frontend sometimes uses `window.location.origin`, sometimes hardcodes `https://talk-graph.onrender.com`, and sometimes `http://localhost:5001`, which can make deployment environments brittle.
 

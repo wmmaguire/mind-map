@@ -146,13 +146,19 @@ router.post('/upload', (req, res, next) => {
       } catch (dbError) {
         console.error('Error saving to database:', dbError);
         await removeSessionUploadArtifacts(req.file.path, metadataBasename);
-        const isDup = dbError.code === 11000;
-        return res.status(isDup ? 409 : 503).json({
+        if (dbError.code === 11000) {
+          return res.status(409).json({
+            success: false,
+            error:
+              'Could not save file metadata (duplicate key). If you upgraded from a one-file-per-session schema, drop the legacy unique index on sessionId in the files collection—see server READEME.',
+            code: 'DUPLICATE_KEY',
+            details: dbError.message
+          });
+        }
+        return res.status(503).json({
           success: false,
-          error: isDup
-            ? 'This session already has an uploaded file. Remove or replace it before uploading again.'
-            : 'Upload could not be recorded in the database. The file was not kept.',
-          code: isDup ? 'SESSION_FILE_EXISTS' : 'DATABASE_PERSIST_FAILED'
+          error: 'Upload could not be recorded in the database. The file was not kept.',
+          code: 'DATABASE_PERSIST_FAILED'
         });
       }
 

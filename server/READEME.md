@@ -101,11 +101,15 @@ Relevant code:
 3. Server writes:
    - raw file to `server/uploads/` (via multer storage)
    - metadata JSON to `server/metadata/<filename>.json`
-4. Server saves a `File` record to Mongo. **If that save fails**, the response is an error (no success body implying persistence):
+4. Server saves a `File` record to Mongo (many files may share the same `sessionId`). **If that save fails**, the response is an error (no success body implying persistence):
    - **503** `DATABASE_PERSIST_FAILED` — transient DB / server error; the uploaded file and metadata JSON are **removed** so disk and DB do not diverge.
-   - **409** `SESSION_FILE_EXISTS` — unique constraint (`sessionId` already has a file); artifacts are rolled back the same way.
+   - **409** `DUPLICATE_KEY` — rare (e.g. duplicate `path` or a **legacy** unique index still on `sessionId` from older deployments); artifacts are rolled back the same way.
    - **500** `METADATA_WRITE_FAILED` — metadata JSON could not be written; the multer file is removed.
 5. **200** responses include `success: true` and `persistedToDatabase: true` when both disk and Mongo are in sync.
+
+**MongoDB (existing databases):** If this project previously created a **unique** index on `sessionId` only, drop it after deploying this schema so multiple uploads per session work:
+
+`db.files.dropIndex("sessionId_1")` (name may vary; use `db.files.getIndexes()` in `mongosh` to confirm).
 
 Relevant code:
 
@@ -217,6 +221,7 @@ Relevant code:
 
 - **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
 - Other hybrid paths (e.g. graph save writes disk then Mongo) may still need explicit failure semantics—see open issues / backlog.
+- **Legacy DB:** If uploads still fail with duplicate key on `sessionId`, drop the old `sessionId` unique index on `files` (see upload flow above).
 
 ## Quick reference: scripts
 

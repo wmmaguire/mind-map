@@ -4,7 +4,6 @@ const fileSchema = new mongoose.Schema({
   sessionId: {
     type: String,
     required: true,
-    unique: true,  // Ensures one-to-one relationship with session
     index: true
   },
   customName: {
@@ -33,13 +32,15 @@ const fileSchema = new mongoose.Schema({
   },
   path: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
 // Add indexes for common queries
+fileSchema.index({ sessionId: 1, uploadTime: -1 });
 fileSchema.index({ uploadTime: -1 });
 fileSchema.index({ fileType: 1 });
 fileSchema.index({ fileSize: 1 });
