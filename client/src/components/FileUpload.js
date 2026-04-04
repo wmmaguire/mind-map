@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { apiUrl } from '../config';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import './Modal.css';
 import './FileUpload.css';
@@ -31,15 +31,10 @@ function FileUpload({ onClose, onUploadSuccess }) {
     try {
       setUploadStatus('Uploading...');
 
-      const response = await fetch(apiUrl('/api/upload'), {
+      await apiRequest('/api/upload', {
         method: 'POST',
         body: formData,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
 
       setUploadStatus('File uploaded successfully!');
       setFile(null);
@@ -48,7 +43,7 @@ function FileUpload({ onClose, onUploadSuccess }) {
       setTimeout(onClose, 1500);
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadStatus(`Upload failed: ${error.message}`);
+      setUploadStatus(`Upload failed: ${getApiErrorMessage(error)}`);
     }
   };
 

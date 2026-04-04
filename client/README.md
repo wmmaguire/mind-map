@@ -22,12 +22,29 @@ The client is a Create React App (CRA) single-page application with:
 - A library flow that **lists uploaded files** and **runs analysis**.
 - A D3-driven visualization that supports **interactive graph editing** and **AI-assisted expansion**.
 
-The client communicates with the backend via fetch calls to the `/api/*` endpoints. In development, CRA uses a proxy to the backend (see `client/package.json`).
+The client communicates with the backend via **`apiRequest()`** in `client/src/api/http.js` (see [HTTP client](#http-client-srcapihttpjs)). In development, CRA uses a proxy to the backend (see `client/package.json`).
+
+## HTTP client (`src/api/http.js`)
+
+Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
+
+| Export | Role |
+|--------|------|
+| **`apiRequest(path, options)`** | Resolves relative `path` with **`apiUrl(path)`** from `config.js` (or accepts an absolute URL). Set **`json: object`** to stringify the body and send `Content-Type: application/json`. Pass **`body: FormData`** for uploads without forcing JSON headers. On non-2xx, throws **`ApiError`** with `status` and message from `details` / `message` / `error` when present. **`status: 0`** means the browser could not reach the server (maps common network failures to a short dev hint). |
+| **`ApiError`** | Normalized failure; read **`message`**, **`status`**, optional **`code`**. |
+| **`getApiErrorMessage(err)`** | Safe string for UI (`ApiError` or generic `Error`). |
+| **`isNetworkError(err)`** | True when **`ApiError`** and **`status === 0`**. |
+
+**Tests:** `client/src/api/http.test.js` (run with `CI=true npm test -- --watchAll=false`).
+
+**Out of scope for #22** (see **`docs/github-backlog-issues.md`**): global React error boundary, toast/snackbar layer, unified loading skeletons, batch-analyze partial failure (**#48**), and fixing **`VisualizationPage`** save payload vs server (**#49**).
 
 ## Key modules
 
 - `client/src/App.js`
   - Top-level router and page composition.
+- `client/src/api/http.js`
+  - **`apiRequest`**, **`ApiError`**, **`getApiErrorMessage`**, **`isNetworkError`** — shared JSON API client and consistent loading/error behavior (GitHub **#22**).
 - `client/src/config.js`
   - **`getApiOrigin()` / `apiUrl()`** — single module for backend base URL (see [API base URL](#api-base-url) below).
 - `client/src/context/SessionContext.jsx`
@@ -118,7 +135,7 @@ The landing feedback form posts to **`POST /api/feedback`**; when the session ex
 
 ## API base URL
 
-All fetch targets are built with **`apiUrl('/api/...')`** from `client/src/config.js`.
+All API requests go through **`apiRequest()`**, which builds URLs with **`apiUrl('/api/...')`** from `client/src/config.js`. Do not call `fetch(apiUrl(...))` directly for JSON APIs unless there is a strong reason (keeps errors and env behavior consistent).
 
 | Environment | Default behavior |
 |---------------|------------------|

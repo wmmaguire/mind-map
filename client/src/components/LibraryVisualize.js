@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import GraphVisualization from './GraphVisualization';
-import { apiUrl } from '../config';
 import { useSession } from '../context/SessionContext';
+import {
+  apiRequest,
+  getApiErrorMessage,
+  isNetworkError,
+} from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import './LibraryVisualize.css';
 
@@ -47,84 +51,24 @@ function LibraryVisualize() {
     fetchSavedGraphs();
   }, []);
 
-  const handleApiRequest = async (url, options = {}) => {
-    const fullUrl = apiUrl(url);
-    
-    try {
-      console.log('Request details:', {
-        url: fullUrl,
-        method: options.method || 'GET',
-        headers: options.headers,
-        body: options.body ? JSON.parse(options.body) : undefined
-      });
-
-      const response = await fetch(fullUrl, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        }
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const ct = response.headers.get('content-type') || '';
-        let detail = `HTTP ${response.status}`;
-        try {
-          if (ct.includes('application/json')) {
-            const errBody = await response.json();
-            detail =
-              errBody.details ||
-              errBody.message ||
-              errBody.error ||
-              detail;
-          } else {
-            const errorText = await response.text();
-            if (errorText) detail = `${detail}: ${errorText.slice(0, 300)}`;
-          }
-        } catch (parseErr) {
-          console.error('Error reading error body:', parseErr);
-        }
-        console.error('API error:', detail);
-        throw new Error(detail);
-      }
-
-      try {
-        const data = await response.json();
-        console.log('Response data:', data);
-        return data;
-      } catch (jsonError) {
-        console.error('JSON parsing error:', jsonError);
-        throw new Error(`Invalid response from server at ${url} (${response.status})`);
-      }
-    } catch (error) {
-      console.error(`API request failed for ${fullUrl}:`, error);
-      throw error;
-    }
-  };
-
   const fetchFiles = async () => {
     try {
-      const data = await handleApiRequest('/api/files');
+      const data = await apiRequest('/api/files');
       if (data && data.files) {
         setFiles(data.files);
       }
     } catch (error) {
       console.error('Error fetching files:', error);
-      const base = `Failed to fetch files: ${error.message}`;
-      const hint =
-        error.message === 'Failed to fetch'
-          ? ' Check that the API server is running (e.g. port 5001).'
-          : '';
-      setError(`${base}${hint}`);
+      const msg = getApiErrorMessage(error);
+      setError(
+        `Failed to fetch files: ${msg}${isNetworkError(error) ? ' Check that the API server is running (e.g. port 5001).' : ''}`
+      );
     }
   };
 
   const fetchSavedGraphs = async () => {
     try {
-      const data = await handleApiRequest('/api/graphs');
+      const data = await apiRequest('/api/graphs');
       if (data && data.graphs) {
         setSavedGraphs(data.graphs);
       }
@@ -135,7 +79,9 @@ function LibraryVisualize() {
   };
 
   const handleErrorBannerAction = () => {
-    const wasFetchError = error?.startsWith('Failed to fetch files');
+    const wasFetchError =
+      error?.startsWith('Failed to fetch files') ||
+      error?.includes('Cannot reach the API server');
     setError(null);
     if (wasFetchError) {
       fetchFiles();
@@ -178,12 +124,12 @@ function LibraryVisualize() {
         edgeCount: graphData.links.length
       };
 
-      const data = await handleApiRequest('/api/graphs/save', {
+      const data = await apiRequest('/api/graphs/save', {
         method: 'POST',
-        body: JSON.stringify({
+        json: {
           graph: graphToSave,
-          metadata
-        })
+          metadata,
+        },
       });
 
       if (data.success) {
@@ -196,7 +142,7 @@ function LibraryVisualize() {
       }
     } catch (error) {
       console.error('Error saving graph:', error);
-      setError(error.message);
+      setError(getApiErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -204,9 +150,8 @@ function LibraryVisualize() {
 
   const handleLoadGraph = async (filename) => {
     try {
-      const response = await fetch(apiUrl(`/api/graphs/${filename}`));
-      const data = await response.json();
-      
+      const data = await apiRequest(`/api/graphs/${filename}`);
+
       if (data.success) {
         console.log('Graph data:', data.data);
         const graphData = data.data.graph;
@@ -237,7 +182,9 @@ function LibraryVisualize() {
         // If there's a dbId in the metadata, fetch view stats
         if (data.data.metadata.dbId) {
           try {
-            const viewStats = await handleApiRequest(`/api/graphs/${data.data.metadata.dbId}/views`);
+            const viewStats = await apiRequest(
+              `/api/graphs/${data.data.metadata.dbId}/views`
+            );
             console.log('Graph view stats:', viewStats);
           } catch (statsError) {
             console.warn('Failed to fetch view stats:', statsError);
@@ -248,7 +195,7 @@ function LibraryVisualize() {
       }
     } catch (error) {
       console.error('Error loading graph:', error);
-      setError('Failed to load graph');
+      setError(`Failed to load graph: ${getApiErrorMessage(error)}`);
     }
   };
 
@@ -273,19 +220,19 @@ function LibraryVisualize() {
       
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
-          const fileData = await handleApiRequest(`/api/files/${file.filename}`);
+          const fileData = await apiRequest(`/api/files/${file.filename}`);
           if (!fileData.success || !fileData.content) {
             throw new Error(`Failed to read file: ${file.originalName}`);
           }
 
-          const analysisData = await handleApiRequest('/api/analyze', {
+          const analysisData = await apiRequest('/api/analyze', {
             method: 'POST',
-            body: JSON.stringify({ 
+            json: {
               content: fileData.content,
-              context: context,
+              context,
               sessionId,
-              sourceFiles: [file._id || file.filename]  // Use file ID or filename
-            })
+              sourceFiles: [file._id || file.filename],
+            },
           });
 
           if (!analysisData.success || !analysisData.data) {
@@ -317,7 +264,7 @@ function LibraryVisualize() {
 
     } catch (error) {
       console.error('Analysis error:', error);
-      setError(`Failed to analyze files: ${error.message}`);
+      setError(`Failed to analyze files: ${getApiErrorMessage(error)}`);
       setGraphData(null);
     } finally {
       setAnalyzing(false);

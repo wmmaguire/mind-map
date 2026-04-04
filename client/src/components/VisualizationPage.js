@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
-import { apiUrl } from '../config';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import './VisualizationPage.css';
 
@@ -13,23 +13,18 @@ function VisualizationPage() {
 
   const handleSave = async () => {
     try {
-      const response = await fetch(apiUrl('/api/graphs/save'), {
+      const data = await apiRequest('/api/graphs/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        json: {
           data: graphData,
           filename,
           metadata: {
             sessionId,
             createdAt: new Date().toISOString(),
             sourceFiles: [filename],
-          }
-        })
+          },
+        },
       });
-
-      const data = await response.json();
       if (data.success) {
         alert('Graph saved successfully!');
       } else {
@@ -37,7 +32,7 @@ function VisualizationPage() {
       }
     } catch (error) {
       console.error('Save error:', error);
-      alert('Failed to save graph: ' + error.message);
+      alert('Failed to save graph: ' + getApiErrorMessage(error));
     }
   };
 

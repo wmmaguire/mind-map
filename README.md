@@ -64,6 +64,7 @@ npm run start
 - Frontend code can be modified in the `client/src` directory.
 - Backend code can be modified in the `server` directory.
 - Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or `npm test -- --watchAll=false` once. See **`client/README.md`** → *Testing (Jest)* for router/d3 setup details.
+- **Client HTTP layer:** JSON and upload calls use **`apiRequest()`** in **`client/src/api/http.js`** (shared base URL, error bodies, network messaging; GitHub **#22**). See **`client/README.md`** → *HTTP client*.
 - The backend will automatically restart when changes are made to the backend code.
 - The frontend will automatically restart when changes are made to the frontend code.
 

@@ -29,7 +29,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #37–#38 | NF—Graph intelligence | Growth modes + discovery epics |
 | #39 | NF—Social | Sharing & collaboration epic |
 | #40 | NF—Polish | Dynamic UI / UX epic |
-| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. |
+| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**. |
 
 **Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency), **#45** (`UserActivity` ops: volume / retention / indexes).
 
@@ -40,5 +40,16 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 **Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics.
 
 **Note:** **#48** — **batch analyze** resilience (partial failures, per-file status, retry vs **#22** general error handling).
+
+**Note:** Client **#22** (merged on branch `issue-22-unify-loading-errors`) adds **`client/src/api/http.js`** — `apiRequest()`, `ApiError`, `getApiErrorMessage()`, `isNetworkError()` — so all prior `fetch('/api/...')` call sites share **`apiUrl()`** from `config.js` and consistent JSON error bodies. Jest tests: **`client/src/api/http.test.js`**. This addresses **transport-level** loading/error consistency; UI-level work is tracked separately.
+
+| Follow-up (outside #22 scope) | GitHub issue |
+|-------------------------------|--------------|
+| `VisualizationPage` save body uses `data` / `filename`; server expects `graph` + `metadata` | **#49** |
+| React error boundary + toast/snackbar; reduce `alert()` / ad-hoc inline only | **#50** |
+| `GraphVisualization` D3 `useEffect` `exhaustive-deps` warning (telemetry / delete handlers) | **#51** |
+| Batch analyze: partial success, per-file errors (`Promise.all` → `allSettled`) | **#48** (existing) |
+| E2E / integration tests (mock `apiRequest` or MSW) | **#24** (existing) |
+| File list skeleton + empty states (loading UX beyond API errors) | **#26** (existing) |
 
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*

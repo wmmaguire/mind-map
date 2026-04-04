@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { apiUrl } from '../config';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import './Modal.css';
 import './Library.css';
@@ -20,16 +20,10 @@ function Library({ onClose }) {
 
   const fetchFiles = async () => {
     try {
-      const response = await fetch(apiUrl('/api/files'));
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch files');
-      }
-
-      const data = await response.json();
+      const data = await apiRequest('/api/files');
       setFiles(data.files);
     } catch (error) {
-      setError(error.message);
+      setError(getApiErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -44,27 +38,15 @@ function Library({ onClose }) {
       console.log('Fetching file:', file);
       
       const filename = file.filename || file.originalName;
-      const response = await fetch(apiUrl(`/api/files/${encodeURIComponent(filename)}`), {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+      const data = await apiRequest(
+        `/api/files/${encodeURIComponent(filename)}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
         }
-      });
+      );
 
-      // First try to get the response as text to debug
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      // Try to parse the text as JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('JSON Parse Error:', parseError);
-        console.error('Response text:', responseText);
-        throw new Error('Invalid JSON response from server');
-      }
-      
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch file');
       }
@@ -73,7 +55,7 @@ function Library({ onClose }) {
       await analyzeContent(data.content, file);
     } catch (error) {
       console.error('File fetch error:', error);
-      setError('Failed to load file: ' + error.message);
+      setError('Failed to load file: ' + getApiErrorMessage(error));
       setAnalyzing(false);
     }
   };
@@ -82,33 +64,15 @@ function Library({ onClose }) {
     try {
       console.log('Sending content for analysis, length:', content.length);
       
-      const response = await fetch(apiUrl('/api/analyze'), {
+      const data = await apiRequest('/api/analyze', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ 
+        json: {
           content,
           sessionId,
-          sourceFiles: [file._id || file.filename]
-        })
+          sourceFiles: [file._id || file.filename],
+        },
       });
 
-      // First get response as text for debugging
-      const responseText = await response.text();
-      console.log('Analysis raw response:', responseText);
-
-      // Try to parse the response
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Analysis JSON Parse Error:', parseError);
-        console.error('Analysis response text:', responseText);
-        throw new Error('Invalid JSON response from analysis server');
-      }
-      
       if (!data.success) {
         throw new Error(data.error || 'Analysis failed');
       }
@@ -116,7 +80,7 @@ function Library({ onClose }) {
       setGraphData(data.data);
     } catch (error) {
       console.error('Analysis error:', error);
-      setError('Failed to analyze content: ' + error.message);
+      setError('Failed to analyze content: ' + getApiErrorMessage(error));
     } finally {
       setAnalyzing(false);
     }

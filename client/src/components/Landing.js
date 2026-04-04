@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import './Landing.css';
-import { apiUrl } from '../config';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 
 function Landing() {
@@ -67,20 +67,11 @@ function Landing() {
 
       console.log('Submitting feedback data:', feedbackData);
 
-      const response = await fetch(apiUrl('/api/feedback'), {
+      const responseData = await apiRequest('/api/feedback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(feedbackData)
+        json: feedbackData,
       });
-
-      const responseData = await response.json();
       console.log('Server response:', responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to submit feedback');
-      }
 
       // Clear form only after successful submission
       setRating(null);
@@ -91,7 +82,9 @@ function Landing() {
       alert('Thank you for your feedback!');
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      setFeedbackError(error.message || 'Failed to submit feedback. Please try again.');
+      setFeedbackError(
+        getApiErrorMessage(error) || 'Failed to submit feedback. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }

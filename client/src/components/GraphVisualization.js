@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
-import { apiUrl } from '../config';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import './GraphVisualization.css';
 
@@ -50,23 +50,18 @@ function GraphVisualization({ data, onDataUpdate }) {
           details
         });
 
-        const response = await fetch(apiUrl('/api/operations'), {
+        const payload = await apiRequest('/api/operations', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+          json: {
             graphId: window.currentGraphId,
             sessionId: sessionIdRef.current,
             operationType,
             status,
             duration,
             error: error?.message,
-            details
-          })
+            details,
+          },
         });
-
-        const payload = await response.json();
         if (!payload.success) {
           console.warn('Failed to track operation:', payload.error);
         }
@@ -1226,23 +1221,18 @@ function GraphVisualization({ data, onDataUpdate }) {
 
       console.log('Selected nodes for generation:', selectedNodes.map(n => `${n.label} (${n.id})`));
 
-      const response = await fetch(apiUrl('/api/generate-node'), {
+      const result = await apiRequest('/api/generate-node', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        json: {
           selectedNodes,
-          numNodes: numNodesToAdd
-        })
+          numNodes: numNodesToAdd,
+        },
       });
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         operationStatus = 'FAILURE';
         operationError =
-          result.details || result.error || `Request failed (${response.status})`;
+          result.details || result.error || 'Request failed';
         throw new Error(operationError);
       }
 
@@ -1360,8 +1350,8 @@ function GraphVisualization({ data, onDataUpdate }) {
     } catch (error) {
       console.error('Error generating nodes:', error);
       operationStatus = 'FAILURE';
-      operationError = error.message;
-      alert('Error generating nodes: ' + error.message);
+      operationError = getApiErrorMessage(error);
+      alert('Error generating nodes: ' + getApiErrorMessage(error));
     } finally {
       setIsGenerating(false);
 

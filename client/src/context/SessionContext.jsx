@@ -5,7 +5,7 @@ import React, {
   useEffect
 } from 'react';
 import PropTypes from 'prop-types';
-import { apiUrl } from '../config';
+import { apiRequest } from '../api/http';
 
 const SessionContext = createContext(null);
 
@@ -63,22 +63,13 @@ function getSessionBootstrap() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       };
 
-      const response = await fetch(apiUrl('/api/sessions'), {
+      const data = await apiRequest('/api/sessions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+        json: {
           sessionStart: startTime.toISOString(),
-          userMetadata
-        })
+          userMetadata,
+        },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to initialize session');
-      }
-
-      const data = await response.json();
       try {
         sessionStorage.setItem(STORAGE_ID, data.sessionId);
         sessionStorage.setItem(STORAGE_START, startTime.toISOString());
