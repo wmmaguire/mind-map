@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { apiUrl } from '../config';
+import { useSession } from '../context/SessionContext';
 import './Modal.css';
 import './FileUpload.css';
 
-function FileUpload({ onClose }) {
+function FileUpload({ onClose, onUploadSuccess }) {
+  const { sessionId } = useSession();
   const [file, setFile] = useState(null);
   const [customName, setCustomName] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
@@ -16,8 +18,7 @@ function FileUpload({ onClose }) {
       return;
     }
 
-    const currentSessionId = window.currentSessionId;
-    if (!currentSessionId) {
+    if (!sessionId) {
       setUploadStatus('No active session. Please try again.');
       return;
     }
@@ -25,7 +26,7 @@ function FileUpload({ onClose }) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('customName', customName.trim());
-    formData.append('sessionId', currentSessionId);
+    formData.append('sessionId', sessionId);
 
     try {
       setUploadStatus('Uploading...');
@@ -43,6 +44,7 @@ function FileUpload({ onClose }) {
       setUploadStatus('File uploaded successfully!');
       setFile(null);
       setCustomName('');
+      if (onUploadSuccess) onUploadSuccess(true);
       setTimeout(onClose, 1500);
     } catch (error) {
       console.error('Upload error:', error);
@@ -147,7 +149,8 @@ function FileUpload({ onClose }) {
 }
 
 FileUpload.propTypes = {
-  onClose: PropTypes.func.isRequired
+  onClose: PropTypes.func.isRequired,
+  onUploadSuccess: PropTypes.func
 };
 
 export default FileUpload; 

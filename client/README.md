@@ -28,8 +28,10 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
   - Top-level router and page composition.
 - `client/src/config.js`
   - **`getApiOrigin()` / `apiUrl()`** — single module for backend base URL (see [API base URL](#api-base-url) below).
+- `client/src/context/SessionContext.jsx`
+  - **`SessionProvider` / `useSession()`** — creates or restores the browser session (`POST /api/sessions`), persists `sessionId` in `sessionStorage` for refresh, and sends session end via `sendBeacon` on unload. Wraps the app in `client/src/index.js`.
 - `client/src/components/Landing.js`
-  - Session initialization, session end reporting, and feedback UI.
+  - Feedback UI (session id comes from context).
 - `client/src/components/FileUpload.js`
   - Upload modal; posts `multipart/form-data` to the backend and associates uploads with the current session.
 - `client/src/components/LibraryVisualize.js`
@@ -43,12 +45,11 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
 
 **Goal**: create a backend session and make its UUID available to other client flows.
 
-1. On initial load, `Landing` calls `POST /api/sessions` with:
+1. On initial load, `SessionProvider` either restores `sessionId` / start time from `sessionStorage` or calls `POST /api/sessions` with:
    - `sessionStart`
    - `userMetadata` (browser, OS, screen size, language, timezone)
-2. The response contains a `sessionId` (UUID).
-3. The client stores this globally as `window.currentSessionId`.
-4. On unload, the client reports end time/duration via `navigator.sendBeacon` to:
+2. The response contains a `sessionId` (UUID); it is stored in React context (`useSession()`) and in `sessionStorage` for reloads in the same tab.
+3. On unload, the client reports end time/duration via `navigator.sendBeacon` to:
    - `POST /api/sessions/:sessionId`
 
 Why it matters: uploads, analysis, and telemetry all reference the session UUID.
@@ -61,7 +62,7 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 2. `FileUpload` posts to `POST /api/upload` with form fields:
    - `file`
    - `customName`
-   - `sessionId` (from `window.currentSessionId`)
+   - `sessionId` (from `useSession()`)
 3. On success, the server writes the upload to disk and records metadata.
 
 ### 3) Library list → analyze → graph render

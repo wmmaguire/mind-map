@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { apiUrl } from '../config';
+import { useSession } from '../context/SessionContext';
 import './Modal.css';
 import './Library.css';
 
 function Library({ onClose }) {
+  const { sessionId } = useSession();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -88,7 +90,7 @@ function Library({ onClose }) {
         },
         body: JSON.stringify({ 
           content,
-          sessionId: window.currentSessionId,
+          sessionId,
           sourceFiles: [file._id || file.filename]
         })
       });

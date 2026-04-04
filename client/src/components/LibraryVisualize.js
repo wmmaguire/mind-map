@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import GraphVisualization from './GraphVisualization';
 import { apiUrl } from '../config';
+import { useSession } from '../context/SessionContext';
 import './LibraryVisualize.css';
 
 function LibraryVisualize() {
+  const { sessionId } = useSession();
   const [files, setFiles] = useState([]);
   const [savedGraphs, setSavedGraphs] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
@@ -138,7 +140,7 @@ function LibraryVisualize() {
       const metadata = {
         name: graphName.trim(),
         description: graphDescription.trim(),
-        sessionId: window.currentSessionId,  // Use global sessionId
+        sessionId,
         sourceFiles: Array.from(selectedFiles).map(f => f.originalName),
         generatedAt: new Date().toISOString(),
         nodeCount: graphData.nodes.length,
@@ -250,7 +252,7 @@ function LibraryVisualize() {
             body: JSON.stringify({ 
               content: fileData.content,
               context: context,
-              sessionId: window.currentSessionId,  // Use global sessionId
+              sessionId,
               sourceFiles: [file._id || file.filename]  // Use file ID or filename
             })
           });

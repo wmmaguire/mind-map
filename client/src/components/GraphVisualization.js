@@ -1,47 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiUrl } from '../config';
+import { useSession } from '../context/SessionContext';
 import './GraphVisualization.css';
-
-const trackOperation = async (operationType, details, startTime = Date.now(), error = null) => {
-  try {
-    const duration = Date.now() - startTime;
-    const status = error ? 'FAILURE' : 'SUCCESS';
-
-    console.log('Tracking operation:', {
-      graphId: window.currentGraphId,
-      sessionId: window.currentSessionId,
-      operationType,
-      status,
-      duration,
-      details
-    });
-
-    const response = await fetch(apiUrl('/api/operations'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        graphId: window.currentGraphId,
-        sessionId: window.currentSessionId,
-        operationType,
-        status,
-        duration,
-        error: error?.message,
-        details
-      })
-    });
-    
-    const data = await response.json();
-    if (!data.success) {
-      console.warn('Failed to track operation:', data.error);
-    }
-  } catch (error) {
-    console.warn('Error tracking operation:', error);
-  }
-};
 
 function GraphVisualization({ data, onDataUpdate }) {
   const svgRef = useRef();
@@ -68,6 +30,52 @@ function GraphVisualization({ data, onDataUpdate }) {
     width: window.innerWidth,
     height: window.innerHeight
   });
+
+  const { sessionId } = useSession();
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+
+  const trackOperation = useCallback(
+    async (operationType, details, startTime = Date.now(), error = null) => {
+      try {
+        const duration = Date.now() - startTime;
+        const status = error ? 'FAILURE' : 'SUCCESS';
+
+        console.log('Tracking operation:', {
+          graphId: window.currentGraphId,
+          sessionId: sessionIdRef.current,
+          operationType,
+          status,
+          duration,
+          details
+        });
+
+        const response = await fetch(apiUrl('/api/operations'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            graphId: window.currentGraphId,
+            sessionId: sessionIdRef.current,
+            operationType,
+            status,
+            duration,
+            error: error?.message,
+            details
+          })
+        });
+
+        const payload = await response.json();
+        if (!payload.success) {
+          console.warn('Failed to track operation:', payload.error);
+        }
+      } catch (err) {
+        console.warn('Error tracking operation:', err);
+      }
+    },
+    []
+  );
 
   // Add width and height constants
   const width = 800;

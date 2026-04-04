@@ -2,9 +2,11 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
 import { apiUrl } from '../config';
+import { useSession } from '../context/SessionContext';
 import './VisualizationPage.css';
 
 function VisualizationPage() {
+  const { sessionId } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const { graphData, filename } = location.state || {};
@@ -20,7 +22,7 @@ function VisualizationPage() {
           data: graphData,
           filename,
           metadata: {
-            sessionId: window.currentSessionId,  // Use global sessionId
+            sessionId,
             createdAt: new Date().toISOString(),
             sourceFiles: [filename],
           }
