@@ -29,5 +29,6 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #37–#38 | NF—Graph intelligence | Growth modes + discovery epics |
 | #39 | NF—Social | Sharing & collaboration epic |
 | #40 | NF—Polish | Dynamic UI / UX epic |
+| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. |
 
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*

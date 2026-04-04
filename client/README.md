@@ -35,7 +35,7 @@ The client communicates with the backend via fetch calls to the `/api/*` endpoin
 - `client/src/components/Landing.js`
   - Feedback UI (session id comes from context).
 - `client/src/components/FileUpload.js`
-  - Upload modal; posts `multipart/form-data` to the backend and associates uploads with the current session.
+  - Upload modal; posts `multipart/form-data` to **`POST /api/upload`** and associates each upload with the current session. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
   - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization.
 - `client/src/components/GraphVisualization.js`
@@ -60,14 +60,15 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 
 ### 2) Upload flow (file + metadata)
 
-**Goal**: upload a source file and associate it with the current session.
+**Goal**: upload source file(s) and associate each with the current session.
 
 1. User opens the upload modal (`FileUpload`) and selects a `.txt` or `.md` file.
 2. `FileUpload` posts to `POST /api/upload` with form fields:
    - `file`
    - `customName`
    - `sessionId` (from `useSession()`)
-3. On success, the server writes the upload to disk and records metadata.
+3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo. Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
+4. On failure, the API may return structured JSON (`error`, `details`, `code`). If a **legacy Mongo index** still enforces one file per session, see **`server/READEME.md`** (GitHub **#42**).
 
 ### 3) Library list → analyze → graph render
 

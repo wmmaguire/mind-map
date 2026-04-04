@@ -20,8 +20,11 @@ mind-map/
 │   └── README.md
 ├── server/
 │   ├── server.js
+│   ├── routes/
+│   │   ├── files.js      # /api/files, /api/upload, file content
+│   │   └── graphs.js     # /api/graphs/* (save, list, load, views)
 │   ├── package.json
-│   └── README.md
+│   └── READEME.md        # server architecture (not README.md)
 ├── .env
 ├── package.json
 └── README.md
@@ -61,6 +64,12 @@ npm run start
 - Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or `npm test -- --watchAll=false` once. See **`client/README.md`** → *Testing (Jest)* for router/d3 setup details.
 - The backend will automatically restart when changes are made to the backend code.
 - The frontend will automatically restart when changes are made to the frontend code.
+
+#### Backend API layout
+
+- Full detail: **`server/READEME.md`** (env vars, flows, OpenAI, persistence).
+- **Library uploads** (`GET/POST /api/files`, `POST /api/upload`) and **persisted graphs** (`/api/graphs/*`) are implemented in **`server/routes/files.js`** and **`server/routes/graphs.js`** (mounted from `server.js`).
+- **Multiple files per session** are allowed; older MongoDB databases may still have a legacy **unique index on `sessionId`** in the `files` collection—drop it if second uploads fail (see **server/READEME.md** upload section, and GitHub **#42**).
 
 #### Database Migrations
 
