@@ -16,6 +16,15 @@ const STORAGE_START = 'mindmap.sessionStart';
 /** Single-flight bootstrap so React StrictMode does not create duplicate sessions. */
 let sessionBootstrapPromise = null;
 
+/**
+ * Clears the cached bootstrap promise so the next `SessionProvider` mount runs a
+ * fresh session flow. For Jest only; keeps integration tests isolated without
+ * `jest.resetModules()` (which would load a second React copy).
+ */
+export function resetSessionBootstrapForTests() {
+  sessionBootstrapPromise = null;
+}
+
 function getSessionBootstrap() {
   if (!sessionBootstrapPromise) {
     sessionBootstrapPromise = (async () => {

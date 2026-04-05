@@ -16,6 +16,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:ci": "CI=true npm test -- --watchAll=false",
+    "test:integration": "CI=true npm test -- --watchAll=false --testPathPattern=integration",
     "eject": "react-scripts eject",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"

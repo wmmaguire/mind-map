@@ -2,7 +2,15 @@ import './setupPolyfills';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { SessionProvider } from './context/SessionContext';
+import {
+  SessionProvider,
+  resetSessionBootstrapForTests,
+} from './context/SessionContext';
+
+beforeEach(() => {
+  resetSessionBootstrapForTests();
+  sessionStorage.clear();
+});
 
 test('renders app title', () => {
   render(

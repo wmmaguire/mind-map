@@ -189,6 +189,29 @@ Because this app uses **React Router v7** and **d3** (ESM), `client/package.json
 
 Pure utilities such as **`src/utils/mergeGraphs.test.js`** (multi-file graph merge / id namespacing, GitHub **#21**) do not need the router polyfill order.
 
+### Integration-style tests (GitHub **#24**)
+
+**`client/src/criticalPath.integration.test.js`** exercises a **critical path** with **`global.fetch` mocked** (not `jest.mock('./api/http')`): session bootstrap (`POST /api/sessions`), library shell on **`/visualize`** (`GET /api/files`, `GET /api/graphs`), and navigation from the landing **Visualize** control to the empty-library state. **`SessionContext`** caches a one-shot bootstrap promise; tests call **`resetSessionBootstrapForTests()`** (exported from **`context/SessionContext.jsx`**) in **`App.test.js`** and integration **`beforeEach`** so order across test files does not leak session state.
+
+Commands:
+
+| Command | Purpose |
+|---------|---------|
+| **`npm run test:ci`** | Full client suite once (non-watch); use in CI or before pushing. |
+| **`npm run test:integration`** | Only files matching `integration` in the name (faster local check of #24-style tests). |
+
+### Manual end-to-end checks (browser + API)
+
+There is no Playwright/Cypress harness in this repo yet; validate the full stack manually:
+
+1. From the repo root, start API + client: **`npm run dev`** (server on port **5001**, CRA on **3000** with proxy to the API).
+2. Open **`http://localhost:3000`**. Confirm the landing page loads and (with DevTools → Network) **`POST /api/sessions`** succeeds.
+3. **Upload:** open **Upload**, pick a small `.txt` file, submit; expect success and **`POST /api/upload`** (multipart) **200**.
+4. **Visualize:** go to **Visualize** (or **`/visualize`**). Confirm **`GET /api/files`** lists the upload; select the file, **Analyze Selected**; expect **`GET /api/files/:name`**, **`POST /api/analyze`**, then a graph in the visualization area.
+5. Optional: **Give feedback** (FAB), **Save** graph if you want to verify **`POST /api/graphs/save`** and **`GET /api/graphs`**.
+
+If the API is not running, the client surfaces **`apiRequest`** / network errors (see **`http.js`**); **`GET /api/files`** failures on the library page show the banner described in **`LibraryVisualize`**.
+
 ## Learn more
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
