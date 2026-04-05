@@ -40,6 +40,27 @@ function GraphVisualization({
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
+  /** Clears all graph edit tool modes, modals, and node selections (Escape + mutual exclusivity). */
+  const exitGraphEditModes = useCallback(() => {
+    setShowAddForm(false);
+    setShowGenerateForm(false);
+    setIsAddingRelationship(false);
+    setIsDeleteMode(false);
+    setRelationshipForm({ show: false, relationship: '' });
+    setSelectedNodes([]);
+    selectedNodeIds.current.clear();
+    selectedNodeId.current = null;
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      exitGraphEditModes();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [exitGraphEditModes]);
+
   const trackOperation = useCallback(
     async (operationType, details, startTime = Date.now(), error = null) => {
       try {
@@ -1522,26 +1543,78 @@ function GraphVisualization({
         <div className="controls-content">
           <div className="edit-controls">
             <button
-              className="generate-button"
-              onClick={() => setShowGenerateForm(true)}
+              className={`generate-button ${showGenerateForm ? 'active' : ''}`}
+              onClick={() => {
+                if (showGenerateForm) {
+                  setShowGenerateForm(false);
+                  return;
+                }
+                setShowAddForm(false);
+                setIsAddingRelationship(false);
+                setIsDeleteMode(false);
+                setRelationshipForm({ show: false, relationship: '' });
+                setSelectedNodes([]);
+                selectedNodeIds.current.clear();
+                selectedNodeId.current = null;
+                setShowGenerateForm(true);
+              }}
             >
               Generate Nodes
             </button>
             <button
               className={`add-node-button ${showAddForm ? 'active' : ''}`}
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                if (showAddForm) {
+                  setShowAddForm(false);
+                  return;
+                }
+                setShowGenerateForm(false);
+                setIsAddingRelationship(false);
+                setIsDeleteMode(false);
+                setRelationshipForm({ show: false, relationship: '' });
+                setSelectedNodes([]);
+                selectedNodeIds.current.clear();
+                selectedNodeId.current = null;
+                setShowAddForm(true);
+              }}
             >
               Add Node
             </button>
             <button
               className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
-              onClick={() => setIsAddingRelationship(!isAddingRelationship)}
+              onClick={() => {
+                if (isAddingRelationship) {
+                  setIsAddingRelationship(false);
+                  setRelationshipForm({ show: false, relationship: '' });
+                  setSelectedNodes([]);
+                  selectedNodeIds.current.clear();
+                  selectedNodeId.current = null;
+                  return;
+                }
+                setShowAddForm(false);
+                setShowGenerateForm(false);
+                setIsDeleteMode(false);
+                setIsAddingRelationship(true);
+              }}
             >
               Add Relationship
             </button>
             <button
               className={`delete-button ${isDeleteMode ? 'active' : ''}`}
-              onClick={() => setIsDeleteMode(!isDeleteMode)}
+              onClick={() => {
+                if (isDeleteMode) {
+                  setIsDeleteMode(false);
+                  return;
+                }
+                setShowAddForm(false);
+                setShowGenerateForm(false);
+                setIsAddingRelationship(false);
+                setRelationshipForm({ show: false, relationship: '' });
+                setSelectedNodes([]);
+                selectedNodeIds.current.clear();
+                selectedNodeId.current = null;
+                setIsDeleteMode(true);
+              }}
             >
               Delete
             </button>
@@ -1579,14 +1652,7 @@ function GraphVisualization({
               </div>
               <div className="modal-buttons">
                 <button type="submit">Add Relationship</button>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setRelationshipForm({ show: false, relationship: '' });
-                    setSelectedNodes([]);
-                    setIsAddingRelationship(false);
-                  }}
-                >
+                <button type="button" onClick={exitGraphEditModes}>
                   Cancel
                 </button>
               </div>
@@ -1628,7 +1694,7 @@ function GraphVisualization({
               </div>
               <div className="modal-buttons">
                 <button type="submit">Add Concept</button>
-                <button type="button" onClick={() => setShowAddForm(false)}>Cancel</button>
+                <button type="button" onClick={exitGraphEditModes}>Cancel</button>
               </div>
             </form>
           </div>
@@ -1653,7 +1719,7 @@ function GraphVisualization({
                 <button type="submit" disabled={isGenerating}>
                   {isGenerating ? 'Generating...' : 'Confirm'}
                 </button>
-                <button type="button" onClick={() => setShowGenerateForm(false)}>
+                <button type="button" onClick={exitGraphEditModes}>
                   Cancel
                 </button>
               </div>

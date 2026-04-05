@@ -144,12 +144,28 @@ svg {
   transform: translateY(-1px);
 }
 
+.add-node-button.active {
+  background-color: #3562bd;
+}
+
+.add-node-button.active:hover {
+  background-color: #3562bd;
+}
+
 .add-relationship-button.active {
   background-color: #3562bd;
 }
 
 .add-relationship-button.active:hover {
   background-color: #3562bd;
+}
+
+.generate-button.active {
+  background-color: #3d8b40;
+}
+
+.generate-button.active:hover {
+  background-color: #3d8b40;
 }
 
 .delete-button.active {
