@@ -471,6 +471,7 @@ function LibraryVisualize() {
             ? { width: sidebarWidth, flexShrink: 0 }
             : undefined
         }
+        aria-hidden={isMobile ? !showSidebar : undefined}
       >
         <div className="sidebar-header">
           <div className="sidebar-header__titles">

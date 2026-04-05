@@ -750,3 +750,17 @@ svg {
     z-index: 2;
   }
 }
+
+/* Compact bottom-sheet header on small screens (parity with Library chrome density; see #28–#30) */
+@media (max-width: 768px) {
+  .graph-visualization-container .controls-header {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .graph-visualization-container .controls-header h3 {
+    font-size: 0.95rem;
+    margin: 0;
+  }
+}
