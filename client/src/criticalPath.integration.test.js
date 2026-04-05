@@ -88,8 +88,11 @@ describe('critical path integration (mocked fetch)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/No files available/i)).toBeInTheDocument();
+      expect(screen.getByText(/No uploaded files yet/i)).toBeInTheDocument();
     });
+    expect(
+      screen.getByRole('link', { name: /Go to home/i })
+    ).toBeInTheDocument();
 
     expect(
       global.fetch.mock.calls.some(([url]) => String(url).includes('/api/files'))
@@ -112,7 +115,7 @@ describe('critical path integration (mocked fetch)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/No files available/i)).toBeInTheDocument();
+      expect(screen.getByText(/No uploaded files yet/i)).toBeInTheDocument();
     });
   });
 });

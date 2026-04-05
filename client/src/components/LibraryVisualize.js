@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
 import {
@@ -7,6 +8,14 @@ import {
   isNetworkError,
 } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
+import {
+  getFilteredSortedFiles,
+  getFileDisplayName,
+  FILE_SORT_NAME_ASC,
+  FILE_SORT_NAME_DESC,
+  FILE_SORT_DATE_ASC,
+  FILE_SORT_DATE_DESC,
+} from '../utils/libraryFileList';
 import './LibraryVisualize.css';
 
 const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
@@ -48,6 +57,9 @@ function readStoredSections() {
 function LibraryVisualize() {
   const { sessionId } = useSession();
   const [files, setFiles] = useState([]);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [fileSort, setFileSort] = useState(FILE_SORT_NAME_ASC);
   const [savedGraphs, setSavedGraphs] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [graphData, setGraphData] = useState(null);
@@ -76,6 +88,11 @@ function LibraryVisualize() {
     width: window.innerWidth,
     height: window.innerHeight
   });
+
+  const displayFiles = useMemo(
+    () => getFilteredSortedFiles(files, fileSearchQuery, fileSort),
+    [files, fileSearchQuery, fileSort]
+  );
 
   const defaultNodeColor = '#4a90e2'; // default node color is blue
   // Add resize handler
@@ -161,6 +178,7 @@ function LibraryVisualize() {
   );
 
   const fetchFiles = async () => {
+    setFilesLoading(true);
     try {
       const data = await apiRequest('/api/files');
       if (data && data.files) {
@@ -172,6 +190,8 @@ function LibraryVisualize() {
       setError(
         `Failed to fetch files: ${msg}${isNetworkError(error) ? ' Check that the API server is running (e.g. port 5001).' : ''}`
       );
+    } finally {
+      setFilesLoading(false);
     }
   };
 
@@ -197,6 +217,34 @@ function LibraryVisualize() {
       fetchSavedGraphs();
     }
   };
+
+  const handleSelectAllFiltered = useCallback(() => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      displayFiles.forEach((f) => next.add(f));
+      return next;
+    });
+  }, [displayFiles]);
+
+  const handleClearFileSelection = useCallback(() => {
+    setSelectedFiles(new Set());
+  }, []);
+
+  const handleFileListKeyDown = useCallback((e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const root = e.currentTarget;
+    const boxes = root.querySelectorAll('.file-item-checkbox');
+    if (!boxes.length) return;
+    const active = document.activeElement;
+    const i = Array.from(boxes).indexOf(active);
+    if (i < 0) return;
+    e.preventDefault();
+    const nextIndex =
+      e.key === 'ArrowDown'
+        ? Math.min(i + 1, boxes.length - 1)
+        : Math.max(i - 1, 0);
+    boxes[nextIndex]?.focus();
+  }, []);
 
   const handleSaveClick = () => {
     const defaultName = Array.from(selectedFiles)
@@ -526,44 +574,169 @@ function LibraryVisualize() {
                   {filesSectionOpen ? '▼' : '▶'}
                 </span>
                 Files
-                {files.length > 0 ? ` (${files.length})` : ''}
+                {!filesLoading && files.length > 0
+                  ? ` (${files.length})`
+                  : ''}
               </button>
             </h3>
             {filesSectionOpen && (
-              <div className="library-section__body file-list">
-                {files.length === 0 ? (
-                  <p className="no-files">No files available</p>
+              <div
+                className="library-section__body file-list"
+                aria-busy={filesLoading}
+              >
+                {filesLoading ? (
+                  <div
+                    className="file-list-skeleton"
+                    aria-hidden
+                  >
+                    <div className="file-list-skeleton__row" />
+                    <div className="file-list-skeleton__row" />
+                    <div className="file-list-skeleton__row" />
+                    <div className="file-list-skeleton__row" />
+                  </div>
+                ) : error && error.startsWith('Failed to fetch files') ? (
+                  <p className="no-files no-files--muted">
+                    File list could not be loaded. Use Retry above.
+                  </p>
+                ) : files.length === 0 ? (
+                  <div className="file-list-empty">
+                    <p className="file-list-empty__title">No uploaded files yet</p>
+                    <p className="file-list-empty__hint">
+                      Upload text or Markdown from the home page to analyze them
+                      here.
+                    </p>
+                    <Link className="file-list-empty__cta" to="/">
+                      Go to home
+                    </Link>
+                  </div>
                 ) : (
                   <>
-                    <div className="file-list-header">
-                      <span>Selected: {selectedFiles.size} files</span>
+                    <div className="library-file-toolbar">
+                      <div className="library-file-toolbar__search">
+                        <label className="sr-only" htmlFor="library-file-search">
+                          Search files
+                        </label>
+                        <input
+                          id="library-file-search"
+                          type="search"
+                          className="library-file-search-input"
+                          placeholder="Search files…"
+                          value={fileSearchQuery}
+                          onChange={(e) => setFileSearchQuery(e.target.value)}
+                          autoComplete="off"
+                          aria-label="Search files"
+                        />
+                      </div>
+                      <div className="library-file-toolbar__sort">
+                        <label className="sr-only" htmlFor="library-file-sort">
+                          Sort files
+                        </label>
+                        <select
+                          id="library-file-sort"
+                          className="library-file-sort-select"
+                          value={fileSort}
+                          onChange={(e) => setFileSort(e.target.value)}
+                          aria-label="Sort files"
+                        >
+                          <option value={FILE_SORT_NAME_ASC}>Name (A–Z)</option>
+                          <option value={FILE_SORT_NAME_DESC}>Name (Z–A)</option>
+                          <option value={FILE_SORT_DATE_DESC}>
+                            Newest upload first
+                          </option>
+                          <option value={FILE_SORT_DATE_ASC}>
+                            Oldest upload first
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                    {fileSearchQuery.trim() && (
+                      <p className="file-list-filter-hint" role="status">
+                        Showing {displayFiles.length} of {files.length} files
+                      </p>
+                    )}
+                    <div className="file-list-actions">
                       <button
-                        className="analyze-button"
-                        onClick={handleAnalyzeClick}
-                        disabled={analyzing || selectedFiles.size === 0}
+                        type="button"
+                        className="file-list-action-btn"
+                        onClick={handleSelectAllFiltered}
+                        disabled={displayFiles.length === 0}
                       >
-                        {analyzing ? 'Analyzing...' : 'Analyze Selected'}
+                        Select all
+                      </button>
+                      <button
+                        type="button"
+                        className="file-list-action-btn"
+                        onClick={handleClearFileSelection}
+                        disabled={selectedFiles.size === 0}
+                      >
+                        Clear selection
                       </button>
                     </div>
-                    <ul>
-                      {files.map((file, index) => (
-                        <li
-                          key={file.id || index}
-                          className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
+                    {displayFiles.length === 0 ? (
+                      <div className="file-list-empty file-list-empty--compact">
+                        <p>No files match your search.</p>
+                        <button
+                          type="button"
+                          className="file-list-empty__cta file-list-empty__cta--btn"
+                          onClick={() => setFileSearchQuery('')}
                         >
-                          <label className="file-label">
-                            <input
-                              type="checkbox"
-                              checked={selectedFiles.has(file)}
-                              onChange={() => handleFileSelect(file)}
-                            />
-                            <span className="file-name">
-                              {file.customName || file.originalName}
-                            </span>
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
+                          Clear search
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="file-list-header">
+                          <span>
+                            Selected: {selectedFiles.size} file
+                            {selectedFiles.size === 1 ? '' : 's'}
+                          </span>
+                          <button
+                            className="analyze-button"
+                            type="button"
+                            onClick={handleAnalyzeClick}
+                            disabled={analyzing || selectedFiles.size === 0}
+                          >
+                            {analyzing ? 'Analyzing...' : 'Analyze Selected'}
+                          </button>
+                        </div>
+                        <ul
+                          className="file-list-items"
+                          onKeyDown={handleFileListKeyDown}
+                        >
+                          {displayFiles.map((file, index) => (
+                            <li
+                              key={file.filename || file.id || index}
+                              className={`file-item ${
+                                selectedFiles.has(file) ? 'selected' : ''
+                              }`}
+                            >
+                              <label className="file-label">
+                                <input
+                                  type="checkbox"
+                                  className="file-item-checkbox"
+                                  checked={selectedFiles.has(file)}
+                                  onChange={() => handleFileSelect(file)}
+                                />
+                                <span className="file-name">
+                                  {getFileDisplayName(file)}
+                                </span>
+                                {file.uploadDate && (
+                                  <span className="file-meta">
+                                    {new Date(
+                                      file.uploadDate
+                                    ).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
+                                    })}
+                                  </span>
+                                )}
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                   </>
                 )}
               </div>
