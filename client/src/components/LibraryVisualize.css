@@ -249,15 +249,15 @@
 
 /* Scoped so GraphVisualization.css global .visualization-header rules do not add margin/padding */
 .library-visualize .visualization-header {
-  padding: 4px 10px;
+  margin: 0;
+  padding: 0;
   border-bottom: 1px solid #eee;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
   box-sizing: border-box;
-  min-height: 28px;
-  margin-top: 0;
+  min-height: 0;
 }
 
 .library-visualize .visualization-header h3 {
