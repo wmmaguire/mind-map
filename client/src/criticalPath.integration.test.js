@@ -44,6 +44,7 @@ function setupApiFetchMock() {
 function renderApp(initialEntries) {
   resetSessionBootstrapForTests();
   sessionStorage.clear();
+  localStorage.clear();
   setupApiFetchMock();
 
   return render(
@@ -79,6 +80,12 @@ describe('critical path integration (mocked fetch)', () => {
 
   it('loads visualize route and empty library', async () => {
     renderApp(['/visualize']);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /^Library$/i })
+      ).toBeInTheDocument();
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/No files available/i)).toBeInTheDocument();

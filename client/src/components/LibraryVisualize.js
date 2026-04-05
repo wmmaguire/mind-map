@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
 import {
@@ -8,6 +8,40 @@ import {
 } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import './LibraryVisualize.css';
+
+const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
+const SECTIONS_KEY = 'mindmap.librarySections';
+const MIN_SIDEBAR_WIDTH = 240;
+const MAX_SIDEBAR_WIDTH = 480;
+const DEFAULT_SIDEBAR_WIDTH = 300;
+const RESIZE_HANDLE_PX = 6;
+
+function readStoredSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const w = parseInt(raw, 10);
+    if (Number.isFinite(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) {
+      return w;
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_SIDEBAR_WIDTH;
+}
+
+function readStoredSections() {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY);
+    if (!raw) return { files: true, graphs: true };
+    const o = JSON.parse(raw);
+    return {
+      files: typeof o.files === 'boolean' ? o.files : true,
+      graphs: typeof o.graphs === 'boolean' ? o.graphs : true,
+    };
+  } catch {
+    return { files: true, graphs: true };
+  }
+}
 
 function LibraryVisualize() {
   const { sessionId } = useSession();
@@ -25,6 +59,15 @@ function LibraryVisualize() {
   const [showContextModal, setShowContextModal] = useState(false);
   const [additionalContext, setAdditionalContext] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
+
+  const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
+  const [filesSectionOpen, setFilesSectionOpen] = useState(
+    () => readStoredSections().files
+  );
+  const [graphsSectionOpen, setGraphsSectionOpen] = useState(
+    () => readStoredSections().graphs
+  );
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
@@ -50,6 +93,70 @@ function LibraryVisualize() {
     fetchFiles();
     fetchSavedGraphs();
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SIDEBAR_WIDTH_KEY,
+        String(sidebarWidth)
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SECTIONS_KEY,
+        JSON.stringify({ files: filesSectionOpen, graphs: graphsSectionOpen })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [filesSectionOpen, graphsSectionOpen]);
+
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMove = (moveEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const next = Math.min(
+        MAX_SIDEBAR_WIDTH,
+        Math.max(MIN_SIDEBAR_WIDTH, startWidth + delta)
+      );
+      setSidebarWidth(next);
+    };
+
+    const onUp = () => {
+      setIsResizingSidebar(false);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
+
+  const handleResizeKeyDown = useCallback(
+    (e) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setSidebarWidth((w) =>
+          Math.max(MIN_SIDEBAR_WIDTH, w - 16)
+        );
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setSidebarWidth((w) =>
+          Math.min(MAX_SIDEBAR_WIDTH, w + 16)
+        );
+      }
+    },
+    []
+  );
 
   const fetchFiles = async () => {
     try {
@@ -326,95 +433,64 @@ function LibraryVisualize() {
     }));
   };
 
+  const isMobile = dimensions.width <= 768;
+  let graphViewportWidth;
+  if (isMobile) {
+    graphViewportWidth = showSidebar
+      ? dimensions.width
+      : Math.max(200, dimensions.width - 48);
+  } else {
+    graphViewportWidth = Math.max(
+      200,
+      dimensions.width - sidebarWidth - RESIZE_HANDLE_PX
+    );
+  }
+
   return (
-    <div className="library-visualize">
-      {/* Mobile-friendly layout structure */}
-      <div className={`sidebar ${dimensions.width <= 768 ? 'mobile' : ''} ${showSidebar ? 'visible' : 'hidden'}`}>
-        <div className="sidebar-content">
-          <div className="file-list">
-            <h2>Files</h2>
-            {files.length === 0 ? (
-              <p className="no-files">No files available</p>
-            ) : (
-              <>
-                <div className="file-list-header">
-                  <span>Selected: {selectedFiles.size} files</span>
-                  <button
-                    className="analyze-button"
-                    onClick={handleAnalyzeClick}
-                    disabled={analyzing || selectedFiles.size === 0}
-                  >
-                    {analyzing ? 'Analyzing...' : 'Analyze Selected'}
-                  </button>
-                </div>
-                <ul>
-                  {files.map((file, index) => (
-                    <li 
-                      key={file.id || index}
-                      className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
-                    >
-                      <label className="file-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedFiles.has(file)}
-                          onChange={() => handleFileSelect(file)}
-                        />
-                        <span className="file-name">
-                          {file.customName || file.originalName}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div> 
-          <div className="saved-graphs-section">
-            <h2>Graphs</h2>
-            {graphData && (
-              <button 
-                onClick={handleSaveClick}
-                disabled={saving}
-                className="save-current-button"
-              >
-                {saving ? 'Saving...' : 'Save Current Graph'}
-              </button>
-            )}
-            <div className="saved-graphs">
-              {savedGraphs.map((graph, index) => (
-                <div key={index} className="saved-graph-item">
-                  <div className="graph-info">
-                    <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
-                    <small>
-                      Nodes: {graph.metadata.nodeCount} | 
-                      Edges: {graph.metadata.edgeCount}
-                    </small>
-                    <small>Saved: {new Date(graph.metadata.generatedAt).toLocaleDateString()}</small>
-                  </div>
-                  <button 
-                    onClick={() => handleLoadGraph(graph.filename)}
-                    className="load-button"
-                  >
-                    Load
-                  </button>
-                </div>
-              ))}
-            </div>
+    <div
+      className={`library-visualize${isMobile && !showSidebar ? ' library-visualize--rail' : ''}`}
+    >
+      {isMobile && !showSidebar && (
+        <button
+          type="button"
+          className="library-mobile-rail"
+          onClick={() => setShowSidebar(true)}
+          aria-label="Open Library"
+        >
+          <span className="library-mobile-rail__icon" aria-hidden>
+            📚
+          </span>
+          <span className="library-mobile-rail__label">Library</span>
+        </button>
+      )}
+
+      <aside
+        className={`sidebar ${isMobile ? 'mobile' : 'desktop'} ${showSidebar ? 'visible' : 'hidden'}`}
+        style={
+          !isMobile
+            ? { width: sidebarWidth, flexShrink: 0 }
+            : undefined
+        }
+      >
+        <div className="sidebar-header">
+          <div className="sidebar-header__titles">
+            <h2 className="sidebar-title">Library</h2>
+            <p className="sidebar-subtitle">Sources and saved graphs</p>
           </div>
-        </div>
-        <div className="sidebar-footer">
-          {dimensions.width <= 768 && (
-            <button 
-              className="toggle-sidebar"
-              onClick={() => setShowSidebar(prev => !prev)}
+          {isMobile && (
+            <button
+              type="button"
+              className="sidebar-close"
+              onClick={() => setShowSidebar(false)}
+              aria-label="Close library panel"
             >
-              {showSidebar ? '×' : '☰'}
+              ×
             </button>
           )}
-          <h3>Library</h3>
         </div>
+
         {error && (
-          <div className="error" role="alert">
+          <div className="error sidebar-error" role="alert">
             <span className="error-text">{error}</span>
             <button
               type="button"
@@ -425,18 +501,139 @@ function LibraryVisualize() {
             </button>
           </div>
         )}
-      </div>
 
-      {/* Add floating button for mobile */}
-      {dimensions.width <= 768 && !showSidebar && (
-        <button 
-          className="mobile-sidebar-toggle"
-          onClick={() => setShowSidebar(true)}
-          aria-label="Open Library"
-        >
-          <span className="toggle-icon">☰</span>
-          <span className="toggle-text">Library</span>
-        </button>
+        <div className="sidebar-content">
+          <section
+            className="library-section"
+            aria-labelledby="library-section-files"
+          >
+            <h3 id="library-section-files" className="library-section__title">
+              <button
+                type="button"
+                className="library-section__toggle"
+                onClick={() => setFilesSectionOpen((o) => !o)}
+                aria-expanded={filesSectionOpen}
+              >
+                <span className="library-section__chevron" aria-hidden>
+                  {filesSectionOpen ? '▼' : '▶'}
+                </span>
+                Files
+                {files.length > 0 ? ` (${files.length})` : ''}
+              </button>
+            </h3>
+            {filesSectionOpen && (
+              <div className="library-section__body file-list">
+                {files.length === 0 ? (
+                  <p className="no-files">No files available</p>
+                ) : (
+                  <>
+                    <div className="file-list-header">
+                      <span>Selected: {selectedFiles.size} files</span>
+                      <button
+                        className="analyze-button"
+                        onClick={handleAnalyzeClick}
+                        disabled={analyzing || selectedFiles.size === 0}
+                      >
+                        {analyzing ? 'Analyzing...' : 'Analyze Selected'}
+                      </button>
+                    </div>
+                    <ul>
+                      {files.map((file, index) => (
+                        <li
+                          key={file.id || index}
+                          className={`file-item ${selectedFiles.has(file) ? 'selected' : ''}`}
+                        >
+                          <label className="file-label">
+                            <input
+                              type="checkbox"
+                              checked={selectedFiles.has(file)}
+                              onChange={() => handleFileSelect(file)}
+                            />
+                            <span className="file-name">
+                              {file.customName || file.originalName}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section
+            className="library-section library-section--graphs"
+            aria-labelledby="library-section-graphs"
+          >
+            <h3 id="library-section-graphs" className="library-section__title">
+              <button
+                type="button"
+                className="library-section__toggle"
+                onClick={() => setGraphsSectionOpen((o) => !o)}
+                aria-expanded={graphsSectionOpen}
+              >
+                <span className="library-section__chevron" aria-hidden>
+                  {graphsSectionOpen ? '▼' : '▶'}
+                </span>
+                Graphs
+                {savedGraphs.length > 0 ? ` (${savedGraphs.length})` : ''}
+              </button>
+            </h3>
+            {graphsSectionOpen && (
+              <div className="library-section__body saved-graphs-section">
+                {graphData && (
+                  <button
+                    onClick={handleSaveClick}
+                    disabled={saving}
+                    className="save-current-button"
+                  >
+                    {saving ? 'Saving...' : 'Save Current Graph'}
+                  </button>
+                )}
+                <div className="saved-graphs">
+                  {savedGraphs.length === 0 ? (
+                    <p className="no-saved-graphs">No saved graphs yet.</p>
+                  ) : (
+                    savedGraphs.map((graph, index) => (
+                      <div key={index} className="saved-graph-item">
+                        <div className="graph-info">
+                          <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
+                          <small>
+                            Nodes: {graph.metadata.nodeCount} |
+                            Edges: {graph.metadata.edgeCount}
+                          </small>
+                          <small>
+                            Saved:{' '}
+                            {new Date(graph.metadata.generatedAt).toLocaleDateString()}
+                          </small>
+                        </div>
+                        <button
+                          onClick={() => handleLoadGraph(graph.filename)}
+                          className="load-button"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      </aside>
+
+      {!isMobile && (
+        <div
+          className={`sidebar-resize-handle${isResizingSidebar ? ' is-active' : ''}`}
+          onMouseDown={handleResizeStart}
+          onKeyDown={handleResizeKeyDown}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize library panel"
+          tabIndex={0}
+        />
       )}
 
       <div className="visualization-panel">
@@ -444,10 +641,10 @@ function LibraryVisualize() {
           <h3>Visualization: {currentSource?.name || 'Unnamed Graph'}</h3>
         </div>
         <div className="graph-container">
-          <GraphVisualization 
+          <GraphVisualization
             data={graphData || { nodes: [], links: [] }}
             onDataUpdate={handleGraphDataUpdate}
-            width={dimensions.width > 768 ? dimensions.width - 300 : dimensions.width}
+            width={graphViewportWidth}
             height={dimensions.height - 100}
           />
         </div>

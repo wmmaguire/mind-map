@@ -54,7 +54,7 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
 - `client/src/components/FileUpload.js`
   - Upload modal; posts `multipart/form-data` to **`POST /api/upload`** and associates each upload with the current session. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
-  - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization.
+  - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization. Desktop: **resizable** sidebar width (persisted in **`localStorage`**), collapsible **Files** / **Graphs** sections (persisted), clear **Library** header. Narrow viewports: **left icon rail** opens the panel (GitHub **#25**).
 - `client/src/components/GraphVisualization.js`
   - D3 force graph rendering + interaction model (select, zoom, edit, delete, generate).
 - `client/src/setupPolyfills.js`
