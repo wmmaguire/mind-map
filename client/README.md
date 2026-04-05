@@ -49,8 +49,8 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
   - **`getApiOrigin()` / `apiUrl()`** — single module for backend base URL (see [API base URL](#api-base-url) below).
 - `client/src/context/SessionContext.jsx`
   - **`SessionProvider` / `useSession()`** — creates or restores the browser session (`POST /api/sessions`), persists `sessionId` in `sessionStorage` for refresh, and sends session end via `sendBeacon` on unload. Wraps the app in `client/src/index.js`.
-- `client/src/components/Landing.js`
-  - Feedback UI (session id comes from context).
+- `client/src/components/GiveFeedbackControl.jsx`
+  - App-shell **Give Feedback** FAB + modal for **`POST /api/feedback`** (GitHub **#23**): single mount in **`App.js`**, **`apiRequest`**, safe-area insets, Escape / basic dialog a11y. Post–#23 follow-ups: **#24** (tests), **#50** (toast), **#52** (z-index vs library UI) — see **`docs/github-backlog-issues.md`**.
 - `client/src/components/FileUpload.js`
   - Upload modal; posts `multipart/form-data` to **`POST /api/upload`** and associates each upload with the current session. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
@@ -131,7 +131,7 @@ Key operations are logged via:
 
 - `POST /api/operations` (includes `sessionId`, operation type, status, duration, and details)
 
-The landing feedback form posts to **`POST /api/feedback`**; when the session exists in Mongo, the server also records **`UserActivity`** **`FEEDBACK_SUBMIT`** (see **`server/READEME.md`**).
+The feedback form in **`GiveFeedbackControl`** posts to **`POST /api/feedback`**; when the session exists in Mongo, the server also records **`UserActivity`** **`FEEDBACK_SUBMIT`** (see **`server/READEME.md`**).
 
 ## API base URL
 

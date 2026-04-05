@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
-import Landing from './components/Landing';
+import GiveFeedbackControl from './components/GiveFeedbackControl';
 import './App.css';
 
 function App() {
@@ -19,6 +19,7 @@ function App() {
 
   return (
     <div className="App">
+      <GiveFeedbackControl />
       <Routes>
         <Route 
           path="/" 
@@ -67,7 +68,6 @@ function App() {
                   </div>
                 )}
               </div>
-              <Landing />
             </div>
           } 
         />
@@ -76,7 +76,6 @@ function App() {
           element={
             <div>
               <LibraryVisualize />
-              <Landing />
             </div>
           } 
         />

@@ -34,8 +34,8 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - `/visualize`: library + visualization screen
 
 - **Session lifecycle**
-  - `client/src/components/Landing.js` initializes a session by calling `POST /api/sessions`.
-  - The returned session UUID is stored globally as `window.currentSessionId` and used by:
+  - `client/src/context/SessionContext.jsx` (`SessionProvider`) creates or restores a session via `POST /api/sessions`.
+  - The returned session UUID is exposed via `useSession()` and used by:
     - upload requests (`POST /api/upload`)
     - analysis requests (`POST /api/analyze`)
     - telemetry (`POST /api/operations`)

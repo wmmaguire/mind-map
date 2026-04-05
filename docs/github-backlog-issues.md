@@ -29,7 +29,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #37–#38 | NF—Graph intelligence | Growth modes + discovery epics |
 | #39 | NF—Social | Sharing & collaboration epic |
 | #40 | NF—Polish | Dynamic UI / UX epic |
-| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**. |
+| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking). |
 
 **Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency), **#45** (`UserActivity` ops: volume / retention / indexes).
 
@@ -43,6 +43,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** Client **#22** (merged on branch `issue-22-unify-loading-errors`) adds **`client/src/api/http.js`** — `apiRequest()`, `ApiError`, `getApiErrorMessage()`, `isNetworkError()` — so all prior `fetch('/api/...')` call sites share **`apiUrl()`** from `config.js` and consistent JSON error bodies. Jest tests: **`client/src/api/http.test.js`**. This addresses **transport-level** loading/error consistency; UI-level work is tracked separately.
 
+**Note:** Client **#23** — **`GiveFeedbackControl`** (`client/src/components/GiveFeedbackControl.jsx` + `.css`): app-shell **FAB** (bottom-right, safe-area insets) and **modal** for **`POST /api/feedback`**; mounted **once** in **`App.js`**; Escape to close, focus to close button on open, focus return to FAB; inline thanks (no `alert`). **`Landing.js`** removed. Does **not** include a strict **focus trap** (Tab stays in dialog), shared **toast** for success, or automated UI tests — see table below.
+
 | Follow-up (outside #22 scope) | GitHub issue |
 |-------------------------------|--------------|
 | `VisualizationPage` save body uses `data` / `filename`; server expects `graph` + `metadata` | **#49** |
@@ -51,5 +53,12 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | Batch analyze: partial success, per-file errors (`Promise.all` → `allSettled`) | **#48** (existing) |
 | E2E / integration tests (mock `apiRequest` or MSW) | **#24** (existing) |
 | File list skeleton + empty states (loading UX beyond API errors) | **#26** (existing) |
+
+| Follow-up (outside #23 scope) | GitHub issue |
+|-------------------------------|--------------|
+| Strict focus trap (Tab cycles only inside feedback dialog) | **#50** (shared shell / notifications) or future a11y pass |
+| Success UX via shared toast/snackbar instead of inline thanks | **#50** (existing) |
+| E2E or component test: open FAB → submit feedback (`apiRequest` mock) | **#24** (existing) |
+| Z-index / stacking: FAB vs `LibraryVisualize` sidebar & other modals | **#52** |
 
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*
