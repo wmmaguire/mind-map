@@ -83,7 +83,9 @@ const corsOptions = {
     }
     return callback(null, true);
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
+  // Include DELETE (and PUT/PATCH) so dev clients using REACT_APP_API_URL / config
+  // getApiOrigin() → http://localhost:5001 can call file delete and other mutations.
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
