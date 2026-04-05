@@ -15,8 +15,8 @@ const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 480;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
-/** Space reserved for the "Visualization: …" title row above the graph. */
-const VISUALIZATION_HEADER_PX = 44;
+/** Space reserved for the "Visualization: …" title row above the graph (compact bar). */
+const VISUALIZATION_HEADER_PX = 28;
 
 function readStoredSidebarWidth() {
   try {
