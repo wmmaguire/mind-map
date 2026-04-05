@@ -25,7 +25,7 @@ const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 480;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
-/** Space reserved for the "Visualization: …" title row (border, padding, bold title). */
+/** Space reserved for the graph title row (border, padding, bold title). */
 const VISUALIZATION_HEADER_PX = 40;
 
 function readStoredSidebarWidth() {
@@ -60,6 +60,8 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [deletingFiles, setDeletingFiles] = useState(false);
+  /** Fixed toast after delete (mirrors App upload success banner). */
+  const [deleteToast, setDeleteToast] = useState(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [fileSort, setFileSort] = useState(FILE_SORT_NAME_ASC);
   const [savedGraphs, setSavedGraphs] = useState([]);
@@ -137,6 +139,12 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     if (fileRefreshToken === 0) return;
     fetchFiles();
   }, [fileRefreshToken, fetchFiles]);
+
+  useEffect(() => {
+    if (!deleteToast) return;
+    const id = setTimeout(() => setDeleteToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [deleteToast]);
 
   useEffect(() => {
     try {
@@ -247,9 +255,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       return;
     }
     setDeletingFiles(true);
-    setError(null);
     try {
       const list = Array.from(selectedFiles);
+      const n = list.length;
       for (const file of list) {
         const path = `/api/files/${encodeURIComponent(file.filename)}?sessionId=${encodeURIComponent(sessionId)}`;
         await apiRequest(path, { method: 'DELETE' });
@@ -258,9 +266,19 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       setGraphData(null);
       setCurrentSource(null);
       await fetchFiles();
+      setDeleteToast({
+        type: 'success',
+        message:
+          n === 1
+            ? 'File deleted successfully.'
+            : `${n} files deleted successfully.`,
+      });
     } catch (error) {
       console.error('Delete files:', error);
-      setError(`Failed to delete file(s): ${getApiErrorMessage(error)}`);
+      setDeleteToast({
+        type: 'error',
+        message: `Could not delete file(s): ${getApiErrorMessage(error)}`,
+      });
       await fetchFiles();
     } finally {
       setDeletingFiles(false);
@@ -542,6 +560,14 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     <div
       className={`library-visualize${isMobile && !showSidebar ? ' library-visualize--rail' : ''}`}
     >
+      {deleteToast && (
+        <div
+          className={`library-file-action-toast library-file-action-toast--${deleteToast.type}`}
+          role={deleteToast.type === 'error' ? 'alert' : 'status'}
+        >
+          {deleteToast.message}
+        </div>
+      )}
       {isMobile && !showSidebar && (
         <button
           type="button"
@@ -878,7 +904,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
       <div className="visualization-panel">
         <div className="visualization-header">
-          <h3>Visualization: {currentSource?.name || 'Unnamed Graph'}</h3>
+          <h3>{currentSource?.name || 'Unnamed Graph'}</h3>
         </div>
         <div className="graph-container library-graph-mount">
           <GraphVisualization

@@ -6,6 +6,48 @@
   overflow: hidden;
 }
 
+/* Delete success/error — align with App `.app-upload-success` (z-index, position) */
+.library-file-action-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1350;
+  max-width: min(90vw, 28rem);
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+  animation: library-toast-in 0.25s ease-out;
+}
+
+@keyframes library-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.library-file-action-toast--success {
+  color: #166534;
+  background-color: #ecfdf5;
+  border: 1px solid #c6f6d5;
+}
+
+.library-file-action-toast--error {
+  color: #991b1b;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
 /* Left edge rail: open library on small viewports (GitHub #25) */
 .library-mobile-rail {
   position: fixed;
