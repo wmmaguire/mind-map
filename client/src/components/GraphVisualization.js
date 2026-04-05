@@ -1204,6 +1204,9 @@ function GraphVisualization({ data, onDataUpdate }) {
       simulation.stop();
       tooltip.remove();
     };
+    // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
+    // would re-run the full simulation on every render where those identities change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
   }, [data, selectedNodes, isAddingRelationship, isDeleteMode, width, height]);
 
   const handleGenerate = async (event) => {

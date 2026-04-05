@@ -139,7 +139,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Error handling
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Error:', err);
   res.status(500).json({
     success: false,
@@ -166,7 +166,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Error handling middleware - must be last
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Global error handler:', err);
   res.status(500).json({ 
     error: 'Something went wrong!',

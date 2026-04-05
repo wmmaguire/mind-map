@@ -63,7 +63,8 @@ npm run start
 
 - Frontend code can be modified in the `client/src` directory.
 - Backend code can be modified in the `server` directory.
-- Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or `npm test -- --watchAll=false` once. See **`client/README.md`** → *Testing (Jest)* for router/d3 setup details.
+- **Lint (client + server):** from the repo root, run **`npm run lint`** (`eslint` in `client/src` and `server/`). Server uses **`server/eslint.config.mjs`** (ESLint 9 flat config, **Node** globals).
+- Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or **`npm run test:ci`** / `npm test -- --watchAll=false` once. Router/d3 Jest setup, integration tests, and manual E2E: **`client/README.md`** → *Testing (Jest)* (GitHub **#24**).
 - **Client HTTP layer:** JSON and upload calls use **`apiRequest()`** in **`client/src/api/http.js`** (shared base URL, error bodies, network messaging; GitHub **#22**). See **`client/README.md`** → *HTTP client*.
 - **Give Feedback:** FAB + modal in **`client/src/components/GiveFeedbackControl.jsx`**, mounted once from **`App.js`** (GitHub **#23**).
 - The backend will automatically restart when changes are made to the backend code.

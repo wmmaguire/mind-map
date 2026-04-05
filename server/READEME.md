@@ -17,7 +17,7 @@ Server runtime and tooling are defined in `server/package.json`.
 Dev dependencies:
 
 - **nodemon**: hot-reload for `npm run dev`
-- **eslint** (+ config files): linting
+- **eslint** (`eslint.config.mjs`): ESLint 9 **flat** config; **`globals.node`** so `process` and other Node builtins resolve (this package has no React/JSX). From the repo root, **`npm run lint`** runs `eslint` for both `client/` and `server/`.
 
 ## Environment variables (required)
 
