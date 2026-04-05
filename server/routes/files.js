@@ -258,4 +258,86 @@ router.get('/files/:filename', async (req, res) => {
   }
 });
 
+router.delete('/files/:filename', async (req, res) => {
+  const sessionId = req.query.sessionId;
+  if (!sessionId || typeof sessionId !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: 'sessionId query parameter is required',
+    });
+  }
+
+  let filename;
+  try {
+    filename = decodeURIComponent(req.params.filename);
+  } catch {
+    return res.status(400).json({ success: false, error: 'Invalid filename' });
+  }
+
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ success: false, error: 'Invalid filename' });
+  }
+
+  const metadataPath = path.join(metadataDir, `${filename}.json`);
+  const uploadPath = path.join(uploadsDir, filename);
+
+  let meta;
+  try {
+    const raw = await fs.readFile(metadataPath, 'utf8');
+    meta = JSON.parse(raw);
+  } catch {
+    return res.status(404).json({
+      success: false,
+      error: 'File not found',
+    });
+  }
+
+  if (meta.sessionId !== sessionId) {
+    return res.status(403).json({
+      success: false,
+      error: 'You can only delete files uploaded in this session',
+    });
+  }
+
+  try {
+    await fs.unlink(uploadPath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      console.error('Delete upload file:', e);
+    }
+  }
+
+  try {
+    await fs.unlink(metadataPath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      console.error('Delete metadata file:', e);
+    }
+  }
+
+  try {
+    await File.findOneAndDelete({ path: uploadPath });
+  } catch (e) {
+    console.error('Delete File document:', e);
+  }
+
+  try {
+    const session = await Session.findOne({ sessionId });
+    if (session) {
+      await recordUserActivity({
+        sessionObjectId: session._id,
+        sessionUuid: sessionId,
+        action: 'FILE_DELETE',
+        status: 'SUCCESS',
+        resourceType: 'File',
+        summary: `Deleted ${meta.customName || meta.originalName || filename}`,
+      });
+    }
+  } catch (e) {
+    console.error('recordUserActivity FILE_DELETE:', e);
+  }
+
+  return res.json({ success: true, filename });
+});
+
 export default router;

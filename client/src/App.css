@@ -112,6 +112,18 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+.app-upload-success {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  margin: 0;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+  border: 1px solid #c6f6d5;
+  font-weight: 600;
+}
+
 .visualize-button {
   display: inline-block;
   padding: 0.8rem 1.5rem;

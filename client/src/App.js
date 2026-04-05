@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
@@ -8,33 +8,54 @@ import './App.css';
 function App() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [fileRefreshToken, setFileRefreshToken] = useState(0);
 
-  const handleUploadComplete = (wasSuccessful) => {
+  const handleUploadComplete = useCallback((wasSuccessful) => {
     setShowUpload(false);
     if (wasSuccessful) {
       setUploadSuccess(true);
+      setFileRefreshToken((t) => t + 1);
       setTimeout(() => setUploadSuccess(false), 3000);
     }
-  };
+  }, []);
+
+  const openUploadModal = useCallback(() => setShowUpload(true), []);
 
   return (
     <div className="App">
       <GiveFeedbackControl />
+      {showUpload && (
+        <FileUpload
+          onUploadSuccess={handleUploadComplete}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
+      {uploadSuccess && (
+        <div className="success-message app-upload-success" role="status">
+          File uploaded successfully!
+        </div>
+      )}
       <Routes>
-        <Route 
-          path="/" 
-          element={
+        <Route
+          path="/"
+          element={(
             <div className="landing-container">
               <div className="content">
                 <h1>MindMap</h1>
                 <p className="description">
                   Transform your ideas into interactive visual networks
                 </p>
-                
+
                 <div className="features-grid">
-                  <div 
-                    className="feature-card" 
-                    onClick={() => setShowUpload(true)}
+                  <div
+                    className="feature-card"
+                    onClick={openUploadModal}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openUploadModal();
+                      }
+                    }}
                     role="button"
                     tabIndex={0}
                   >
@@ -42,9 +63,9 @@ function App() {
                     <h3>Upload</h3>
                     <p>Upload your text files and let AI analyze the connections</p>
                   </div>
-                  
-                  <Link 
-                    to="/visualize" 
+
+                  <Link
+                    to="/visualize"
                     className="feature-card"
                     role="button"
                     tabIndex={0}
@@ -54,30 +75,20 @@ function App() {
                     <p>See your content transformed into interactive network graphs</p>
                   </Link>
                 </div>
-
-                {showUpload && (
-                  <FileUpload 
-                    onUploadSuccess={handleUploadComplete}
-                    onClose={() => setShowUpload(false)}
-                  />
-                )}
-
-                {uploadSuccess && (
-                  <div className="success-message">
-                    File uploaded successfully!
-                  </div>
-                )}
               </div>
             </div>
-          } 
+          )}
         />
-        <Route 
-          path="/visualize" 
-          element={
+        <Route
+          path="/visualize"
+          element={(
             <div>
-              <LibraryVisualize />
+              <LibraryVisualize
+                onOpenUpload={openUploadModal}
+                fileRefreshToken={fileRefreshToken}
+              />
             </div>
-          } 
+          )}
         />
       </Routes>
     </div>

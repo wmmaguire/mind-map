@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
@@ -54,10 +55,14 @@ function readStoredSections() {
   }
 }
 
-function LibraryVisualize() {
+function LibraryVisualize({
+  onOpenUpload = () => {},
+  fileRefreshToken = 0,
+} = {}) {
   const { sessionId } = useSession();
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
+  const [deletingFiles, setDeletingFiles] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [fileSort, setFileSort] = useState(FILE_SORT_NAME_ASC);
   const [savedGraphs, setSavedGraphs] = useState([]);
@@ -108,10 +113,33 @@ function LibraryVisualize() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const fetchFiles = useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      const data = await apiRequest('/api/files');
+      if (data && data.files) {
+        setFiles(data.files);
+      }
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      const msg = getApiErrorMessage(error);
+      setError(
+        `Failed to fetch files: ${msg}${isNetworkError(error) ? ' Check that the API server is running (e.g. port 5001).' : ''}`
+      );
+    } finally {
+      setFilesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchFiles();
     fetchSavedGraphs();
-  }, []);
+  }, [fetchFiles]);
+
+  useEffect(() => {
+    if (fileRefreshToken === 0) return;
+    fetchFiles();
+  }, [fileRefreshToken, fetchFiles]);
 
   useEffect(() => {
     try {
@@ -177,24 +205,6 @@ function LibraryVisualize() {
     []
   );
 
-  const fetchFiles = async () => {
-    setFilesLoading(true);
-    try {
-      const data = await apiRequest('/api/files');
-      if (data && data.files) {
-        setFiles(data.files);
-      }
-    } catch (error) {
-      console.error('Error fetching files:', error);
-      const msg = getApiErrorMessage(error);
-      setError(
-        `Failed to fetch files: ${msg}${isNetworkError(error) ? ' Check that the API server is running (e.g. port 5001).' : ''}`
-      );
-    } finally {
-      setFilesLoading(false);
-    }
-  };
-
   const fetchSavedGraphs = async () => {
     try {
       const data = await apiRequest('/api/graphs');
@@ -229,6 +239,36 @@ function LibraryVisualize() {
   const handleClearFileSelection = useCallback(() => {
     setSelectedFiles(new Set());
   }, []);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedFiles.size === 0 || !sessionId) return;
+    if (
+      !window.confirm(
+        `Delete ${selectedFiles.size} file(s) from your library? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingFiles(true);
+    setError(null);
+    try {
+      const list = Array.from(selectedFiles);
+      for (const file of list) {
+        const path = `/api/files/${encodeURIComponent(file.filename)}?sessionId=${encodeURIComponent(sessionId)}`;
+        await apiRequest(path, { method: 'DELETE' });
+      }
+      setSelectedFiles(new Set());
+      setGraphData(null);
+      setCurrentSource(null);
+      await fetchFiles();
+    } catch (error) {
+      console.error('Delete files:', error);
+      setError(`Failed to delete file(s): ${getApiErrorMessage(error)}`);
+      await fetchFiles();
+    } finally {
+      setDeletingFiles(false);
+    }
+  }, [selectedFiles, sessionId, fetchFiles]);
 
   const handleFileListKeyDown = useCallback((e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -686,18 +726,40 @@ function LibraryVisualize() {
                     ) : (
                       <>
                         <div className="file-list-header">
-                          <span>
+                          <span className="file-list-header__count">
                             Selected: {selectedFiles.size} file
                             {selectedFiles.size === 1 ? '' : 's'}
                           </span>
-                          <button
-                            className="analyze-button"
-                            type="button"
-                            onClick={handleAnalyzeClick}
-                            disabled={analyzing || selectedFiles.size === 0}
-                          >
-                            {analyzing ? 'Analyzing...' : 'Analyze Selected'}
-                          </button>
+                          <div className="file-list-header__actions">
+                            <button
+                              type="button"
+                              className="library-toolbar-btn library-toolbar-btn--add"
+                              onClick={onOpenUpload}
+                            >
+                              <span className="library-toolbar-btn__icon" aria-hidden>
+                                +
+                              </span>
+                              Add new
+                            </button>
+                            <button
+                              type="button"
+                              className="library-toolbar-btn library-toolbar-btn--danger"
+                              onClick={handleDeleteSelected}
+                              disabled={
+                                selectedFiles.size === 0 || deletingFiles
+                              }
+                            >
+                              {deletingFiles ? 'Deleting…' : 'Delete selected'}
+                            </button>
+                            <button
+                              className="library-toolbar-btn library-toolbar-btn--primary"
+                              type="button"
+                              onClick={handleAnalyzeClick}
+                              disabled={analyzing || selectedFiles.size === 0}
+                            >
+                              {analyzing ? 'Analyzing…' : 'Analyze Selected'}
+                            </button>
+                          </div>
                         </div>
                         <ul
                           className="file-list-items"
@@ -995,5 +1057,10 @@ function LibraryVisualize() {
     </div>
   );
 }
+
+LibraryVisualize.propTypes = {
+  onOpenUpload: PropTypes.func,
+  fileRefreshToken: PropTypes.number,
+};
 
 export default LibraryVisualize;
