@@ -242,6 +242,7 @@
 
 .visualization-panel {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -277,6 +278,33 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+}
+
+/*
+ * GraphVisualization.css sets global mobile .graph-container { position:fixed; top:48px; … }
+ * for a legacy shell. Library already has .visualization-header above the graph — that
+ * fixed positioning removes the graph from flow and leaves a ~48px gap. Scope overrides:
+ */
+.library-visualize .library-graph-mount {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 1;
+  min-height: 0;
+}
+
+.library-visualize .library-graph-mount .graph-visualization-container {
+  height: 100% !important;
+  min-height: 0;
+  max-height: 100%;
+  box-sizing: border-box;
 }
 
 .empty-state {

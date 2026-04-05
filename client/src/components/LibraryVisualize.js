@@ -648,7 +648,7 @@ function LibraryVisualize() {
         <div className="visualization-header">
           <h3>Visualization: {currentSource?.name || 'Unnamed Graph'}</h3>
         </div>
-        <div className="graph-container">
+        <div className="graph-container library-graph-mount">
           <GraphVisualization
             data={graphData || { nodes: [], links: [] }}
             onDataUpdate={handleGraphDataUpdate}
