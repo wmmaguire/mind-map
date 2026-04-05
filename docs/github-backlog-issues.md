@@ -29,7 +29,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #37–#38 | NF—Graph intelligence | Growth modes + discovery epics |
 | #39 | NF—Social | Sharing & collaboration epic |
 | #40 | NF—Polish | Dynamic UI / UX epic |
-| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library graph height vs header CSS). |
+| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library graph height vs header CSS); post–**#26**: **#54** (server docs: file delete API + CORS). |
 
 **Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency), **#45** (`UserActivity` ops: volume / retention / indexes).
 
@@ -47,6 +47,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** Client **#25** — Library **sidebar** (resizable width, persisted **Files** / **Graphs** sections), **mobile rail** (`48px` left strip when the panel is closed), **full-viewport** overlay when the library is open on narrow screens, and a **visualization header** (bordered bar, slate grey background `#e2e8f0`, bold centered title) above the graph. **`GraphVisualization`** receives explicit **`width` / `height`**; height subtracts **`VISUALIZATION_HEADER_PX`** (see **#53**). Global mobile rules in **`GraphVisualization.css`** on **`.graph-container`** (`position: fixed`, `top: 48px`, …) target the standalone shell; **Library** uses **`.library-graph-mount`** + **`.library-visualize`** scoped overrides so the graph stays in normal flex layout (no gap under the header). Implementation: **`client/src/components/LibraryVisualize.js`**, **`LibraryVisualize.css`**. Follow-ups: **#27** (scope mobile graph CSS to the standalone route), **#53** (remove header pixel constant), **#52** (z-index vs FAB).
 
+**Note:** Client **#26** — Library **file list** helpers in **`client/src/utils/libraryFileList.js`** (filter, sort, display name; tests: **`libraryFileList.test.js`**). **Files** section: **search**, **sort** (name / upload date), **Select all** (filtered), **Clear selection**, **loading skeleton**, empty states (**Go to home** link, no-search-match + **Clear search**). Toolbar: **+ Add new** (opens app-level **`FileUpload`** from **`App.js`**; **`fileRefreshToken`** refetches list after upload), **Delete selected** (`DELETE /api/files/:filename?sessionId=` — session-scoped; **`UserActivity`** **`FILE_DELETE`**), **Analyze Selected**. **Delete** success/error **toasts** (fixed, auto-dismiss; **`library-file-action-toast`**). Dev **CORS** must allow **`DELETE`** when the client uses **`getApiOrigin()` → `http://localhost:5001`** (cross-origin from `:3000`); implemented in **`server/server.js`**. **Modal z-index:** **`.modal-overlay`** **`1300`** so **`FileUpload`** and save dialogs sit above the mobile library sidebar (**`1200`**); upload success toast **`1350`**. Graph title row shows **`currentSource` name** only (no **“Visualization:”** prefix). **`prop-types`** direct dependency; **`LibraryVisualize.defaultProps`**. Follow-ups: **#50** (unify upload + delete toasts / shared shell), **#52** (full z-index audit incl. FAB vs modals), **#24** (integration tests for delete/upload from library), **#54** (server README for delete + CORS).
+
 **Note:** Client **#24** — Integration baseline is in **`client/src/criticalPath.integration.test.js`** with manual E2E steps in **`client/README.md`**. Remaining automation (browser E2E, upload/analyze/feedback, feedback FAB) is **follow-up** — see issue comments and table row above.
 
 **Note:** Client **#23** — **`GiveFeedbackControl`** (`client/src/components/GiveFeedbackControl.jsx` + `.css`): app-shell **FAB** (bottom-right, safe-area insets) and **modal** for **`POST /api/feedback`**; mounted **once** in **`App.js`**; Escape to close, focus to close button on open, focus return to FAB; inline thanks (no `alert`). **`Landing.js`** removed. Does **not** include a strict **focus trap** (Tab stays in dialog), shared **toast** for success, or automated UI tests — see table below.
@@ -58,7 +60,14 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | `GraphVisualization` D3 `useEffect` `exhaustive-deps` warning (telemetry / delete handlers) | **#51** |
 | Batch analyze: partial success, per-file errors (`Promise.all` → `allSettled`) | **#48** (existing) |
 | E2E / integration tests (mock `apiRequest` or MSW) | **#24** — baseline: **`criticalPath.integration.test.js`** (mocked `fetch`), **`resetSessionBootstrapForTests`**, **`test:ci`** / **`test:integration`**, manual E2E checklist in **`client/README.md`**. **Follow-ups:** browser automation (Playwright/Cypress), upload/analyze/feedback in tests, optional MSW — see issue **#24** comments. |
-| File list skeleton + empty states (loading UX beyond API errors) | **#26** (existing) |
+| File list skeleton + empty states (loading UX beyond API errors) | **#26** (implemented) |
+
+| Follow-up (outside #26 scope) | GitHub issue |
+|-------------------------------|--------------|
+| Unify **upload** success ( **`App`**) and **delete** toasts (**`LibraryVisualize`**) into a shared notification pattern; replace **`window.confirm`** for delete with an accessible dialog | **#50** (shared shell / notifications) |
+| **Z-index** audit: **Give Feedback** FAB/modal vs **Library** vs **`GraphVisualization`** after modal layer **1300** / toast **1350** | **#52** (see issue comment) |
+| Integration / E2E tests: **Add new**, **Delete selected**, toast assertions (**`apiRequest`** or **MSW**) | **#24** |
+| Document **`DELETE /api/files`**, session checks, and **CORS** **`DELETE`** for dev in **`server/READEME.md`** | **#54** |
 
 | Follow-up (outside #23 scope) | GitHub issue |
 |-------------------------------|--------------|

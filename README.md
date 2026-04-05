@@ -67,7 +67,7 @@ npm run start
 - Frontend unit tests (Jest / Testing Library): from `client/`, run `npm test` (watch mode) or **`npm run test:ci`** / `npm test -- --watchAll=false` once. Router/d3 Jest setup, integration tests, and manual E2E: **`client/README.md`** → *Testing (Jest)* (GitHub **#24**).
 - **Client HTTP layer:** JSON and upload calls use **`apiRequest()`** in **`client/src/api/http.js`** (shared base URL, error bodies, network messaging; GitHub **#22**). See **`client/README.md`** → *HTTP client*.
 - **Give Feedback:** FAB + modal in **`client/src/components/GiveFeedbackControl.jsx`**, mounted once from **`App.js`** (GitHub **#23**). Stacking vs Library UI: **#52**.
-- **Library (Visualize):** sidebar resize, mobile rail, visualization header + graph panel — **`client/src/components/LibraryVisualize.js`** (GitHub **#25**); backlog notes in **`docs/github-backlog-issues.md`**.
+- **Library (Visualize):** file list UX (**#26**), sidebar (**#25**), app-level upload modal from **`App.js`**, **`DELETE /api/files`** + CORS — **`client/src/components/LibraryVisualize.js`**, **`server/routes/files.js`**; backlog in **`docs/github-backlog-issues.md`** (follow-ups **#50**, **#52**, **#54**).
 - The backend will automatically restart when changes are made to the backend code.
 - The frontend will automatically restart when changes are made to the frontend code.
 

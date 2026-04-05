@@ -42,7 +42,7 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
 ## Key modules
 
 - `client/src/App.js`
-  - Top-level router and page composition.
+  - Top-level router and page composition. **`FileUpload`** modal and upload-success toast at app root; **`openUploadModal`** and **`fileRefreshToken`** passed to **`LibraryVisualize`** on **`/visualize`** so **Add new** matches the landing **Upload** flow and refetches the file list after upload.
 - `client/src/api/http.js`
   - **`apiRequest`**, **`ApiError`**, **`getApiErrorMessage`**, **`isNetworkError`** — shared JSON API client and consistent loading/error behavior (GitHub **#22**).
 - `client/src/config.js`
@@ -54,7 +54,7 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
 - `client/src/components/FileUpload.js`
   - Upload modal; posts `multipart/form-data` to **`POST /api/upload`** and associates each upload with the current session. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
-  - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization. Desktop: **resizable** sidebar width (persisted in **`localStorage`**), collapsible **Files** / **Graphs** sections (persisted), clear **Library** header. Narrow viewports: **left icon rail** (`48px`) opens the panel; the library can cover the viewport as an overlay when open. A **visualization header** (bordered strip, grey background, bold centered “Visualization: …” title) sits above the graph; **`GraphVisualization`** is passed explicit **`width` / `height`**; height reserves space for that header via **`VISUALIZATION_HEADER_PX`** (follow-up: GitHub **#53**). The graph wrapper uses **`library-graph-mount`** so **scoped CSS** in **`LibraryVisualize.css`** overrides global mobile **`GraphVisualization.css`** rules on **`.graph-container`** that would otherwise break in-flow layout (follow-up: scope those rules in **#27**). GitHub **#25**.
+  - “Library” UI for selecting files, calling analysis, saving/loading graphs, and rendering the visualization. Desktop: **resizable** sidebar width (persisted in **`localStorage`**), collapsible **Files** / **Graphs** sections (persisted), clear **Library** header. Narrow viewports: **left icon rail** (`48px`) opens the panel; the library can cover the viewport as an overlay when open. **Files** list: search, sort, select-all/clear, loading skeleton, empty states; toolbar **+ Add new** / **Delete selected** / **Analyze Selected**; delete success/error **toasts**. Helpers: **`client/src/utils/libraryFileList.js`**. A **visualization header** (bordered strip, grey background, bold title = current graph name) sits above the graph; **`GraphVisualization`** is passed explicit **`width` / `height`**; height reserves space via **`VISUALIZATION_HEADER_PX`** (follow-up: **#53**). The graph wrapper uses **`library-graph-mount`** so **scoped CSS** overrides global mobile **`GraphVisualization.css`** on **`.graph-container`** (follow-up: **#27**). GitHub **#25**, **#26**.
 - `client/src/components/GraphVisualization.js`
   - D3 force graph rendering + interaction model (select, zoom, edit, delete, generate).
 - `client/src/setupPolyfills.js`
