@@ -818,6 +818,7 @@
   flex-shrink: 0;
 }
 
+/* Match Modal.css — above mobile library sidebar (z-index 1200) */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -828,7 +829,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 1300;
 }
 
 .save-dialog {
