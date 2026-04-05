@@ -251,8 +251,9 @@
 /* Scoped so GraphVisualization.css global .visualization-header rules do not add margin/padding */
 .library-visualize .visualization-header {
   margin: 0;
-  padding: 0;
-  border-bottom: 1px solid #eee;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -263,12 +264,12 @@
 
 .library-visualize .visualization-header h3 {
   margin: 0;
-  color: #333;
+  color: #1e293b;
   width: 100%;
   text-align: center;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.25;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
