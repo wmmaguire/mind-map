@@ -55,10 +55,7 @@ function readStoredSections() {
   }
 }
 
-function LibraryVisualize({
-  onOpenUpload = () => {},
-  fileRefreshToken = 0,
-} = {}) {
+function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const { sessionId } = useSession();
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
@@ -1061,6 +1058,11 @@ function LibraryVisualize({
 LibraryVisualize.propTypes = {
   onOpenUpload: PropTypes.func,
   fileRefreshToken: PropTypes.number,
+};
+
+LibraryVisualize.defaultProps = {
+  onOpenUpload: () => {},
+  fileRefreshToken: 0,
 };
 
 export default LibraryVisualize;
