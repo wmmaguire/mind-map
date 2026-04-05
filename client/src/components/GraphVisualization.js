@@ -5,7 +5,12 @@ import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import './GraphVisualization.css';
 
-function GraphVisualization({ data, onDataUpdate }) {
+function GraphVisualization({
+  data,
+  onDataUpdate,
+  width: widthProp,
+  height: heightProp,
+}) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
   const selectedNodeId = useRef(null);
@@ -72,9 +77,9 @@ function GraphVisualization({ data, onDataUpdate }) {
     []
   );
 
-  // Add width and height constants
-  const width = 800;
-  const height = 600;
+  /** Viewport size from parent (e.g. LibraryVisualize); defaults match prior hardcoded SVG size. */
+  const width = widthProp ?? 800;
+  const height = heightProp ?? 600;
 
   // Add new refs without modifying existing state
   const previousZoomRef = useRef(1);
@@ -1690,7 +1695,9 @@ GraphVisualization.propTypes = {
       })
     ).isRequired
   }),
-  onDataUpdate: PropTypes.func
+  onDataUpdate: PropTypes.func,
+  width: PropTypes.number,
+  height: PropTypes.number,
 };
 
 export default GraphVisualization; 

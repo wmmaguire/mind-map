@@ -248,16 +248,23 @@
 }
 
 .visualization-header {
-  padding: 0px;
+  padding: 8px 12px;
   border-bottom: 1px solid #eee;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: 44px;
 }
 
 .visualization-header h3 {
   margin: 0;
   color: #333;
+  width: 100%;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .graph-container {
@@ -1179,5 +1186,22 @@
 
   .library-visualize .visualization-panel {
     padding-bottom: 0 !important;
+  }
+
+  /* Graph area starts right of the fixed library rail; full viewport height */
+  .library-visualize--rail .visualization-panel {
+    margin-left: 48px;
+    width: calc(100% - 48px);
+    max-width: calc(100% - 48px);
+    box-sizing: border-box;
+    min-height: 100dvh;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .library-visualize--rail .graph-container {
+    flex: 1;
+    min-height: 0;
   }
 }

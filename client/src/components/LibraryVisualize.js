@@ -15,6 +15,8 @@ const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 480;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
+/** Space reserved for the "Visualization: …" title row above the graph. */
+const VISUALIZATION_HEADER_PX = 44;
 
 function readStoredSidebarWidth() {
   try {
@@ -446,6 +448,11 @@ function LibraryVisualize() {
     );
   }
 
+  const graphViewportHeight = Math.max(
+    200,
+    dimensions.height - VISUALIZATION_HEADER_PX
+  );
+
   return (
     <div
       className={`library-visualize${isMobile && !showSidebar ? ' library-visualize--rail' : ''}`}
@@ -646,7 +653,7 @@ function LibraryVisualize() {
             data={graphData || { nodes: [], links: [] }}
             onDataUpdate={handleGraphDataUpdate}
             width={graphViewportWidth}
-            height={dimensions.height - 100}
+            height={graphViewportHeight}
           />
         </div>
       </div>
