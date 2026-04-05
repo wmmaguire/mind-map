@@ -29,7 +29,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #37–#38 | NF—Graph intelligence | Growth modes + discovery epics |
 | #39 | NF—Social | Sharing & collaboration epic |
 | #40 | NF—Polish | Dynamic UI / UX epic |
-| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking). |
+| #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library graph height vs header CSS). |
 
 **Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency), **#45** (`UserActivity` ops: volume / retention / indexes).
 
@@ -44,6 +44,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 **Note:** Client **#22** (merged on branch `issue-22-unify-loading-errors`) adds **`client/src/api/http.js`** — `apiRequest()`, `ApiError`, `getApiErrorMessage()`, `isNetworkError()` — so all prior `fetch('/api/...')` call sites share **`apiUrl()`** from `config.js` and consistent JSON error bodies. Jest tests: **`client/src/api/http.test.js`**. This addresses **transport-level** loading/error consistency; UI-level work is tracked separately.
 
 **Note:** **Repo lint** — Root **`npm run lint`** runs ESLint for **`client/src`** and **`server/`**. Server config is **`server/eslint.config.mjs`** (flat config, **`globals.node`**). **`GraphVisualization`** uses a scoped **`eslint-disable-next-line react-hooks/exhaustive-deps`** pending a proper fix tracked in **#51**.
+
+**Note:** Client **#25** — Library **sidebar** (resizable width, persisted **Files** / **Graphs** sections), **mobile rail** (`48px` left strip when the panel is closed), **full-viewport** overlay when the library is open on narrow screens, and a **visualization header** (bordered bar, slate grey background `#e2e8f0`, bold centered title) above the graph. **`GraphVisualization`** receives explicit **`width` / `height`**; height subtracts **`VISUALIZATION_HEADER_PX`** (see **#53**). Global mobile rules in **`GraphVisualization.css`** on **`.graph-container`** (`position: fixed`, `top: 48px`, …) target the standalone shell; **Library** uses **`.library-graph-mount`** + **`.library-visualize`** scoped overrides so the graph stays in normal flex layout (no gap under the header). Implementation: **`client/src/components/LibraryVisualize.js`**, **`LibraryVisualize.css`**. Follow-ups: **#27** (scope mobile graph CSS to the standalone route), **#53** (remove header pixel constant), **#52** (z-index vs FAB).
 
 **Note:** Client **#24** — Integration baseline is in **`client/src/criticalPath.integration.test.js`** with manual E2E steps in **`client/README.md`**. Remaining automation (browser E2E, upload/analyze/feedback, feedback FAB) is **follow-up** — see issue comments and table row above.
 
@@ -64,5 +66,11 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | Success UX via shared toast/snackbar instead of inline thanks | **#50** (existing) |
 | E2E or component test: open FAB → submit feedback (`apiRequest` mock) | Still **backlog** (not in **`criticalPath.integration.test.js`** yet); track under **#24** follow-ups or a future UI test pass. |
 | Z-index / stacking: FAB vs `LibraryVisualize` sidebar & other modals | **#52** |
+
+| Follow-up (outside #25 scope) | GitHub issue |
+|-------------------------------|--------------|
+| Scope **`GraphVisualization.css`** mobile **`.graph-container`** rules to the standalone visualization shell (avoid global `position: fixed` / `top: 48px` affecting embedded Library graph); reduce reliance on **`.library-graph-mount`** `!important` overrides | **#27** (see issue comment) |
+| Replace **`VISUALIZATION_HEADER_PX`** with flex-only layout and/or **`ResizeObserver`** on **`.visualization-header`** so graph dimensions stay aligned with CSS | **#53** |
+| Z-index: **Give Feedback** FAB vs **library rail** / overlay / **`GraphVisualization`** controls | **#52** (existing; see issue comment) |
 
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*
