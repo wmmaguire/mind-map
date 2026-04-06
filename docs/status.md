@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-07
+Last updated: 2026-04-07 (guest identity shell — **#31**)
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -40,6 +40,9 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - analysis requests (`POST /api/analyze`)
     - telemetry (`POST /api/operations`)
     - graph saving metadata
+
+- **Identity (guest — GitHub #31 foundation)**
+  - `client/src/context/IdentityContext.jsx` (`IdentityProvider`, `useIdentity()`) currently exposes guest-only mode; `GuestIdentityBanner` shows a shell notice until registered accounts exist (**#32** / **#33**).
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`

@@ -6,6 +6,7 @@ import {
   SessionProvider,
   resetSessionBootstrapForTests,
 } from './context/SessionContext';
+import { IdentityProvider } from './context/IdentityContext';
 import App from './App';
 
 const sessionId = 'test-session-uuid';
@@ -50,7 +51,9 @@ function renderApp(initialEntries) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <SessionProvider>
-        <App />
+        <IdentityProvider>
+          <App />
+        </IdentityProvider>
       </SessionProvider>
     </MemoryRouter>
   );
@@ -69,6 +72,10 @@ describe('critical path integration (mocked fetch)', () => {
     await waitFor(() => {
       expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
     });
+
+    expect(
+      screen.getByRole('status', { name: /account mode/i })
+    ).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalled();
     const sessionsPost = global.fetch.mock.calls.find(

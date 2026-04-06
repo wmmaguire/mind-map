@@ -77,6 +77,14 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 
 The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SESSION_UPDATE`** (end/duration) so session lifecycle is auditable in Mongo (see **`server/READEME.md`**, GitHub **#16**).
 
+#### Identity (guest) — GitHub **#31** foundation
+
+**Goal**: make it explicit that the app is **guest-first**: a browser **`sessionId`**, not a user account.
+
+1. **`IdentityProvider`** (in **`client/src/index.js`**, inside **`SessionProvider`**) exposes **`useIdentity()`** with `identityKind: 'guest'` and `isRegistered: false` until sign-in / profiles exist.
+2. **`GuestIdentityBanner`** renders on all routes with a short notice; it will hide once **`isRegistered`** is true in a later milestone.
+3. **Guest → registered migration (future):** when accounts and user-scoped APIs land (**#32**, **#33**), the product will define how existing session-scoped files/graphs attach to a new user (e.g. explicit “link this session” after login). Until then, **do not** log API keys or tokens in the client; the guest banner is informational only.
+
 ### 2) Upload flow (file + metadata)
 
 **Goal**: upload source file(s) and associate each with the current session.

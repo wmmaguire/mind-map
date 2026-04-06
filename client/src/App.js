@@ -3,6 +3,7 @@ import { Routes, Route, Link } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
 import GiveFeedbackControl from './components/GiveFeedbackControl';
+import GuestIdentityBanner from './components/GuestIdentityBanner';
 import './App.css';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
 
   return (
     <div className="App">
+      <GuestIdentityBanner />
       <GiveFeedbackControl />
       {showUpload && (
         <FileUpload

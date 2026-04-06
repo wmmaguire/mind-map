@@ -21,7 +21,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #14–#20 | M—Server | CORS/baseDir → … → hybrid persistence docs |
 | #21–#26 | M—Client | Merge, loading, feedback, E2E, sidebar, file list |
 | #27–#30 | M—Client | GraphVisualization (modes, mobile, hierarchy, a11y) — **#27** graph actions UI implemented on branch `issue-27-graph-edit-modes` (see note below) |
-| #31 | NF—Social | Epic: Accounts, profiles & BYO LLM |
+| #31 | NF—Social | Epic: Accounts, profiles & BYO LLM — **foundation:** `IdentityProvider`, `useIdentity()`, `GuestIdentityBanner` (branch `issue-31-guest-identity-foundation`) |
 | #32 | NF—Social | User-scoped file & graph listing APIs |
 | #33 | M—Client | Library + accounts UI |
 | #34–#35 | NF—Input | Audio epic + FileUpload audio UI |

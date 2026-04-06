@@ -5,13 +5,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { SessionProvider } from './context/SessionContext';
+import { IdentityProvider } from './context/IdentityContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
       <SessionProvider>
-        <App />
+        <IdentityProvider>
+          <App />
+        </IdentityProvider>
       </SessionProvider>
     </BrowserRouter>
   </React.StrictMode>
