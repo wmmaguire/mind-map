@@ -470,24 +470,21 @@
 /* Scoped so GraphVisualization.css global .visualization-header rules do not add margin/padding */
 .library-visualize .visualization-header {
   margin: 0;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border: 1px solid #cbd5e1;
   background: #e2e8f0;
-  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
   box-sizing: border-box;
-  min-height: 52px;
+  min-height: 0;
 }
 
 .library-visualize .visualization-header h3 {
   margin: 0;
   color: #1e293b;
   width: 100%;
-  padding: 0 120px;
-  box-sizing: border-box;
   text-align: center;
   font-size: 1rem;
   font-weight: 700;
@@ -495,19 +492,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Actions FAB portaled from GraphVisualization (#27); keep title centered, FAB top-right */
-.library-visualize .visualization-header__graph-fab-slot {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  z-index: 2;
-  pointer-events: auto;
 }
 
 .graph-container {
@@ -541,6 +525,16 @@
   min-height: 0;
   max-height: 100%;
   box-sizing: border-box;
+}
+
+/* Actions FAB: top-right of graph/SVG area, not the title bar (GraphVisualization #27) */
+.library-visualize .library-graph-mount .graph-actions-fab--library-graph-mount {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
+  left: auto;
+  bottom: auto;
+  z-index: 1190;
 }
 
 .empty-state {

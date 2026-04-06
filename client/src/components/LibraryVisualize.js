@@ -25,8 +25,8 @@ const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 480;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
-/** Space reserved for the visualization header (title row + Actions FAB slot; border/padding). */
-const VISUALIZATION_HEADER_PX = 52;
+/** Space reserved for the graph title row (border, padding, bold title). */
+const VISUALIZATION_HEADER_PX = 40;
 
 function readStoredSidebarWidth() {
   try {
@@ -86,11 +86,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     () => readStoredSections().graphs
   );
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  /** DOM node for portaling GraphVisualization Actions FAB into the visualization header. */
-  const [graphActionsFabHost, setGraphActionsFabHost] = useState(null);
-  const graphActionsFabHostRef = useCallback((node) => {
-    setGraphActionsFabHost(node);
-  }, []);
 
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
@@ -910,14 +905,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       <div className="visualization-panel">
         <div className="visualization-header">
           <h3>{currentSource?.name || 'Unnamed Graph'}</h3>
-          <div
-            className="visualization-header__graph-fab-slot"
-            ref={graphActionsFabHostRef}
-          />
         </div>
         <div className="graph-container library-graph-mount">
           <GraphVisualization
-            graphActionsFabHost={graphActionsFabHost}
+            actionsFabPlacement="libraryGraphMount"
             data={graphData || { nodes: [], links: [] }}
             onDataUpdate={handleGraphDataUpdate}
             width={graphViewportWidth}

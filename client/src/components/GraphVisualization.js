@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
@@ -11,8 +10,11 @@ function GraphVisualization({
   onDataUpdate,
   width: widthProp,
   height: heightProp,
-  /** When set (e.g. Library header slot), the Actions FAB is portaled here instead of fixed in the graph. */
-  graphActionsFabHost = null,
+  /**
+   * `fixedViewport`: FAB fixed to window top-right (default).
+   * `libraryGraphMount`: FAB absolutely positioned top-right of the graph container (Library + SVG).
+   */
+  actionsFabPlacement = 'fixedViewport',
 }) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
@@ -1665,7 +1667,9 @@ function GraphVisualization({
       ref={graphActionsFabRef}
       type="button"
       className={`graph-actions-fab${
-        graphActionsFabHost ? ' graph-actions-fab--embedded' : ''
+        actionsFabPlacement === 'libraryGraphMount'
+          ? ' graph-actions-fab--library-graph-mount'
+          : ''
       }`}
       onClick={e => {
         e.stopPropagation();
@@ -2061,9 +2065,7 @@ function GraphVisualization({
       )}
 
       <svg ref={svgRef} className="graph-visualization"></svg>
-      {graphActionsFabHost
-        ? createPortal(actionsFabButton, graphActionsFabHost)
-        : actionsFabButton}
+      {actionsFabButton}
     </div>
   );
 }
@@ -2100,12 +2102,7 @@ GraphVisualization.propTypes = {
   onDataUpdate: PropTypes.func,
   width: PropTypes.number,
   height: PropTypes.number,
-  graphActionsFabHost: PropTypes.oneOfType([
-    PropTypes.instanceOf(
-      typeof Element !== 'undefined' ? Element : Object
-    ),
-    PropTypes.oneOf([null]),
-  ]),
+  actionsFabPlacement: PropTypes.oneOf(['fixedViewport', 'libraryGraphMount']),
 };
 
 export default GraphVisualization; 
