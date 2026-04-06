@@ -33,6 +33,11 @@ function GraphVisualization({
   /** Labels-only hint on Add Concept modal (ids of nodes the new concept will link to). */
   const [pendingConnectIdsForAddForm, setPendingConnectIdsForAddForm] = useState([]);
   const [graphActionMenu, setGraphActionMenu] = useState(null);
+  /** Collapsible Actions menu sections (Generate vs Edit), like Library sidebar accordions */
+  const [graphActionMenuSectionsOpen, setGraphActionMenuSectionsOpen] = useState({
+    generate: true,
+    edit: true,
+  });
 
   const graphActionMenuRef = useRef(null);
   const graphActionsFabRef = useRef(null);
@@ -1704,70 +1709,116 @@ function GraphVisualization({
             <strong>×</strong>, or outside to close. On desktop, right-click the
             graph works too. Keyboard: Escape.
           </div>
-          <div
-            className="graph-action-menu-section"
-            role="group"
-            aria-labelledby="graph-action-menu-section-generate"
+          <section
+            className="graph-action-menu-section graph-action-menu-section--collapsible"
+            aria-labelledby="graph-action-menu-section-generate-label"
           >
-            <div
-              className="graph-action-menu-section-label"
-              id="graph-action-menu-section-generate"
+            <h3
+              className="graph-action-menu-section-heading"
+              id="graph-action-menu-section-generate-label"
             >
-              Generate (AI)
-            </div>
-            <button
-              type="button"
-              className="generate-button"
-              onClick={onMenuPickGenerate}
-              aria-describedby="graph-action-menu-section-generate"
-            >
-              Generate Nodes
-            </button>
-          </div>
+              <button
+                type="button"
+                className="graph-action-menu-section-toggle"
+                onClick={() =>
+                  setGraphActionMenuSectionsOpen(prev => ({
+                    ...prev,
+                    generate: !prev.generate,
+                  }))
+                }
+                aria-expanded={graphActionMenuSectionsOpen.generate}
+                aria-controls="graph-action-menu-panel-generate"
+              >
+                <span className="graph-action-menu-section-chevron" aria-hidden>
+                  {graphActionMenuSectionsOpen.generate ? '▼' : '▶'}
+                </span>
+                Generate (AI)
+              </button>
+            </h3>
+            {graphActionMenuSectionsOpen.generate && (
+              <div
+                id="graph-action-menu-panel-generate"
+                className="graph-action-menu-section-body"
+                role="group"
+                aria-label="Generate with AI"
+              >
+                <button
+                  type="button"
+                  className="generate-button"
+                  onClick={onMenuPickGenerate}
+                >
+                  Generate Nodes
+                </button>
+              </div>
+            )}
+          </section>
           <div className="graph-action-menu-divider" aria-hidden="true" />
-          <div
-            className="graph-action-menu-section"
-            role="group"
-            aria-labelledby="graph-action-menu-section-edit"
+          <section
+            className="graph-action-menu-section graph-action-menu-section--collapsible"
+            aria-labelledby="graph-action-menu-section-edit-label"
           >
-            <div
-              className="graph-action-menu-section-label"
-              id="graph-action-menu-section-edit"
+            <h3
+              className="graph-action-menu-section-heading"
+              id="graph-action-menu-section-edit-label"
             >
-              Edit graph
-            </div>
-            <button
-              type="button"
-              className="add-node-button"
-              onClick={onMenuPickAddNode}
-              aria-describedby="graph-action-menu-section-edit"
-            >
-              Add Node
-            </button>
-            <button
-              type="button"
-              className="add-relationship-button"
-              onClick={onMenuPickAddRelationship}
-              aria-describedby="graph-action-menu-relationship-hint"
-            >
-              Add Relationship
-            </button>
-            <button
-              type="button"
-              className="delete-button"
-              onClick={onMenuPickDelete}
-            >
-              Delete
-            </button>
-            <p
-              className="graph-action-menu-link-hint"
-              id="graph-action-menu-relationship-hint"
-            >
-              To add a link between two ideas, select both on the graph (two
-              highlights), open Actions, then tap Add Relationship and describe
-              the connection.
-            </p>
-          </div>
+              <button
+                type="button"
+                className="graph-action-menu-section-toggle"
+                onClick={() =>
+                  setGraphActionMenuSectionsOpen(prev => ({
+                    ...prev,
+                    edit: !prev.edit,
+                  }))
+                }
+                aria-expanded={graphActionMenuSectionsOpen.edit}
+                aria-controls="graph-action-menu-panel-edit"
+              >
+                <span className="graph-action-menu-section-chevron" aria-hidden>
+                  {graphActionMenuSectionsOpen.edit ? '▼' : '▶'}
+                </span>
+                Edit graph
+              </button>
+            </h3>
+            {graphActionMenuSectionsOpen.edit && (
+              <div
+                id="graph-action-menu-panel-edit"
+                className="graph-action-menu-section-body"
+                role="group"
+                aria-label="Edit graph structure"
+              >
+                <button
+                  type="button"
+                  className="add-node-button"
+                  onClick={onMenuPickAddNode}
+                >
+                  Add Node
+                </button>
+                <button
+                  type="button"
+                  className="add-relationship-button"
+                  onClick={onMenuPickAddRelationship}
+                  aria-describedby="graph-action-menu-relationship-hint"
+                >
+                  Add Relationship
+                </button>
+                <button
+                  type="button"
+                  className="delete-button"
+                  onClick={onMenuPickDelete}
+                >
+                  Delete
+                </button>
+                <p
+                  className="graph-action-menu-link-hint"
+                  id="graph-action-menu-relationship-hint"
+                >
+                  To add a link between two ideas, select both on the graph (two
+                  highlights), open Actions, then tap Add Relationship and describe
+                  the connection.
+                </p>
+              </div>
+            )}
+          </section>
         </div>
       )}
 

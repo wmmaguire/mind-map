@@ -160,17 +160,56 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0 0 6px;
+  padding: 0 0 4px;
 }
 
-.graph-action-menu-section-label {
+/* Accordion headers — parity with LibraryVisualize .library-section__toggle */
+.graph-action-menu-section-heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.graph-action-menu-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font: inherit;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: #475569;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-action-menu-section-toggle:hover {
+  background: #e2e8f0;
+}
+
+.graph-action-menu-section-toggle:active {
+  background: #cbd5e1;
+}
+
+.graph-action-menu-section-chevron {
+  display: inline-block;
+  width: 1.1rem;
+  flex-shrink: 0;
+  font-size: 0.65rem;
   color: #64748b;
-  padding: 10px 14px 6px;
-  margin: 0;
+}
+
+.graph-action-menu-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 6px 0 8px;
 }
 
 .graph-action-menu-divider {
@@ -198,8 +237,8 @@ svg {
   justify-content: center;
 }
 
-.graph-action-menu-section .generate-button,
-.graph-action-menu-section .add-node-button {
+.graph-action-menu-section-body .generate-button,
+.graph-action-menu-section-body .add-node-button {
   margin-top: 0;
 }
 

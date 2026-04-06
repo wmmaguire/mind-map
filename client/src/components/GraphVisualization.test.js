@@ -35,6 +35,38 @@ describe('GraphVisualization graph action menu', () => {
     expect(screen.getByText('Edit graph')).toBeInTheDocument();
   });
 
+  it('collapses and expands Generate (AI) via section toggle (accordion)', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open graph actions menu/i })
+    );
+    expect(
+      screen.getByRole('button', { name: /^Generate Nodes$/i })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /^Generate \(AI\)$/i })
+    );
+    expect(
+      screen.queryByRole('button', { name: /^Generate Nodes$/i })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /^Generate \(AI\)$/i })
+    );
+    expect(
+      screen.getByRole('button', { name: /^Generate Nodes$/i })
+    ).toBeInTheDocument();
+  });
+
   it('opens the action menu on context menu (right-click) on the SVG', () => {
     render(
       <GraphVisualization
