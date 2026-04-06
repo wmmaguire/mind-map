@@ -1752,6 +1752,13 @@ function GraphVisualization({
             >
               Add Relationship
             </button>
+            <button
+              type="button"
+              className="delete-button"
+              onClick={onMenuPickDelete}
+            >
+              Delete
+            </button>
             <p
               className="graph-action-menu-link-hint"
               id="graph-action-menu-relationship-hint"
@@ -1760,13 +1767,6 @@ function GraphVisualization({
               highlights), open Actions, then tap Add Relationship and describe
               the connection.
             </p>
-            <button
-              type="button"
-              className="delete-button"
-              onClick={onMenuPickDelete}
-            >
-              Delete
-            </button>
           </div>
         </div>
       )}

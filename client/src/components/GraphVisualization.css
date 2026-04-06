@@ -94,12 +94,15 @@ svg {
   gap: 10px;
   min-width: 220px;
   max-width: min(100vw - 24px, 320px);
+  max-height: min(85vh, 520px);
   padding: 0;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   border: 1px solid #e0e0e0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .graph-action-menu-header {
