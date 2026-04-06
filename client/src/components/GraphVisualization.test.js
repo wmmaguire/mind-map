@@ -1,6 +1,5 @@
 import '../setupPolyfills';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import GraphVisualization from './GraphVisualization';
 
 jest.mock('../context/SessionContext', () => ({
@@ -15,9 +14,8 @@ const minimalData = {
   links: [],
 };
 
-describe('GraphVisualization edit modes', () => {
-  it('makes tool modes mutually exclusive (delete vs add node)', async () => {
-    const user = userEvent.setup();
+describe('GraphVisualization graph action menu', () => {
+  it('opens the action menu from the floating Actions button', () => {
     render(
       <GraphVisualization
         data={minimalData}
@@ -27,22 +25,15 @@ describe('GraphVisualization edit modes', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /Delete/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open graph actions menu/i })
+    );
     expect(
-      screen.getByText(/Click on a node or relationship to delete/i)
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /Add Node/i }));
-    expect(
-      screen.queryByText(/Click on a node or relationship to delete/i)
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /Add New Concept/i })
+      screen.getByRole('menu', { name: /Graph actions/i })
     ).toBeInTheDocument();
   });
 
-  it('clears edit modes on Escape', async () => {
-    const user = userEvent.setup();
+  it('opens the action menu on context menu (right-click) on the SVG', () => {
     render(
       <GraphVisualization
         data={minimalData}
@@ -52,36 +43,64 @@ describe('GraphVisualization edit modes', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /Add Node/i }));
+    const svg = document.querySelector('.graph-visualization');
+    expect(svg).toBeTruthy();
+    fireEvent.contextMenu(svg, { clientX: 120, clientY: 140, bubbles: true });
+
+    expect(
+      screen.getByRole('menu', { name: /Graph actions/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Generate Nodes$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Add Node$/i })
+    ).toBeInTheDocument();
+  });
+
+  it('closes the action menu on Escape', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    fireEvent.contextMenu(svg, { clientX: 120, clientY: 140, bubbles: true });
+    expect(
+      screen.getByRole('menu', { name: /Graph actions/i })
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(
+      screen.queryByRole('menu', { name: /Graph actions/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('still closes add-node modal on Escape', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    fireEvent.contextMenu(svg, { clientX: 120, clientY: 140, bubbles: true });
+    fireEvent.click(screen.getByRole('button', { name: /^Add Node$/i }));
+
     expect(
       screen.getByRole('heading', { name: /Add New Concept/i })
     ).toBeInTheDocument();
 
-    await user.keyboard('{Escape}');
+    fireEvent.keyDown(window, { key: 'Escape' });
     expect(
       screen.queryByRole('heading', { name: /Add New Concept/i })
     ).not.toBeInTheDocument();
-  });
-
-  it('turns off Add Relationship when opening Add Node', async () => {
-    const user = userEvent.setup();
-    render(
-      <GraphVisualization
-        data={minimalData}
-        onDataUpdate={jest.fn()}
-        width={800}
-        height={600}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /Add Relationship/i }));
-    const relBtn = screen.getByRole('button', { name: /Add Relationship/i });
-    expect(relBtn).toHaveClass('active');
-
-    await user.click(screen.getByRole('button', { name: /Add Node/i }));
-    expect(relBtn).not.toHaveClass('active');
-    expect(
-      screen.getByRole('heading', { name: /Add New Concept/i })
-    ).toBeInTheDocument();
   });
 });

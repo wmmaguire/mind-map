@@ -93,6 +93,106 @@ svg {
   margin-bottom: 15px;
 }
 
+/* Floating menu: Actions FAB, long-press, or right-click on the graph */
+.graph-action-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+  max-width: min(100vw - 24px, 320px);
+  padding: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.graph-action-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.graph-action-menu-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+}
+
+.graph-action-menu-close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin: -4px -6px -4px 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #555;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.graph-action-menu-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #111;
+}
+
+.graph-action-menu-close:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.graph-action-menu-hint {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.35;
+  margin: 0;
+  padding: 8px 12px 0;
+}
+
+.graph-action-menu .generate-button,
+.graph-action-menu .add-node-button,
+.graph-action-menu .add-relationship-button,
+.graph-action-menu .delete-button {
+  width: calc(100% - 24px);
+  margin-left: 12px;
+  margin-right: 12px;
+  justify-content: center;
+}
+
+.graph-action-menu .generate-button {
+  margin-top: 8px;
+}
+
+.graph-action-menu .delete-button {
+  margin-bottom: 12px;
+}
+
+.add-node-connect-hint {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.45;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #f0f7ff;
+  border-radius: 8px;
+  border: 1px solid #cfe2ff;
+}
+
+.connect-new-node-lead {
+  font-size: 14px;
+  color: #333;
+  margin: 0 0 10px;
+}
+
 .add-node-button,
 .add-relationship-button,
 .delete-button,
@@ -717,10 +817,64 @@ svg {
 
 /* Update graph container and visualization styles */
 .graph-visualization-container {
+  position: relative;
   height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* Top-right: avoids Give feedback FAB (bottom-right). z-index below LibraryVisualize
+   mobile full-screen sidebar (1200) so sidebar-header / close stay tappable. */
+.graph-actions-fab {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  top: max(12px, env(safe-area-inset-top, 0px));
+  z-index: 1190;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  min-height: 48px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(145deg, #4a90e2 0%, #357abd 100%);
+  box-shadow:
+    0 4px 14px rgba(74, 144, 226, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.graph-actions-fab:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(74, 144, 226, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.graph-actions-fab:active {
+  transform: translateY(0);
+}
+
+.graph-actions-fab-icon {
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.95;
+}
+
+.graph-actions-fab-label {
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 380px) {
+  .graph-actions-fab {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
 }
 
 .graph-container {

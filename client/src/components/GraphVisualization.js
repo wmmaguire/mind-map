@@ -23,18 +23,23 @@ function GraphVisualization({
     description: '',
     wikiUrl: ''
   });
-  const [isAddingRelationship, setIsAddingRelationship] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState([]);
   const [relationshipForm, setRelationshipForm] = useState({
     show: false,
     relationship: ''
   });
-  const [isDeleteMode, setIsDeleteMode] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [dimensions, setDimensions] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight
-  });
+  /** After Add Node, prompt for one relationship per highlighted id (see connectNewNodeToIdsRef). */
+  const [connectNewNodeLinksForm, setConnectNewNodeLinksForm] = useState(null);
+  /** Labels-only hint on Add Concept modal (ids of nodes the new concept will link to). */
+  const [pendingConnectIdsForAddForm, setPendingConnectIdsForAddForm] = useState([]);
+  const [graphActionMenu, setGraphActionMenu] = useState(null);
+
+  const graphActionMenuRef = useRef(null);
+  const graphActionsFabRef = useRef(null);
+  const graphActionSnapshotRef = useRef({ nodeIds: [], relationshipNodes: [] });
+  const generateSourceIdsRef = useRef(null);
+  /** Node ids (from menu snapshot) to connect after "Add Node" submit; cleared after use. */
+  const connectNewNodeToIdsRef = useRef([]);
 
   const { sessionId } = useSession();
   const sessionIdRef = useRef(sessionId);
@@ -44,13 +49,76 @@ function GraphVisualization({
   const exitGraphEditModes = useCallback(() => {
     setShowAddForm(false);
     setShowGenerateForm(false);
-    setIsAddingRelationship(false);
-    setIsDeleteMode(false);
     setRelationshipForm({ show: false, relationship: '' });
+    setConnectNewNodeLinksForm(null);
+    setPendingConnectIdsForAddForm([]);
+    connectNewNodeToIdsRef.current = [];
     setSelectedNodes([]);
     selectedNodeIds.current.clear();
     selectedNodeId.current = null;
+    setGraphActionMenu(null);
+    generateSourceIdsRef.current = null;
   }, []);
+
+  const captureGraphActionSnapshot = useCallback(() => {
+    const ids = Array.from(selectedNodeIds.current).map(String);
+    const nodesOrdered = ids
+      .map(id => data.nodes.find(n => String(n.id) === id))
+      .filter(Boolean);
+    let linkToDelete = null;
+    if (ids.length === 2) {
+      const [a, b] = ids;
+      linkToDelete =
+        data.links.find(l => {
+          const s = typeof l.source === 'object' ? String(l.source.id) : String(l.source);
+          const t = typeof l.target === 'object' ? String(l.target.id) : String(l.target);
+          return (s === a && t === b) || (s === b && t === a);
+        }) || null;
+    }
+    graphActionSnapshotRef.current = {
+      nodeIds: ids,
+      relationshipNodes: [...selectedNodes],
+      nodesOrdered,
+      linkToDelete,
+    };
+  }, [data, selectedNodes]);
+
+  const openGraphActionMenuAt = useCallback(
+    (clientX, clientY) => {
+      captureGraphActionSnapshot();
+      const w = 260;
+      const h = 300;
+      const x = Math.max(8, Math.min(clientX, window.innerWidth - w - 8));
+      const y = Math.max(8, Math.min(clientY, window.innerHeight - h - 8));
+      setGraphActionMenu({ x, y });
+    },
+    [captureGraphActionSnapshot]
+  );
+
+  const toggleGraphActionsFromFab = useCallback(() => {
+    setGraphActionMenu(prev => {
+      if (prev) return null;
+      captureGraphActionSnapshot();
+      const w = 260;
+      const h = 300;
+      const fab = graphActionsFabRef.current;
+      if (fab) {
+        const r = fab.getBoundingClientRect();
+        let x = r.right - w;
+        let y = r.bottom + 10;
+        if (y + h > window.innerHeight - 8) {
+          y = r.top - h - 10;
+        }
+        x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+        y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
+        return { x, y };
+      }
+      return {
+        x: Math.max(8, (window.innerWidth - w) / 2),
+        y: 100,
+      };
+    });
+  }, [captureGraphActionSnapshot]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -60,6 +128,34 @@ function GraphVisualization({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [exitGraphEditModes]);
+
+  useEffect(() => {
+    if (!graphActionMenu) return undefined;
+    const onDocPointerDown = (e) => {
+      const t = e.target;
+      if (graphActionMenuRef.current?.contains(t)) return;
+      if (graphActionsFabRef.current?.contains(t)) return;
+      setGraphActionMenu(null);
+    };
+    document.addEventListener('mousedown', onDocPointerDown);
+    document.addEventListener('touchstart', onDocPointerDown, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', onDocPointerDown);
+      document.removeEventListener('touchstart', onDocPointerDown);
+    };
+  }, [graphActionMenu]);
+
+  /** Right-click opens the graph actions menu (same as Actions). No long-press on the canvas. */
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return undefined;
+    const onContextMenu = (e) => {
+      e.preventDefault();
+      openGraphActionMenuAt(e.clientX, e.clientY);
+    };
+    svg.addEventListener('contextmenu', onContextMenu);
+    return () => svg.removeEventListener('contextmenu', onContextMenu);
+  }, [openGraphActionMenuAt]);
 
   const trackOperation = useCallback(
     async (operationType, details, startTime = Date.now(), error = null) => {
@@ -113,19 +209,6 @@ function GraphVisualization({
 
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
-
-  // Add resize listener
-  useEffect(() => {
-    const handleResize = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
@@ -508,23 +591,6 @@ function GraphVisualization({
           return;
         }
 
-        // Handle community clicks
-        if (isAddingRelationship) {
-          const selectedNode = d.nodes[0];
-          if (selectedNode && (selectedNodes.length === 0 || selectedNodes.length === 1)) {
-            setSelectedNodes(prev => [...prev, selectedNode]);
-            if (selectedNodes.length === 1) {
-              setRelationshipForm({ show: true, relationship: '' });
-            }
-          }
-          return;
-        }
-
-        if (isDeleteMode && d.nodes[0]) {
-          handleDeleteNode(d.nodes[0]);
-          return;
-        }
-
         // Clear previous selection
         selectedNodeIds.current.clear();
         
@@ -623,24 +689,19 @@ function GraphVisualization({
       .call(drag);
 
     // Update link selection with click handler
-    const link = g.selectAll('.link-group')
+    g.selectAll('.link-group')
       .data(data.links)
       .join('g')
       .attr('class', 'link-group')
       .on('click', (event, d) => handleLinkClick(event, d));
 
-    // Update visual states based on delete mode
+    // Update visual states
     node.selectAll('circle')
       .data(d => [d])
       .join('circle')
       .attr('r', 20)
       .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? highlightedColor : defaultNodeColor)
-      .classed('selectable', isAddingRelationship)
-      .classed('selected', d => selectedNodes.some(n => n.id === d.id))
-      .classed('deletable', isDeleteMode);
-
-    link.selectAll('.link-line')
-      .classed('deletable', isDeleteMode);
+      .classed('selected', d => selectedNodes.some(n => n.id === d.id));
 
     // Add labels
     node.append('text')
@@ -692,30 +753,6 @@ function GraphVisualization({
     }
 
     function handleLinkClick(event, link) {
-      if (isDeleteMode) {
-        event.preventDefault();
-        event.stopPropagation();
-        const startTime = Date.now();
-        
-        handleDeleteLink(link);
-        
-        // Track the deletion operation
-        trackOperation('DELETE_LINK', {
-          deletedLink: {
-            source: {
-              id: link.source.id,
-              label: link.source.label
-            },
-            target: {
-              id: link.target.id,
-              label: link.target.label
-            },
-            relationship: link.relationship
-          }
-        }, startTime);
-        return;
-      }
-
       selectedNodeIds.current.add(link.source.id);
       selectedNodeIds.current.add(link.target.id);
       updateHighlighting();
@@ -738,43 +775,9 @@ function GraphVisualization({
     }
 
     function handleNodeClick(event, node) {
-      if (isDeleteMode) {
-        event.preventDefault();
-        event.stopPropagation();
-        const startTime = Date.now();
-        
-        // Count affected relationships before deletion
-        const affectedLinks = data.links.filter(l => 
-          l.source.id === node.id || l.target.id === node.id
-        );
-        
-        handleDeleteNode(node);
-        
-        // Track the deletion operation
-        trackOperation('DELETE_NODE', {
-          deletedNode: {
-            id: node.id,
-            label: node.label
-          },
-          affectedRelationships: affectedLinks.length
-        }, startTime);
-        return;
-      }
-
       try {
         if (!node) {
           console.log('No node provided to handleNodeClick');
-          return;
-        }
-
-        // Handle relationship adding mode separately
-        if (isAddingRelationship) {
-          if (selectedNodes.length === 0 || selectedNodes.length === 1) {
-            setSelectedNodes(prev => [...prev, node]);
-            if (selectedNodes.length === 1) {
-              setRelationshipForm({ show: true, relationship: '' });
-            }
-          }
           return;
         }
 
@@ -1065,23 +1068,6 @@ function GraphVisualization({
             return;
           }
 
-          // Handle community clicks
-          if (isAddingRelationship) {
-            const selectedNode = d.nodes[0];
-            if (selectedNode && (selectedNodes.length === 0 || selectedNodes.length === 1)) {
-              setSelectedNodes(prev => [...prev, selectedNode]);
-              if (selectedNodes.length === 1) {
-                setRelationshipForm({ show: true, relationship: '' });
-              }
-            }
-            return;
-          }
-
-          if (isDeleteMode && d.nodes[0]) {
-            handleDeleteNode(d.nodes[0]);
-            return;
-          }
-
           // Clear previous selection
           selectedNodeIds.current.clear();
           
@@ -1233,10 +1219,14 @@ function GraphVisualization({
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, isAddingRelationship, isDeleteMode, width, height]);
+  }, [data, selectedNodes, width, height]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
+    const sourceIdSnapshot =
+      generateSourceIdsRef.current != null
+        ? [...generateSourceIdsRef.current]
+        : Array.from(selectedNodeIds.current).map(String);
     setIsGenerating(true);
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
@@ -1244,9 +1234,9 @@ function GraphVisualization({
     let generatedNodes = [];
 
     try {
-      const selectedNodes = Array.from(selectedNodeIds.current).map(id => 
-        data.nodes.find(node => node.id === id)
-      );
+      const selectedNodes = sourceIdSnapshot
+        .map(id => data.nodes.find(node => String(node.id) === String(id)))
+        .filter(Boolean);
 
       console.log('Selected nodes for generation:', selectedNodes.map(n => `${n.label} (${n.id})`));
 
@@ -1382,14 +1372,15 @@ function GraphVisualization({
       operationError = getApiErrorMessage(error);
       alert('Error generating nodes: ' + getApiErrorMessage(error));
     } finally {
+      generateSourceIdsRef.current = null;
       setIsGenerating(false);
 
       // Track the operation with its final status
       await trackOperation('GENERATE', {
         numNodesRequested: numNodesToAdd,
-        selectedNodes: Array.from(selectedNodeIds.current).map(id => {
-          const node = data.nodes.find(n => n.id === id);
-          return { 
+        selectedNodes: sourceIdSnapshot.map(id => {
+          const node = data.nodes.find(n => String(n.id) === String(id));
+          return {
             id: node?.id || id,
             label: node?.label || 'Unknown Node'
           };
@@ -1405,7 +1396,7 @@ function GraphVisualization({
   const handleAddNodeSubmit = async (e) => {
     e.preventDefault();
     const startTime = Date.now();
-    
+
     const newNode = {
       id: `node_${Date.now()}`,
       label: newNodeData.label,
@@ -1422,6 +1413,14 @@ function GraphVisualization({
       links: [...data.links]
     };
 
+    const idsToConnect = [...connectNewNodeToIdsRef.current];
+    connectNewNodeToIdsRef.current = [];
+    setPendingConnectIdsForAddForm([]);
+
+    const targets = idsToConnect
+      .map(id => newData.nodes.find(n => String(n.id) === String(id)))
+      .filter(Boolean);
+
     onDataUpdate(newData);
     setShowAddForm(false);
     setNewNodeData({ label: '', description: '', wikiUrl: '' });
@@ -1434,6 +1433,77 @@ function GraphVisualization({
         wikiUrl: newNode.wikiUrl
       }
     }, startTime);
+
+    if (targets.length > 0) {
+      setConnectNewNodeLinksForm({
+        newNode,
+        targets,
+        relationshipInputs: targets.map(() => ''),
+      });
+    }
+  };
+
+  const handleConnectNewNodeLinksSubmit = async (e) => {
+    e.preventDefault();
+    if (!connectNewNodeLinksForm) return;
+    const { newNode, targets, relationshipInputs } = connectNewNodeLinksForm;
+    for (let i = 0; i < relationshipInputs.length; i++) {
+      if (!relationshipInputs[i]?.trim()) {
+        window.alert('Please describe the relationship for each highlighted concept.');
+        return;
+      }
+    }
+    const newNodeObj = data.nodes.find(n => String(n.id) === String(newNode.id));
+    if (!newNodeObj) {
+      window.alert('Could not find the new concept in the graph.');
+      setConnectNewNodeLinksForm(null);
+      return;
+    }
+    const newLinks = targets.map((t, i) => {
+      const targetObj = data.nodes.find(n => String(n.id) === String(t.id));
+      return {
+        source: newNodeObj,
+        target: targetObj,
+        relationship: relationshipInputs[i].trim(),
+      };
+    }).filter(l => l.target);
+
+    onDataUpdate({
+      nodes: [...data.nodes],
+      links: [...data.links, ...newLinks],
+    });
+    setConnectNewNodeLinksForm(null);
+
+    for (let i = 0; i < newLinks.length; i++) {
+      const link = newLinks[i];
+      const opStart = Date.now();
+      await trackOperation(
+        'ADD_RELATIONSHIP',
+        {
+          relationship: {
+            sourceNode: {
+              id: link.source.id,
+              label: link.source.label,
+            },
+            targetNode: {
+              id: link.target.id,
+              label: link.target.label,
+            },
+            relationshipType: link.relationship,
+          },
+        },
+        opStart
+      );
+    }
+  };
+
+  const updateConnectNewNodeRelationshipInput = (index, value) => {
+    setConnectNewNodeLinksForm(prev => {
+      if (!prev) return prev;
+      const next = [...prev.relationshipInputs];
+      next[index] = value;
+      return { ...prev, relationshipInputs: next };
+    });
   };
 
   const handleAddRelationship = async (e) => {
@@ -1456,7 +1526,6 @@ function GraphVisualization({
     // Reset states
     setRelationshipForm({ show: false, relationship: '' });
     setSelectedNodes([]);
-    setIsAddingRelationship(false);
 
     await trackOperation('ADD_RELATIONSHIP', {
       relationship: {
@@ -1519,112 +1588,123 @@ function GraphVisualization({
     }
   };
 
+  const onMenuPickGenerate = () => {
+    const snap = graphActionSnapshotRef.current;
+    generateSourceIdsRef.current = [...snap.nodeIds];
+    connectNewNodeToIdsRef.current = [];
+    setPendingConnectIdsForAddForm([]);
+    setGraphActionMenu(null);
+    setShowAddForm(false);
+    setRelationshipForm({ show: false, relationship: '' });
+    setShowGenerateForm(true);
+  };
+
+  const onMenuPickAddNode = () => {
+    const snap = graphActionSnapshotRef.current;
+    const ids = snap.nodeIds.length ? [...snap.nodeIds] : [];
+    connectNewNodeToIdsRef.current = ids;
+    setPendingConnectIdsForAddForm(ids);
+    setGraphActionMenu(null);
+    setShowGenerateForm(false);
+    setRelationshipForm({ show: false, relationship: '' });
+    setShowAddForm(true);
+  };
+
+  const onMenuPickAddRelationship = () => {
+    const snap = graphActionSnapshotRef.current;
+    const pair = snap.nodesOrdered.length >= 2 ? snap.nodesOrdered.slice(0, 2) : [];
+    if (pair.length < 2) {
+      window.alert(
+        'Highlight exactly two nodes (click to select) before adding a relationship.'
+      );
+      setGraphActionMenu(null);
+      return;
+    }
+    setSelectedNodes(pair);
+    setRelationshipForm({ show: true, relationship: '' });
+    setGraphActionMenu(null);
+  };
+
+  const onMenuPickDelete = () => {
+    const snap = graphActionSnapshotRef.current;
+    setGraphActionMenu(null);
+    if (snap.linkToDelete) {
+      handleDeleteLink(snap.linkToDelete);
+      return;
+    }
+    if (snap.nodeIds.length === 1) {
+      const node = data.nodes.find(n => String(n.id) === String(snap.nodeIds[0]));
+      if (node) handleDeleteNode(node);
+      return;
+    }
+    window.alert(
+      'Select one node to delete it, or click a relationship line (or select both endpoints) to delete that relationship.'
+    );
+  };
+
   return (
     <div className="graph-visualization-container">
-      <div className={`controls-panel ${dimensions.width <= 768 ? 'mobile' : ''} ${showSidebar ? 'visible' : 'hidden'}`}>
-        <div 
-          className="controls-header"
-          onClick={() => dimensions.width <= 768 && setShowSidebar(!showSidebar)}
+      {graphActionMenu && (
+        <div
+          id="graph-action-menu"
+          ref={graphActionMenuRef}
+          className="graph-action-menu"
+          style={{
+            position: 'fixed',
+            left: graphActionMenu.x,
+            top: graphActionMenu.y,
+            zIndex: 10020,
+          }}
+          role="menu"
+          aria-labelledby="graph-action-menu-title"
         >
-          <h3>Graph Controls</h3>
-          {dimensions.width <= 768 && (
-            <button 
-              className="controls-toggle"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowSidebar(!showSidebar);
-              }}
-            >
-              {showSidebar ? '×' : '☰'}
-            </button>
-          )}
-        </div>
-        
-        <div className="controls-content">
-          <div className="edit-controls">
+          <div className="graph-action-menu-header">
+            <span className="graph-action-menu-title" id="graph-action-menu-title">
+              Graph actions
+            </span>
             <button
-              className={`generate-button ${showGenerateForm ? 'active' : ''}`}
-              onClick={() => {
-                if (showGenerateForm) {
-                  setShowGenerateForm(false);
-                  return;
-                }
-                setShowAddForm(false);
-                setIsAddingRelationship(false);
-                setIsDeleteMode(false);
-                setRelationshipForm({ show: false, relationship: '' });
-                setSelectedNodes([]);
-                selectedNodeIds.current.clear();
-                selectedNodeId.current = null;
-                setShowGenerateForm(true);
-              }}
+              type="button"
+              className="graph-action-menu-close"
+              onClick={() => setGraphActionMenu(null)}
+              aria-label="Close graph actions menu"
             >
-              Generate Nodes
-            </button>
-            <button
-              className={`add-node-button ${showAddForm ? 'active' : ''}`}
-              onClick={() => {
-                if (showAddForm) {
-                  setShowAddForm(false);
-                  return;
-                }
-                setShowGenerateForm(false);
-                setIsAddingRelationship(false);
-                setIsDeleteMode(false);
-                setRelationshipForm({ show: false, relationship: '' });
-                setSelectedNodes([]);
-                selectedNodeIds.current.clear();
-                selectedNodeId.current = null;
-                setShowAddForm(true);
-              }}
-            >
-              Add Node
-            </button>
-            <button
-              className={`add-relationship-button ${isAddingRelationship ? 'active' : ''}`}
-              onClick={() => {
-                if (isAddingRelationship) {
-                  setIsAddingRelationship(false);
-                  setRelationshipForm({ show: false, relationship: '' });
-                  setSelectedNodes([]);
-                  selectedNodeIds.current.clear();
-                  selectedNodeId.current = null;
-                  return;
-                }
-                setShowAddForm(false);
-                setShowGenerateForm(false);
-                setIsDeleteMode(false);
-                setIsAddingRelationship(true);
-              }}
-            >
-              Add Relationship
-            </button>
-            <button
-              className={`delete-button ${isDeleteMode ? 'active' : ''}`}
-              onClick={() => {
-                if (isDeleteMode) {
-                  setIsDeleteMode(false);
-                  return;
-                }
-                setShowAddForm(false);
-                setShowGenerateForm(false);
-                setIsAddingRelationship(false);
-                setRelationshipForm({ show: false, relationship: '' });
-                setSelectedNodes([]);
-                selectedNodeIds.current.clear();
-                selectedNodeId.current = null;
-                setIsDeleteMode(true);
-              }}
-            >
-              Delete
+              ×
             </button>
           </div>
-        </div>
-      </div>
-
-      {isDeleteMode && (
-        <div className="delete-helper">
-          Click on a node or relationship to delete it
+          <div className="graph-action-menu-hint">
+            Uses your current highlight.{' '}
+            <strong>Tap Actions</strong> (top-right) to open; tap again,{' '}
+            <strong>×</strong>, or outside to close. On desktop, right-click the
+            graph works too. Keyboard: Escape.
+          </div>
+          <button
+            type="button"
+            className="generate-button"
+            onClick={onMenuPickGenerate}
+          >
+            Generate Nodes
+          </button>
+          <button
+            type="button"
+            className="add-node-button"
+            onClick={onMenuPickAddNode}
+          >
+            Add Node
+          </button>
+          <button
+            type="button"
+            className="add-relationship-button"
+            onClick={onMenuPickAddRelationship}
+          >
+            Add Relationship
+          </button>
+          <button
+            type="button"
+            className="delete-button"
+            onClick={onMenuPickDelete}
+          >
+            Delete
+          </button>
         </div>
       )}
 
@@ -1665,6 +1745,21 @@ function GraphVisualization({
         <div className="modal-overlay">
           <div className="modal-content">
             <h2>Add New Concept</h2>
+            {pendingConnectIdsForAddForm.length > 0 && (
+              <p className="add-node-connect-hint">
+                After you save, you will define how this concept relates to each
+                highlighted concept:{' '}
+                <strong>
+                  {pendingConnectIdsForAddForm
+                    .map(
+                      id =>
+                        data.nodes.find(n => String(n.id) === String(id))
+                          ?.label || id
+                    )
+                    .join(', ')}
+                </strong>
+              </p>
+            )}
             <form onSubmit={handleAddNodeSubmit}>
               <div className="form-group">
                 <label>Label:</label>
@@ -1701,6 +1796,49 @@ function GraphVisualization({
         </div>
       )}
 
+      {connectNewNodeLinksForm && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Connect to existing concepts</h2>
+            <p className="connect-new-node-lead">
+              New concept:{' '}
+              <strong>{connectNewNodeLinksForm.newNode.label}</strong>
+            </p>
+            <p className="connect-new-node-lead">
+              Enter the relationship from this new concept to each node below.
+            </p>
+            <form onSubmit={handleConnectNewNodeLinksSubmit}>
+              {connectNewNodeLinksForm.targets.map((t, i) => (
+                <div className="form-group" key={String(t.id)}>
+                  <label>
+                    Relationship to &quot;{t.label || 'Unnamed'}&quot;:
+                  </label>
+                  <input
+                    type="text"
+                    value={connectNewNodeLinksForm.relationshipInputs[i]}
+                    onChange={e =>
+                      updateConnectNewNodeRelationshipInput(i, e.target.value)
+                    }
+                    placeholder="e.g. supports, contrasts with, part of"
+                    required
+                    autoFocus={i === 0}
+                  />
+                </div>
+              ))}
+              <div className="modal-buttons">
+                <button type="submit">Add connections</button>
+                <button
+                  type="button"
+                  onClick={() => setConnectNewNodeLinksForm(null)}
+                >
+                  Skip connections
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showGenerateForm && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -1728,6 +1866,24 @@ function GraphVisualization({
         </div>
       )}
       <svg ref={svgRef} className="graph-visualization"></svg>
+      <button
+        ref={graphActionsFabRef}
+        type="button"
+        className="graph-actions-fab"
+        onClick={e => {
+          e.stopPropagation();
+          toggleGraphActionsFromFab();
+        }}
+        aria-expanded={Boolean(graphActionMenu)}
+        aria-haspopup="menu"
+        aria-controls="graph-action-menu"
+        aria-label="Open graph actions menu"
+      >
+        <span className="graph-actions-fab-icon" aria-hidden>
+          ☰
+        </span>
+        <span className="graph-actions-fab-label">Actions</span>
+      </button>
     </div>
   );
 }
