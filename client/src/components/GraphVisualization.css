@@ -758,3 +758,11 @@ svg {
     font-size: 14px;
   }
 }
+
+/* Library header slot: not viewport-fixed (see LibraryVisualize .visualization-header__graph-fab-slot) */
+.graph-actions-fab.graph-actions-fab--embedded {
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: auto;
+}

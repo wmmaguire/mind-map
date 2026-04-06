@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
@@ -10,6 +11,8 @@ function GraphVisualization({
   onDataUpdate,
   width: widthProp,
   height: heightProp,
+  /** When set (e.g. Library header slot), the Actions FAB is portaled here instead of fixed in the graph. */
+  graphActionsFabHost = null,
 }) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
@@ -1657,6 +1660,29 @@ function GraphVisualization({
     );
   };
 
+  const actionsFabButton = (
+    <button
+      ref={graphActionsFabRef}
+      type="button"
+      className={`graph-actions-fab${
+        graphActionsFabHost ? ' graph-actions-fab--embedded' : ''
+      }`}
+      onClick={e => {
+        e.stopPropagation();
+        toggleGraphActionsFromFab();
+      }}
+      aria-expanded={Boolean(graphActionMenu)}
+      aria-haspopup="true"
+      aria-controls="graph-action-menu"
+      aria-label="Open graph actions menu"
+    >
+      <span className="graph-actions-fab-icon" aria-hidden>
+        ☰
+      </span>
+      <span className="graph-actions-fab-label">Actions</span>
+    </button>
+  );
+
   let activeGraphEditBanner = null;
   if (showGenerateForm) {
     activeGraphEditBanner = {
@@ -2035,24 +2061,9 @@ function GraphVisualization({
       )}
 
       <svg ref={svgRef} className="graph-visualization"></svg>
-      <button
-        ref={graphActionsFabRef}
-        type="button"
-        className="graph-actions-fab"
-        onClick={e => {
-          e.stopPropagation();
-          toggleGraphActionsFromFab();
-        }}
-        aria-expanded={Boolean(graphActionMenu)}
-        aria-haspopup="true"
-        aria-controls="graph-action-menu"
-        aria-label="Open graph actions menu"
-      >
-        <span className="graph-actions-fab-icon" aria-hidden>
-          ☰
-        </span>
-        <span className="graph-actions-fab-label">Actions</span>
-      </button>
+      {graphActionsFabHost
+        ? createPortal(actionsFabButton, graphActionsFabHost)
+        : actionsFabButton}
     </div>
   );
 }
@@ -2089,6 +2100,12 @@ GraphVisualization.propTypes = {
   onDataUpdate: PropTypes.func,
   width: PropTypes.number,
   height: PropTypes.number,
+  graphActionsFabHost: PropTypes.oneOfType([
+    PropTypes.instanceOf(
+      typeof Element !== 'undefined' ? Element : Object
+    ),
+    PropTypes.oneOf([null]),
+  ]),
 };
 
 export default GraphVisualization; 
