@@ -1,5 +1,5 @@
 import '../setupPolyfills';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import GraphVisualization from './GraphVisualization';
 
 jest.mock('../context/SessionContext', () => ({
@@ -15,6 +15,26 @@ const minimalData = {
 };
 
 describe('GraphVisualization graph action menu', () => {
+  it('moves focus to Close when the Actions menu opens (#30)', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open graph actions menu/i })
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Close graph actions menu/i })
+      ).toHaveFocus();
+    });
+  });
+
   it('opens the action menu from the floating Actions button', () => {
     render(
       <GraphVisualization
@@ -29,7 +49,7 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('button', { name: /Open graph actions menu/i })
     );
     expect(
-      screen.getByRole('menu', { name: /Graph actions/i })
+      screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
     expect(screen.getByText('Generate (AI)')).toBeInTheDocument();
     expect(screen.getByText('Edit graph')).toBeInTheDocument();
@@ -82,7 +102,7 @@ describe('GraphVisualization graph action menu', () => {
     fireEvent.contextMenu(svg, { clientX: 120, clientY: 140, bubbles: true });
 
     expect(
-      screen.getByRole('menu', { name: /Graph actions/i })
+      screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /^Generate Nodes$/i })
@@ -105,12 +125,12 @@ describe('GraphVisualization graph action menu', () => {
     const svg = document.querySelector('.graph-visualization');
     fireEvent.contextMenu(svg, { clientX: 120, clientY: 140, bubbles: true });
     expect(
-      screen.getByRole('menu', { name: /Graph actions/i })
+      screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(
-      screen.queryByRole('menu', { name: /Graph actions/i })
+      screen.queryByRole('group', { name: /Graph actions/i })
     ).not.toBeInTheDocument();
   });
 

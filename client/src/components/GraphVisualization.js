@@ -40,6 +40,7 @@ function GraphVisualization({
   });
 
   const graphActionMenuRef = useRef(null);
+  const graphActionMenuCloseRef = useRef(null);
   const graphActionsFabRef = useRef(null);
   const graphActionSnapshotRef = useRef({ nodeIds: [], relationshipNodes: [] });
   const generateSourceIdsRef = useRef(null);
@@ -148,6 +149,15 @@ function GraphVisualization({
       document.removeEventListener('mousedown', onDocPointerDown);
       document.removeEventListener('touchstart', onDocPointerDown);
     };
+  }, [graphActionMenu]);
+
+  /** Move focus into the panel when it opens (#30: keyboard / AT). */
+  useEffect(() => {
+    if (!graphActionMenu) return undefined;
+    const id = window.setTimeout(() => {
+      graphActionMenuCloseRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [graphActionMenu]);
 
   /** Right-click opens the graph actions menu (same as Actions). No long-press on the canvas. */
@@ -1687,7 +1697,7 @@ function GraphVisualization({
             top: graphActionMenu.y,
             zIndex: 10020,
           }}
-          role="menu"
+          role="group"
           aria-labelledby="graph-action-menu-title"
         >
           <div className="graph-action-menu-header">
@@ -1695,6 +1705,7 @@ function GraphVisualization({
               Graph actions
             </span>
             <button
+              ref={graphActionMenuCloseRef}
               type="button"
               className="graph-action-menu-close"
               onClick={() => setGraphActionMenu(null)}
@@ -1744,10 +1755,15 @@ function GraphVisualization({
               >
                 <button
                   type="button"
-                  className="generate-button"
+                  className="generate-button graph-action-menu__action"
                   onClick={onMenuPickGenerate}
                 >
-                  Generate Nodes
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    ✨
+                  </span>
+                  <span className="graph-action-menu__action-label">
+                    Generate Nodes
+                  </span>
                 </button>
               </div>
             )}
@@ -1788,25 +1804,36 @@ function GraphVisualization({
               >
                 <button
                   type="button"
-                  className="add-node-button"
+                  className="add-node-button graph-action-menu__action"
                   onClick={onMenuPickAddNode}
                 >
-                  Add Node
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    ➕
+                  </span>
+                  <span className="graph-action-menu__action-label">Add Node</span>
                 </button>
                 <button
                   type="button"
-                  className="add-relationship-button"
+                  className="add-relationship-button graph-action-menu__action"
                   onClick={onMenuPickAddRelationship}
                   aria-describedby="graph-action-menu-relationship-hint"
                 >
-                  Add Relationship
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    🔗
+                  </span>
+                  <span className="graph-action-menu__action-label">
+                    Add Relationship
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className="delete-button"
+                  className="delete-button graph-action-menu__action"
                   onClick={onMenuPickDelete}
                 >
-                  Delete
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    🗑
+                  </span>
+                  <span className="graph-action-menu__action-label">Delete</span>
                 </button>
                 <p
                   className="graph-action-menu-link-hint"
@@ -2017,7 +2044,7 @@ function GraphVisualization({
           toggleGraphActionsFromFab();
         }}
         aria-expanded={Boolean(graphActionMenu)}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-controls="graph-action-menu"
         aria-label="Open graph actions menu"
       >
