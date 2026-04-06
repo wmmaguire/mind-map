@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -56,7 +56,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - Add node, add relationship, delete node/link
     - AI expansion via `POST /api/generate-node`
     - Tracks operations via `POST /api/operations`
-    - **Graph actions UI** (GitHub **#27**) uses the **Actions** FAB and context menu, not a fixed toolbar. **Dead CSS** for the pre–#27 controls shell was removed in **#28** (`GraphVisualization.css`, `LibraryVisualize.css`); backlog details in **`docs/github-backlog-issues.md`**.
+    - **Graph actions UI** (GitHub **#27**) uses the **Actions** FAB and context menu, not a fixed toolbar. **Dead CSS** for the pre–#27 controls shell was removed in **#28** (`GraphVisualization.css`, `LibraryVisualize.css`). **#29** adds **Generate (AI)** vs **Edit graph** accordion sections (Library-style toggles), **link-flow** copy, a bottom **`graph-edit-mode-chip`** when a modal flow is active, and scrollable menu height — see **`docs/github-backlog-issues.md`** and **`client/README.md`**.
 
 #### Backend
 - **Entry point**: `server/server.js` (ES modules; server `package.json` uses `"type": "module"`).
