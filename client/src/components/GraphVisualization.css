@@ -67,6 +67,8 @@ svg {
 
 .node circle.selected {
   filter: drop-shadow(0 0 5px rgba(241, 196, 15, 0.5));
+  stroke: #e74c3c;
+  stroke-width: 3px;
 }
 
 .node text {
@@ -83,14 +85,6 @@ svg {
 
 .link-line {
   transition: all 0.3s ease;
-}
-
-.edit-controls {
-  position: static;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 15px;
 }
 
 /* Floating menu: Actions FAB, long-press, or right-click on the graph */
@@ -328,33 +322,6 @@ svg {
 
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  .graph-container {
-    height: 100vh; /* Subtract header and controls height */
-    margin: 0;
-    padding: 0;
-    position: fixed;
-    left: 0;
-    right: 0;
-  }
-
-  .edit-controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    z-index: 2;
-  }
-
-  .edit-controls {
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    width: auto;
-    justify-content: flex-start;
-  }
-
   .add-node-button,
   .add-relationship-button,
   .delete-button,
@@ -366,53 +333,14 @@ svg {
     white-space: nowrap;
   }
 
-  /* Adjust helper text positions for mobile */
-  .relationship-helper,
-  .delete-helper {
-    bottom: 80px;
-    top: auto;
-  }
-
-  /* Adjust modal positions for mobile */
   .modal-overlay {
     padding: 20px;
   }
 
   .modal-content {
-    margin-bottom: 100px; /* Add space for controls at bottom */
-    max-height: calc(100vh - 200px);
+    max-height: min(90vh, calc(100vh - env(safe-area-inset-bottom, 0px) - 32px));
     overflow-y: auto;
   }
-
-  /* Ensure buttons don't overlap with iOS home indicator */
-  @supports (-webkit-touch-callout: none) {
-    .edit-controls {
-      bottom: max(20px, env(safe-area-inset-bottom));
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-    
-  }
-}
-
-/* iOS-specific padding for bottom-fixed elements */
-@supports (-webkit-touch-callout: none) {
-  .edit-controls {
-    bottom: max(30px, env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-.relationship-helper {
-  position: fixed;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  z-index: 1000;
 }
 
 .relationship-preview {
@@ -422,22 +350,6 @@ svg {
   margin: 15px 0;
   text-align: center;
   font-weight: 500;
-}
-
-/* Update node styles for relationship mode */
-.node circle {
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.node circle.selectable {
-  cursor: pointer;
-  filter: brightness(1.1);
-}
-
-.node circle.selected {
-  stroke: #e74c3c;
-  stroke-width: 3px;
 }
 
 /* Update modal and form styles */
@@ -556,229 +468,6 @@ svg {
   transform: scale(1.1);
 }
 
-.delete-button {
-  padding: 10px 20px;
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-
-.delete-button:hover {
-  background-color: #c0392b;
-  transform: translateY(-1px);
-}
-
-.delete-button.active {
-  background-color: #c0392b;
-}
-
-.delete-helper {
-  position: fixed;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(231, 76, 60, 0.9);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  z-index: 1000;
-  transition: all 0.3s ease;
-}
-
-/* Update node and link styles for delete mode */
-.node circle.deletable {
-  cursor: pointer;
-  filter: brightness(0.9);
-}
-
-.link-line.deletable {
-  cursor: pointer;
-  stroke-dasharray: 5;
-}
-
-/* Controls Panel - Base Styles */
-.controls-panel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  background: white;
-  border-left: 1px solid #ddd;
-  height: 100%;
-  width: 250px;
-  transition: all 0.3s ease;
-  z-index: 1000;
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-
-.controls-panel.collapsed {
-  width: 40px;
-}
-
-.controls-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 15px;
-  cursor: pointer;
-  user-select: none;
-  border-bottom: 1px solid #ddd;
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-width: 40px;
-  position: relative;
-}
-
-.controls-header h3 {
-  margin: 0;
-  margin-left: 30px;
-  transition: opacity 0.2s ease;
-  overflow: hidden;
-}
-
-.controls-panel.collapsed .controls-header h3 {
-  opacity: 0;
-  width: 0;
-  margin: 0;
-}
-
-.controls-toggle {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  color: #666;
-  cursor: pointer;
-  padding: 5px;
-  transition: transform 0.3s ease;
-  min-width: 20px;
-  position: absolute;
-  left: 10px;
-}
-
-.controls-panel.collapsed .controls-toggle {
-  left: 10px;
-  transform: rotate(90deg); /* Point left when collapsed */
-}
-
-.controls-content {
-  padding: 15px;
-  transition: all 0.3s ease;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.controls-panel.collapsed .controls-content {
-  width: 0;
-  padding: 0;
-  visibility: hidden;
-}
-
-/* Mobile styles */
-@media (max-width: 768px) {
-  .controls-panel {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: calc(33vh + 48px); /* Panel height plus header */
-    background: white;
-    z-index: 1001;
-    transition: transform 0.3s ease;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    border-radius: 15px 15px 0 0;
-  }
-
-  .controls-header {
-    height: 48px;
-    padding: 0 15px;
-    background: white;
-    border-radius: 15px 15px 0 0;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-  }
-
-  .controls-content {
-    padding: 15px;
-    height: 33vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .controls-panel.visible {
-    transform: translateY(60vh);
-  }
-
-  .controls-panel.hidden {
-    transform: translateY(92vh);
-  }
-
-  /* Ensure graph container has proper spacing */
-  .graph-container {
-    margin-bottom: 48px;
-  }
-
-  .edit-controls {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flext-start;
-    gap: 8px;
-    padding: 0 20px;
-    margin: 0;
-    position: static;
-    transform: none;
-  }
-
-  .edit-controls button,
-  .generate-button,
-  .add-node-button,
-  .add-relationship-button,
-  .delete-button {
-    width: 90%;
-    height: 36px;
-    padding: 0px 20px;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 18px;
-    margin: 0;
-    white-space: nowrap;
-  }
-
-  /* Ensure graph container adjusts for controls */
-  .graph-container {
-    margin-bottom: 25vh;
-    margin-top: 0;
-    padding-bottom: 25vh;
-  }
-
-  /* Ensure visualization header is small */
-  .visualization-header {
-    padding: 4px 8px;
-    height: 30px;
-  }
-
-  .visualization-header h3 {
-    font-size: 0.8rem;
-    margin: 0;
-  }
-}
-
 /* Update visualization header styles */
 .visualization-header {
   padding: 15px 15px 5px 15px; /* Reduced bottom padding */
@@ -805,13 +494,6 @@ svg {
   .visualization-header h3 {
     font-size: 0.8rem;
     margin: 0 0 2px 0; /* Smaller bottom margin for mobile */
-  }
-}
-
-/* Mobile styles for controls panel t*/
-@media (max-width: 768px) {
-  .controls-panel {
-    z-index: 1001;
   }
 }
 
@@ -874,63 +556,5 @@ svg {
   .graph-actions-fab {
     padding: 12px 14px;
     font-size: 14px;
-  }
-}
-
-.graph-container {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  overflow: hidden;
-}
-
-.graph-visualization {
-  width: 100%;
-  height: 100%;
-  background-color: #f8f9fa;
-}
-
-svg {
-  width: 100%;
-  height: 100%;
-}
-
-@media (max-width: 768px) {
-  .graph-container {
-    height: calc(100vh - 48px - 48px); /* Subtract header and controls height */
-    margin: 0;
-    padding: 0;
-    position: fixed;
-    top: 48px; /* Start right after header */
-    left: 0;
-    right: 0;
-    bottom: 48px; /* Leave space for controls */
-  }
-
-  .edit-controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    z-index: 2;
-  }
-}
-
-/* Compact bottom-sheet header on small screens (parity with Library chrome density; see #28–#30) */
-@media (max-width: 768px) {
-  .graph-visualization-container .controls-header {
-    height: 44px;
-    min-height: 44px;
-    padding: 0 12px;
-  }
-
-  .graph-visualization-container .controls-header h3 {
-    font-size: 0.95rem;
-    margin: 0;
   }
 }

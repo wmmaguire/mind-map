@@ -501,9 +501,9 @@
 }
 
 /*
- * GraphVisualization.css sets global mobile .graph-container { position:fixed; top:48px; … }
- * for a legacy shell. Library already has .visualization-header above the graph — that
- * fixed positioning removes the graph from flow and leaves a ~48px gap. Scope overrides:
+ * GraphVisualization.css used to set global mobile .graph-container positioning for a
+ * legacy bottom toolbar (#27/#28). Library scopes the graph with .library-graph-mount so
+ * the SVG stays in normal flow. Defensive overrides remain for any future global rules:
  */
 .library-visualize .library-graph-mount {
   position: relative !important;
@@ -1219,7 +1219,7 @@
     margin-top: 0;
     height: 100vh;
     width: 100%;
-    padding-bottom: 25vh; /* Match controls panel height */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .graph-container {
@@ -1265,9 +1265,9 @@
     padding: 12px;
   }
 
-  /* Ensure sidebar doesn't conflict with controls */
+  /* Sidebar below graph Actions FAB / modal overlays where applicable */
   .sidebar {
-    z-index: 1000; /* Lower than controls */
+    z-index: 1000;
   }
 
   .sidebar-footer {
