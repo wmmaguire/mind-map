@@ -1642,6 +1642,33 @@ function GraphVisualization({
     );
   };
 
+  let activeGraphEditBanner = null;
+  if (showGenerateForm) {
+    activeGraphEditBanner = {
+      title: 'Generate (AI)',
+      hint:
+        'Choose how many related nodes to create from your current highlights.',
+    };
+  } else if (showAddForm) {
+    activeGraphEditBanner = {
+      title: 'Add concept',
+      hint: 'Fill in the form to add a node. Cancel returns to the graph.',
+    };
+  } else if (relationshipForm.show) {
+    const a = selectedNodes[0]?.label || 'first concept';
+    const b = selectedNodes[1]?.label || 'second concept';
+    activeGraphEditBanner = {
+      title: 'Add relationship',
+      hint: `Describe how “${a}” connects to “${b}”. Cancel discards this link.`,
+    };
+  } else if (connectNewNodeLinksForm) {
+    activeGraphEditBanner = {
+      title: 'Connect new concept',
+      hint:
+        'Enter relationship text for each highlighted node, or skip connections.',
+    };
+  }
+
   return (
     <div className="graph-visualization-container">
       {graphActionMenu && (
@@ -1677,34 +1704,70 @@ function GraphVisualization({
             <strong>×</strong>, or outside to close. On desktop, right-click the
             graph works too. Keyboard: Escape.
           </div>
-          <button
-            type="button"
-            className="generate-button"
-            onClick={onMenuPickGenerate}
+          <div
+            className="graph-action-menu-section"
+            role="group"
+            aria-labelledby="graph-action-menu-section-generate"
           >
-            Generate Nodes
-          </button>
-          <button
-            type="button"
-            className="add-node-button"
-            onClick={onMenuPickAddNode}
+            <div
+              className="graph-action-menu-section-label"
+              id="graph-action-menu-section-generate"
+            >
+              Generate (AI)
+            </div>
+            <button
+              type="button"
+              className="generate-button"
+              onClick={onMenuPickGenerate}
+              aria-describedby="graph-action-menu-section-generate"
+            >
+              Generate Nodes
+            </button>
+          </div>
+          <div className="graph-action-menu-divider" aria-hidden="true" />
+          <div
+            className="graph-action-menu-section"
+            role="group"
+            aria-labelledby="graph-action-menu-section-edit"
           >
-            Add Node
-          </button>
-          <button
-            type="button"
-            className="add-relationship-button"
-            onClick={onMenuPickAddRelationship}
-          >
-            Add Relationship
-          </button>
-          <button
-            type="button"
-            className="delete-button"
-            onClick={onMenuPickDelete}
-          >
-            Delete
-          </button>
+            <div
+              className="graph-action-menu-section-label"
+              id="graph-action-menu-section-edit"
+            >
+              Edit graph
+            </div>
+            <button
+              type="button"
+              className="add-node-button"
+              onClick={onMenuPickAddNode}
+              aria-describedby="graph-action-menu-section-edit"
+            >
+              Add Node
+            </button>
+            <button
+              type="button"
+              className="add-relationship-button"
+              onClick={onMenuPickAddRelationship}
+              aria-describedby="graph-action-menu-relationship-hint"
+            >
+              Add Relationship
+            </button>
+            <p
+              className="graph-action-menu-link-hint"
+              id="graph-action-menu-relationship-hint"
+            >
+              To add a link between two ideas, select both on the graph (two
+              highlights), open Actions, then tap Add Relationship and describe
+              the connection.
+            </p>
+            <button
+              type="button"
+              className="delete-button"
+              onClick={onMenuPickDelete}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       )}
 
@@ -1865,6 +1928,34 @@ function GraphVisualization({
           </div>
         </div>
       )}
+
+      {activeGraphEditBanner && (
+        <div
+          className="graph-edit-mode-chip"
+          role="status"
+          aria-live="polite"
+          aria-label={`${activeGraphEditBanner.title}. ${activeGraphEditBanner.hint}`}
+        >
+          <div className="graph-edit-mode-chip__text">
+            <strong className="graph-edit-mode-chip__title">
+              {activeGraphEditBanner.title}
+            </strong>
+            <p className="graph-edit-mode-chip__hint">
+              {activeGraphEditBanner.hint}
+            </p>
+          </div>
+          <div className="graph-edit-mode-chip__actions">
+            <button
+              type="button"
+              className="graph-edit-mode-chip__cancel"
+              onClick={exitGraphEditModes}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <svg ref={svgRef} className="graph-visualization"></svg>
       <button
         ref={graphActionsFabRef}

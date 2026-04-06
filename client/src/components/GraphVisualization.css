@@ -149,7 +149,40 @@ svg {
   color: #555;
   line-height: 1.35;
   margin: 0;
-  padding: 8px 12px 0;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.graph-action-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 0 6px;
+}
+
+.graph-action-menu-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 10px 14px 6px;
+  margin: 0;
+}
+
+.graph-action-menu-divider {
+  height: 1px;
+  margin: 0;
+  background: #e8e8e8;
+  border: none;
+}
+
+.graph-action-menu-link-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #475569;
+  margin: 4px 14px 10px;
+  padding: 0;
 }
 
 .graph-action-menu .generate-button,
@@ -162,12 +195,93 @@ svg {
   justify-content: center;
 }
 
-.graph-action-menu .generate-button {
-  margin-top: 8px;
+.graph-action-menu-section .generate-button,
+.graph-action-menu-section .add-node-button {
+  margin-top: 0;
 }
 
 .graph-action-menu .delete-button {
   margin-bottom: 12px;
+}
+
+/* Fixed mode indicator: visible without opening the Actions menu (#29) */
+.graph-edit-mode-chip {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  transform: translateX(-50%);
+  z-index: 1195;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(100vw - 24px, 440px);
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 18px rgba(15, 23, 42, 0.12),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.graph-edit-mode-chip__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.graph-edit-mode-chip__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.graph-edit-mode-chip__hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #475569;
+  margin: 0;
+}
+
+.graph-edit-mode-chip__actions {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.graph-edit-mode-chip__cancel {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.graph-edit-mode-chip__cancel:hover {
+  background: #e2e8f0;
+}
+
+.graph-edit-mode-chip__cancel:active {
+  background: #cbd5e1;
+}
+
+@media (max-width: 480px) {
+  .graph-edit-mode-chip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .graph-edit-mode-chip__actions {
+    padding-top: 0;
+  }
+
+  .graph-edit-mode-chip__cancel {
+    width: 100%;
+  }
 }
 
 .add-node-connect-hint {
