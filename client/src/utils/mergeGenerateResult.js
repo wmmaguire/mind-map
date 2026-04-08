@@ -12,6 +12,7 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
 
   const baseX = currentData.nodes[0]?.x ?? width / 2;
   const baseY = currentData.nodes[0]?.y ?? height / 2;
+  const mergeTimestamp = Date.now();
 
   generatedPatch.nodes.forEach(node => {
     const processedNode = {
@@ -19,7 +20,8 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
       x: baseX + (Math.random() - 0.5) * 200,
       y: baseY + (Math.random() - 0.5) * 200,
       vx: 0,
-      vy: 0
+      vy: 0,
+      timestamp: node.timestamp ?? mergeTimestamp
     };
     nodeMap.set(String(node.id), processedNode);
   });
@@ -58,7 +60,8 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
       processedLinks.push({
         source: sourceNode,
         target: targetNode,
-        relationship: link.relationship
+        relationship: link.relationship,
+        timestamp: link.timestamp ?? mergeTimestamp
       });
     }
   });

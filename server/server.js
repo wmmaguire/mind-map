@@ -485,6 +485,21 @@ app.post('/api/generate-node', async (req, res) => {
       });
     }
 
+    // Add timestamps to generated graph artifacts (#62).
+    // For manual mode: model did not include timestamps; for randomizedGrowth: nodes
+    // come from the model, links are overwritten below but nodes still need timestamps.
+    {
+      const ts = Date.now();
+      newData.nodes = newData.nodes.map(n => ({
+        ...n,
+        timestamp: n.timestamp ?? ts
+      }));
+      newData.links = newData.links.map(l => ({
+        ...l,
+        timestamp: l.timestamp ?? ts
+      }));
+    }
+
     const newNodeIds = new Set(newData.nodes.map(node => node.id));
     const selectedNodeIds = new Set(selectedNodes.map(node => String(node.id))); // Convert to string
 

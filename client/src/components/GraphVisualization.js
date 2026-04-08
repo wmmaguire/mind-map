@@ -1457,6 +1457,7 @@ function GraphVisualization({
       label: newNodeData.label,
       description: newNodeData.description,
       wikiUrl: newNodeData.wikiUrl,
+      timestamp: Date.now(),
       x: width / 2,
       y: height / 2,
       vx: 0,
@@ -1520,6 +1521,7 @@ function GraphVisualization({
         source: newNodeObj,
         target: targetObj,
         relationship: relationshipInputs[i].trim(),
+        timestamp: Date.now(),
       };
     }).filter(l => l.target);
 
@@ -1568,7 +1570,8 @@ function GraphVisualization({
     const newLink = {
       source: selectedNodes[0],
       target: selectedNodes[1],
-      relationship: relationshipForm.relationship
+      relationship: relationshipForm.relationship,
+      timestamp: Date.now()
     };
 
     const newData = {
@@ -2261,6 +2264,7 @@ GraphVisualization.propTypes = {
         label: PropTypes.string.isRequired,
         description: PropTypes.string,
         wikiUrl: PropTypes.string,
+        timestamp: PropTypes.number,
         x: PropTypes.number,
         y: PropTypes.number,
         vx: PropTypes.number,
@@ -2278,7 +2282,8 @@ GraphVisualization.propTypes = {
           PropTypes.string,
           PropTypes.object
         ]).isRequired,
-        relationship: PropTypes.string
+        relationship: PropTypes.string,
+        timestamp: PropTypes.number
       })
     ).isRequired
   }),

@@ -16,7 +16,7 @@ export const RANDOM_EXPANSION_RELATIONSHIP =
  * @param {string[]} initialPoolIds - Graph node ids before this batch (strings)
  * @param {number} connectionsPerNewNode
  * @param {() => number} [random=Math.random] - returns [0,1)
- * @returns {{ source: string, target: string, relationship: string }[]}
+ * @returns {{ source: string, target: string, relationship: string, timestamp: number }[]}
  */
 export function buildRandomExpansionLinks(
   newNodeIdsInOrder,
@@ -47,7 +47,8 @@ export function buildRandomExpansionLinks(
       links.push({
         source: sid,
         target,
-        relationship: RANDOM_EXPANSION_RELATIONSHIP
+        relationship: RANDOM_EXPANSION_RELATIONSHIP,
+        timestamp: Date.now()
       });
     }
     pool.push(sid);

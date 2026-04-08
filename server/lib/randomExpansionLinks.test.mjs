@@ -18,6 +18,7 @@ test('buildRandomExpansionLinks uses growing pool in batch order', () => {
   );
 
   assert.equal(links.length, 4);
+  assert.ok(links.every(l => typeof l.timestamp === 'number'));
   const aLinks = links.filter(l => l.source === 'a');
   assert.equal(aLinks.length, 2);
   assert.ok(aLinks.every(l => ['x', 'y', 'z'].includes(l.target)));
