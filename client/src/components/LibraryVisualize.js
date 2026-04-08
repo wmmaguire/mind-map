@@ -96,6 +96,31 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   );
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
+  const goToHistoryIndex = useCallback(
+    (nextIndex) => {
+      setGraphHistory((prev) => {
+        if (nextIndex < 0 || nextIndex >= prev.entries.length) return prev;
+        const g = materializeGraphSnapshot(prev.entries[nextIndex]);
+        setGraphData(g);
+        setCurrentSource((p) =>
+          p
+            ? {
+              ...p,
+              nodeCount: g.nodes.length,
+              edgeCount: g.links.length,
+            }
+            : p
+        );
+        return graphHistoryReducer(
+          prev,
+          { type: 'GOTO', index: nextIndex },
+          historyOpts
+        );
+      });
+    },
+    [historyOpts]
+  );
+
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
     width: window.innerWidth,
@@ -292,31 +317,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const handleClearFileSelection = useCallback(() => {
     setSelectedFiles(new Set());
   }, []);
-
-  const goToHistoryIndex = useCallback(
-    (nextIndex) => {
-      setGraphHistory((prev) => {
-        if (nextIndex < 0 || nextIndex >= prev.entries.length) return prev;
-        const g = materializeGraphSnapshot(prev.entries[nextIndex]);
-        setGraphData(g);
-        setCurrentSource((p) =>
-          p
-            ? {
-              ...p,
-              nodeCount: g.nodes.length,
-              edgeCount: g.links.length,
-            }
-            : p
-        );
-        return graphHistoryReducer(
-          prev,
-          { type: 'GOTO', index: nextIndex },
-          historyOpts
-        );
-      });
-    },
-    [historyOpts]
-  );
 
   const graphHistoryBannerPayload = useMemo(() => {
     if (graphHistory.entries.length < 2 || !graphData) return null;
