@@ -7,6 +7,7 @@ import {
   resetSessionBootstrapForTests,
 } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
+import { AuthProvider } from './context/AuthContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
 import { LibraryUiProvider } from './context/LibraryUiContext';
 import App from './App';
@@ -53,13 +54,15 @@ function renderApp(initialEntries) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <SessionProvider>
-        <IdentityProvider>
-          <GraphTitleProvider>
-            <LibraryUiProvider>
-              <App />
-            </LibraryUiProvider>
-          </GraphTitleProvider>
-        </IdentityProvider>
+        <AuthProvider>
+          <IdentityProvider>
+            <GraphTitleProvider>
+              <LibraryUiProvider>
+                <App />
+              </LibraryUiProvider>
+            </GraphTitleProvider>
+          </IdentityProvider>
+        </AuthProvider>
       </SessionProvider>
     </MemoryRouter>
   );

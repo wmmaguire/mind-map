@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
+import { useIdentity } from '../context/IdentityContext';
 import {
   validateAudioFileSizeForTranscribe,
   pickMediaRecorderMimeType
@@ -11,6 +12,11 @@ import './FileUpload.css';
 
 function FileUpload({ onClose, onUploadSuccess }) {
   const { sessionId } = useSession();
+  const { userId } = useIdentity();
+  const uploadAuth = useMemo(
+    () => (userId ? { auth: { userId } } : {}),
+    [userId]
+  );
   const [inputMode, setInputMode] = useState('text');
   const [file, setFile] = useState(null);
   const [customName, setCustomName] = useState('');
@@ -94,7 +100,8 @@ function FileUpload({ onClose, onUploadSuccess }) {
 
     await apiRequest('/api/upload', {
       method: 'POST',
-      body: formData
+      body: formData,
+      ...uploadAuth,
     });
 
     setUploadStatus('File uploaded successfully!');

@@ -49,8 +49,12 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
   - **`getApiOrigin()` / `apiUrl()`** — single module for backend base URL (see [API base URL](#api-base-url) below).
 - `client/src/context/SessionContext.jsx`
   - **`SessionProvider` / `useSession()`** — creates or restores the browser session (`POST /api/sessions`), persists `sessionId` in `sessionStorage` for refresh, and sends session end via `sendBeacon` on unload. Wraps the app in `client/src/index.js`.
+- `client/src/context/AuthContext.jsx`
+  - **`AuthProvider` / `useAuth()`** — **`GET /api/auth/me`** on load (cookie **`mindmap_auth`**), **`register`**, **`login`**, **`logout`**, **`updateProfile`** (**`PATCH /api/auth/me`**). Wraps the app in **`index.js`** (inside **`SessionProvider`**).
+- `client/src/index.js`
+  - **`AuthIdentityBridge`** — passes **`user?.id`** from **`useAuth()`** into **`IdentityProvider`** as **`initialRegisteredUserId`** so **`useIdentity().userId`** matches the signed-in account (GitHub **#63**).
 - `client/src/context/IdentityContext.jsx`
-  - **`IdentityProvider` / `useIdentity()`** — guest vs registered preview: optional **`REACT_APP_MINDMAP_USER_ID`**, dev-only **`setDevRegisteredUserId`** (GitHub **#33**). Wraps **`GraphTitleProvider`** in **`index.js`**.
+  - **`IdentityProvider` / `useIdentity()`** — guest vs registered: **`AuthIdentityBridge`** + optional **`REACT_APP_MINDMAP_USER_ID`**, dev-only **`setDevRegisteredUserId`** when **`REACT_APP_ENABLE_DEV_PREVIEW=true`** (GitHub **#33**). Wraps **`GraphTitleProvider`** inside **`AuthIdentityBridge`**.
 - `client/src/context/GraphTitleContext.jsx`
   - **`GraphTitleProvider` / `useGraphTitle()`** — shell graph title while **`LibraryVisualize`** is mounted (**#33**).
 - `client/src/context/LibraryUiContext.jsx`
@@ -58,7 +62,7 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
 - `client/src/components/GiveFeedbackControl.jsx`
   - App-shell **Give Feedback** FAB + modal for **`POST /api/feedback`** (GitHub **#23**): single mount in **`App.js`**, **`apiRequest`**, safe-area insets, Escape / basic dialog a11y. Post–#23 follow-ups: **#24** (tests), **#50** (toast), **#52** (z-index vs library UI) — see **`docs/github-backlog-issues.md`**.
 - `client/src/components/FileUpload.js`
-  - Upload modal: **Text file** (`.txt` / `.md`) → **`POST /api/upload`**; **Audio → transcript** tab with **Upload file** or in-browser **Record** (`MediaRecorder`), **`POST /api/transcribe`** (default **`whisper-1`**), optional checkbox **Request segment timestamps (Whisper verbose)** → **`verbose=1`** (**#58**), client-side **25 MB** check, editable transcript, then **`.txt`** via **`POST /api/upload`** (**#34** / **#35**). The saved **`.txt`** is plain text only (segment rows are UI-only). Speaker labels remain **backlog** (**#59**). Helpers: **`utils/audioRecording.js`**. Tests: **`FileUpload.test.jsx`**, **`audioRecording.test.js`**. Follow-ups outside **#58**: browser E2E for verbose + segments (**#24**), server HTTP tests (**#60**), optional persist segments / word-level / SRT (**#61**) — see **`server/READEME.md`** §2b. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
+  - Upload modal: **Text file** (`.txt` / `.md`) → **`POST /api/upload`** with **`sessionId`**; when signed in, **`apiRequest`** sends **`auth: { userId }`** → **`X-Mindmap-User-Id`** so the server persists **`File.userId`** (**#63**). **Audio → transcript** tab with **Upload file** or in-browser **Record** (`MediaRecorder`), **`POST /api/transcribe`** (default **`whisper-1`**), optional checkbox **Request segment timestamps (Whisper verbose)** → **`verbose=1`** (**#58**), client-side **25 MB** check, editable transcript, then **`.txt`** via **`POST /api/upload`**. The saved **`.txt`** is plain text only (segment rows are UI-only). Speaker labels remain **backlog** (**#59**). Helpers: **`utils/audioRecording.js`**. Tests: **`FileUpload.test.jsx`**, **`audioRecording.test.js`**. Follow-ups outside **#58**: browser E2E for verbose + segments (**#24**), server HTTP tests (**#60**), optional persist segments / word-level / SRT (**#61**) — see **`server/READEME.md`** §2b. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
   - Library workflow: **`LibrarySidebar`** / **`LibrarySourcesPanel`** / **`LibraryAccountChip`**; selecting files, analyze, save/load graphs, **`GraphVisualization`**. Desktop: **resizable** sidebar (persisted), collapsible **Files** / **Graphs** sections. Narrow viewports: **mobile Library** control is in **`GuestIdentityBanner`** (**`LibraryUiContext`**); overlay when the panel is open. **Files** list: search, sort, select-all/clear, skeleton, empty states; **+ Add new** / **Delete selected** / **Analyze Selected**; delete **toasts**. Helpers: **`libraryFileList.js`**. Current graph **name** is shown in **`GuestIdentityBanner`** via **`GraphTitleContext`** (no separate visualization header strip). **`GraphVisualization`**: explicit **`width` / `height`** (full graph area under the shell), **`actionsFabPlacement="libraryGraphMount"`**. **`apiRequest`** may send **`X-Mindmap-User-Id`** when **`useIdentity().userId`** is set (**#32** / **#33**). The graph wrapper uses **`library-graph-mount`** with scoped **`LibraryVisualize.css`**; legacy global mobile **`.graph-container`** rules in **`GraphVisualization.css`** were **removed** in **#28** (**#55** audit). GitHub **#25**, **#26**, **#28**, **#33**.
 - `client/src/components/GraphVisualization.js`
@@ -83,14 +87,16 @@ Why it matters: uploads, analysis, and telemetry all reference the session UUID.
 
 The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SESSION_UPDATE`** (end/duration) so session lifecycle is auditable in Mongo (see **`server/READEME.md`**, GitHub **#16**).
 
-#### Identity (guest + preview) — GitHub **#31** / **#33**
+#### Identity + auth (guest, preview, accounts) — GitHub **#31** / **#33** / **#63**
 
-**Goal**: **guest-first** app (`sessionId`); optional **preview** of signed-in UX before real auth.
+**Goal**: **guest-first** app (`sessionId`); optional **dev preview** of registered UX; **real** registration/login with httpOnly cookie and profile update.
 
-1. **`IdentityProvider`** exposes **`useIdentity()`**: `identityKind`, `isRegistered`, `userId`; optional **`REACT_APP_MINDMAP_USER_ID`**; in **development**, **`setDevRegisteredUserId`** for preview.
-2. **`GuestIdentityBanner`** — shell strip: graph title (**`GraphTitleContext`**), consolidated account control (guest **Preview** / signed-in menu in dev), **mobile Library** button (**`LibraryUiContext`** on narrow **`/visualize`**).
-3. **API:** **`apiRequest(..., { auth: { userId } })`** sets **`X-Mindmap-User-Id`** for scoped listings (**#32**). **Server** **`POST /api/upload`** does not yet set **`File.userId`** from auth — still session-only writes; product **migration** rules TBD.
-4. **Do not** log tokens or secrets; **`userId`**-style headers only until OAuth/token work lands.
+1. **`AuthProvider`** (**`AuthContext`**) — session state: **`loading` / `guest` / `authenticated`**; **`user`** (`id`, `email`, `name`); **`register`**, **`login`**, **`logout`**, **`updateProfile`**.
+2. **`AuthIdentityBridge`** (**`index.js`**) — maps **`user?.id`** onto **`IdentityProvider`** so **`useIdentity().userId`** is the Mongo user id when signed in.
+3. **`IdentityProvider`** exposes **`useIdentity()`**: `identityKind`, `isRegistered`, `userId`; optional **`REACT_APP_MINDMAP_USER_ID`**; in **development** with **`REACT_APP_ENABLE_DEV_PREVIEW=true`**, **`setDevRegisteredUserId`** for **Guest / Preview** without real auth.
+4. **`GuestIdentityBanner`** — shell strip: graph title (**`GraphTitleContext`**), **Sign in / Create account** (or dev **Preview** when enabled), signed-in menu (**User settings** → **`PATCH /api/auth/me`**, **Sign out**), **mobile Library** (**`LibraryUiContext`** on narrow **`/visualize`**).
+5. **API:** **`apiRequest(..., { auth: { userId } })`** sets **`X-Mindmap-User-Id`** for listings, uploads, analyze, graph save/load, and deletes (**#32**). **`LibraryVisualize`** / **`Library.js`** call **`GET /api/files`** and **`GET /api/graphs`** **without** `sessionId` in the query when **`userId`** is set (header-only account scope); guests use **`?sessionId=`**. Server rules prevent account-owned files/graphs from appearing in session-only lists after sign-out (**`server/READEME.md`** §3).
+6. **Do not** log tokens or secrets in client code; cookies are httpOnly.
 
 ### 2) Upload flow (file + metadata)
 
@@ -103,7 +109,8 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
    - `file`
    - `customName`
    - `sessionId` (from `useSession()`)
-3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo (indexed by **`sessionId`**; optional **`userId`** on the model is **not** set from auth on this path yet — **#33**). A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
+   - When signed in, **`X-Mindmap-User-Id`** is sent; the server stores **`File.userId`** and metadata **`userId`** (**#63**).
+3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo. A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
 4. On failure, the API may return structured JSON (`error`, `details`, `code`). If a **legacy Mongo index** still enforces one file per session, see **`server/READEME.md`** (GitHub **#42**).
 
 **Audio → transcript (same modal):** User switches to **Audio → transcript**, then **Upload file** or **Record**. Recording uses **`getUserMedia`** + **`MediaRecorder`** (best-effort MIME via **`pickMediaRecorderMimeType`**), preview with **`<audio controls>`**, then **`POST /api/transcribe`** with `audio` + `sessionId` — same as choosing a file. Optional **Request segment timestamps** adds **`verbose=1`**; when the API returns **`segments`**, a **Segment timings** disclosure lists start/end times per phrase (**#58**). Oversize clips are rejected **client-side** before upload (**25 MB**, aligned with the server). Edit transcript, then **`POST /api/upload`** as `.txt` for Library **Analyze**.
@@ -112,8 +119,7 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
 
 **Goal**: transform selected source files into a graph and render it.
 
-1. `LibraryVisualize` fetches the available uploads (session-scoped; GitHub **#32**); with a **`userId`**, **`X-Mindmap-User-Id`** is sent (**#33**):
-   - `GET /api/files?sessionId=<uuid>` → list of **`File`** rows for that guest session
+1. `LibraryVisualize` fetches uploads (GitHub **#32** / **#63**): **guest** — `GET /api/files?sessionId=<uuid>`; **signed-in** — `GET /api/files` with **`X-Mindmap-User-Id`** only (no `sessionId` query). **`GET /api/graphs`** follows the same pattern.
 2. For each selected file, it requests the raw content:
    - `GET /api/files/:filename` → `{ success, content }`
 3. It calls analysis **once per selected file** (parallel requests):
@@ -225,7 +231,7 @@ Commands:
 There is no Playwright/Cypress harness in this repo yet; validate the full stack manually:
 
 1. From the repo root, start API + client: **`npm run dev`** (server on port **5001**, CRA on **3000** with proxy to the API).
-2. Open **`http://localhost:3000`**. Confirm the landing page loads and (with DevTools → Network) **`POST /api/sessions`** succeeds. On **Visualize**, **`GET /api/files?sessionId=…`** and **`GET /api/graphs?sessionId=…`** should include your session UUID (guest scoping — **#32**).
+2. Open **`http://localhost:3000`**. Confirm the landing page loads and (with DevTools → Network) **`POST /api/sessions`** succeeds. On **Visualize** as **guest**, **`GET /api/files?sessionId=…`** and **`GET /api/graphs?sessionId=…`** should include your session UUID (**#32**). When **signed in**, listing calls use **`X-Mindmap-User-Id`** without `sessionId` in the URL (**#63**); account-owned uploads must not appear after **Sign out** in the same tab.
 3. **Upload:** open **Upload**, pick a small `.txt` file, submit; expect success and **`POST /api/upload`** (multipart) **200**.
 4. Optional (**#34** / **#35**): **Upload** → **Audio → transcript**. Either **Upload file** (small `.webm` / `.m4a`) or **Record** → allow the mic → **Start recording** / **Stop** → preview → **Transcribe** — expect **`POST /api/transcribe`** **200** — then **Upload transcript as .txt** (**`POST /api/upload`**). Try an oversized file: expect a **client-side** error before transcribe.
 5. **Visualize:** go to **Visualize** (or **`/visualize`**). Confirm **`GET /api/files`** lists the upload; select the file, **Analyze Selected**; expect **`GET /api/files/:name`**, **`POST /api/analyze`**, then a graph in the visualization area.

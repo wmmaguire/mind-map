@@ -74,8 +74,8 @@ The server intentionally stores some data **on disk** and related metadata **in 
 |--------|----------------------|--------------------|------------|
 | **Session identity** | MongoDB `Session` (UUID `sessionId` + `_id`) | — | All API flows that need a session validate against `Session` (or fail). |
 | **Raw upload bytes** | `uploads/` under **`DATA_DIR`** | MongoDB `File` document (`path`, names, `sessionId`, etc.) | A successful **`POST /api/upload`** requires **metadata JSON on disk**, **multer file on disk**, and **`File.save()`**. If the DB write fails, artifacts are removed so disk and DB stay aligned (see upload flow). |
-| **Library file list** | MongoDB `File` when **`GET /api/files?sessionId=`** or **`?userId=`** (#32) | **`metadata/*.json`** mirror | Scoped listing uses **`File`**; legacy unscoped **`GET /api/files`** still scans **metadata/** only. Upload writes both; drift is possible if metadata is edited by hand. |
-| **Serving file content** | **`GET /api/files/:filename`** reads **`uploads/`** by filename | `File` optional for validation | Content is served from disk path under `uploadsDir`. |
+| **Library file list** | MongoDB `File` when **`GET /api/files?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`** (#32) | **`metadata/*.json`** mirror | Scoped listing uses **`File`**; legacy unscoped **`GET /api/files`** still scans **metadata/** only. **Session-only** listings exclude rows with **`File.userId`** set (account-owned), so guests do not see another account’s uploads after sign-out in the same browser session. Upload writes both; drift is possible if metadata is edited by hand. |
+| **Serving file content** | **`GET /api/files/:filename`** reads **`uploads/`** by filename | **`File`** / metadata **`userId`** for **403** when the caller is not the owner | Account-owned files require matching **`X-Mindmap-User-Id`**; see §3 *File listing + file content retrieval*. |
 | **Saved graph snapshot** | Pair: **`graphs/graph_*.json`** + MongoDB `Graph` | `GraphView` when load tracking runs | **`POST /api/graphs/save`** writes **JSON to disk first**, then **`dbGraph.save()`**. If Mongo fails after the file write, a graph JSON file may exist **without** a matching `Graph` document—see GitHub **#44**. **`GET /api/graphs`** lists files in **`graphs/`**; load uses disk JSON and may join Mongo by `metadata.generatedAt`. |
 | **Analyze runs** | MongoDB `GraphTransform` | `UserActivity` (`ANALYZE_COMPLETE`) | Transform is authoritative; audit is supplementary. |
 | **Graph UI telemetry** | MongoDB `GraphOperation` | — | No duplicate row in `UserActivity` (see persistence matrix). |
@@ -99,6 +99,7 @@ The server intentionally stores some data **on disk** and related metadata **in 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
 - `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
+- `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`/api/auth/me`**, **`PATCH /api/auth/me`** (JWT **`mindmap_auth`** httpOnly cookie; GitHub **#63**)
 - `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats)
 - `routes/`: other modules (sessions, feedback, graph operations)
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, UserActivity, etc.)
@@ -185,13 +186,22 @@ Relevant code:
 
 **Goal**: allow the UI to list uploaded content and fetch it for analysis.
 
-- `GET /api/files` — **User/session scoping (GitHub #32):** When **`?sessionId=<uuid>`** is present, the response is built from MongoDB **`File`** documents for that session (guest migration path). When **`?userId=`** or header **`X-Mindmap-User-Id`** is present, results are filtered by **`File.userId`** (accounts). With **no** `sessionId`/`userId`, the handler falls back to enumerating **`server/metadata/`** (legacy unscoped list; not recommended for production).
+- `GET /api/files` — **User/session scoping (GitHub #32):**
+  - **`?userId=`** or header **`X-Mindmap-User-Id`**: MongoDB **`File.find({ userId })`** — account library (signed-in client uses **`GET /api/files`** without `sessionId` in the query; header carries the id).
+  - **`?sessionId=<uuid>`** only (guest / signed-out): **`File.find({ sessionId, … })`** where **`userId`** is **missing, null, or empty** — “guest” uploads for that session. Rows with a non-empty **`File.userId`** are **excluded**, so account-owned uploads are not visible after sign-out while the browser **`sessionId`** is unchanged.
+  - **No** `sessionId`/`userId`: falls back to enumerating **`server/metadata/`** (legacy unscoped list; **not recommended for production** — see backlog).
 - Response may include **`listingScope`**: **`sessionId`**, **`userId`**, or **`legacy`**.
-- `GET /api/files/:filename` reads file content from `server/uploads/` and returns it as JSON `{ success, content }`.
+- `GET /api/files/:filename` — reads from `server/uploads/`. If the **`File`** row or metadata JSON has **`userId`**, the request must send **`X-Mindmap-User-Id`** with the **same** value or the server returns **403** (`FORBIDDEN`).
+- `DELETE /api/files/:filename?sessionId=` — **Guest-only** files: metadata **`sessionId`** must match. **Account-owned** files: only the matching **`X-Mindmap-User-Id`** may delete (session match alone is insufficient), so a guest cannot delete another user’s file in the same session.
+
+**Auth registration / profile (GitHub #63):** **`POST /api/auth/register`**, **`POST /api/auth/login`** set a **`mindmap_auth`** httpOnly cookie; **`GET /api/auth/me`** and **`PATCH /api/auth/me`** read/update the current user. Request bodies for auth routes are **redacted** in the default request logger.
+
+**Follow-ups (outside current scope):** Verify **`X-Mindmap-User-Id`** against the JWT cookie server-side (do not rely on the client header alone); authorize **`POST /api/analyze`** against owned files; retire or gate legacy unscoped **`GET /api/files`** in production — see GitHub issues linked from **`docs/github-backlog-issues.md`**.
 
 Relevant code:
 
 - `server/routes/files.js`
+- `server/routes/auth.js`
 
 ### 4) AI analysis → graph JSON (OpenAI) + transform tracking
 
@@ -257,9 +267,10 @@ Relevant code:
   - writes `server/graphs/graph_<timestamp>.json`
   - also stores a `Graph` document in Mongo
 - `GET /api/graphs`
-  - lists saved graph JSON snapshots in `server/graphs/`. **#32:** pass **`?sessionId=`** to include only snapshots whose **`metadata.sessionId`** matches (string compare), or **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**. Omitting both returns **all** snapshots (**legacy**). Response may include **`listingScope`**.
+  - lists saved graph JSON snapshots in `server/graphs/`. **#32:** pass **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**, or **`?sessionId=`** for guest session snapshots **excluding** any JSON whose **`metadata.userId`** is set (account-owned graphs are not listed in session-only mode). Omitting both returns **all** snapshots (**legacy**). Response may include **`listingScope`**.
+- `POST /api/graphs/save` — **`metadata.userId`** is taken from **`X-Mindmap-User-Id`** when present, else from the request body (header wins).
 - `GET /api/graphs/:filename`
-  - loads a snapshot from disk
+  - loads a snapshot from disk. If **`metadata.userId`** is set, requires matching **`X-Mindmap-User-Id`** or returns **403**.
   - optionally enriches/links to Mongo data and records a `GraphView`
 
 Relevant code:

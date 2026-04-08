@@ -23,17 +23,17 @@ function Library({ onClose }) {
   const fetchFiles = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const data = await apiRequest(
-        `/api/files?sessionId=${encodeURIComponent(sessionId)}`,
-        listingAuth
-      );
+      const path = userId
+        ? '/api/files'
+        : `/api/files?sessionId=${encodeURIComponent(sessionId)}`;
+      const data = await apiRequest(path, listingAuth);
       setFiles(data.files);
     } catch (error) {
       setError(getApiErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [sessionId, listingAuth]);
+  }, [sessionId, userId, listingAuth]);
 
   useEffect(() => {
     if (!sessionId) {

@@ -6,6 +6,7 @@ import {
   IDENTITY_KIND_REGISTERED,
   useIdentity,
 } from './IdentityContext';
+import { AuthProvider } from './AuthContext';
 
 function Probe() {
   const { identityKind, isRegistered, userId } = useIdentity();
@@ -45,4 +46,17 @@ test('useIdentity throws outside IdentityProvider', () => {
     render(<Probe />);
   }).toThrow(/useIdentity must be used within IdentityProvider/);
   console.error = err;
+});
+
+test('IdentityProvider can render inside AuthProvider', () => {
+  render(
+    <AuthProvider>
+      <IdentityProvider initialRegisteredUserId="test-user-2">
+        <Probe />
+      </IdentityProvider>
+    </AuthProvider>
+  );
+  expect(screen.getByTestId('probe')).toHaveTextContent(
+    `${IDENTITY_KIND_REGISTERED}:true:test-user-2`
+  );
 });
