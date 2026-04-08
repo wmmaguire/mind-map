@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import GraphVisualization from './GraphVisualization';
@@ -426,13 +432,13 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       goLater: () => goToHistoryIndex(Math.min(n - 1, idx + 1)),
       goToIndex: goToHistoryIndex,
     };
-  }, [graphHistory.entries, graphHistory.index, graphData, goToHistoryIndex]);
+  }, [graphHistory, graphData, goToHistoryIndex]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setGraphHistoryBannerPayload(graphHistoryBannerPayload);
   }, [graphHistoryBannerPayload, setGraphHistoryBannerPayload]);
 
-  useEffect(
+  useLayoutEffect(
     () => () => {
       setGraphHistoryBannerPayload(null);
     },

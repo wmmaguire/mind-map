@@ -1,7 +1,8 @@
 .guest-identity-banner {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.5fr) minmax(0, 1fr);
+  /* Center must not collapse to 0: minmax(0,…) allowed that and hid #36 history controls beside rail + account. */
+  grid-template-columns: minmax(0, 1fr) minmax(13.5rem, 2.5fr) minmax(0, 1fr);
   align-items: center;
   gap: 0.4rem 0.65rem;
   padding: 0.28rem 0.75rem;
@@ -86,6 +87,7 @@
   grid-column: 2;
   margin: 0;
   min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
