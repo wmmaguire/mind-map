@@ -1,5 +1,5 @@
 /**
- * POST /api/transcribe — audio → text via OpenAI Whisper (GitHub #34).
+ * POST /api/transcribe — audio → text via OpenAI Whisper (GitHub #34, #58).
  */
 import express from 'express';
 import multer from 'multer';
@@ -14,6 +14,40 @@ export function isAllowedAudioMime(mime) {
   if (!mime || typeof mime !== 'string') return false;
   const base = mime.split(';')[0].trim().toLowerCase();
   return base.startsWith('audio/');
+}
+
+/**
+ * Opt-in verbose transcript (segment timestamps): multipart field or query `verbose`.
+ * Truthy: `1`, `true`, `yes`, `on` (case-insensitive).
+ */
+export function parseVerboseRequestFlag(body, query) {
+  const raw = body?.verbose ?? query?.verbose;
+  if (raw === undefined || raw === null || raw === '') return false;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw).trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
+/**
+ * Maps OpenAI verbose_json transcription to our JSON contract (GitHub #58).
+ */
+export function buildTranscribeJsonResponse(transcription, model, options = {}) {
+  const verbose = Boolean(options.verbose);
+  const transcript = typeof transcription?.text === 'string' ? transcription.text : '';
+  const base = { success: true, transcript, model };
+  if (!verbose) return base;
+
+  const duration =
+    typeof transcription?.duration === 'number' ? transcription.duration : undefined;
+  const segments = Array.isArray(transcription?.segments)
+    ? transcription.segments.map((s) => ({
+        start: typeof s.start === 'number' ? s.start : 0,
+        end: typeof s.end === 'number' ? s.end : 0,
+        text: typeof s.text === 'string' ? s.text : ''
+      }))
+    : [];
+
+  return { ...base, ...(duration !== undefined ? { duration } : {}), segments };
 }
 
 function openaiErrorHttpStatus(err) {
@@ -97,6 +131,7 @@ export default function createTranscribeRouter(openai) {
       }
 
       const model = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1';
+      const verbose = parseVerboseRequestFlag(req.body, req.query);
 
       try {
         const safeName = req.file.originalname?.replace(/[^\w.\-()+]/g, '_') || 'audio.webm';
@@ -104,27 +139,30 @@ export default function createTranscribeRouter(openai) {
           type: req.file.mimetype
         });
 
-        const transcription = await openai.audio.transcriptions.create({
+        const createParams = {
           file: fileForApi,
           model
-        });
+        };
+        if (verbose) {
+          createParams.response_format = 'verbose_json';
+        }
 
-        const transcript = typeof transcription.text === 'string' ? transcription.text : '';
+        const transcription = await openai.audio.transcriptions.create(createParams);
+
+        const payload = buildTranscribeJsonResponse(transcription, model, { verbose });
+        const transcriptLen =
+          typeof payload.transcript === 'string' ? payload.transcript.length : 0;
 
         await recordUserActivity({
           sessionObjectId: session._id,
           sessionUuid: sessionId,
           action: 'TRANSCRIBE_COMPLETE',
           status: 'SUCCESS',
-          summary: `Transcribed ${transcript.length} characters`,
-          meta: { model, bytes: req.file.size }
+          summary: `Transcribed ${transcriptLen} characters`,
+          meta: { model, bytes: req.file.size, verbose }
         });
 
-        return res.json({
-          success: true,
-          transcript,
-          model
-        });
+        return res.json(payload);
       } catch (error) {
         console.error('Transcribe error:', error);
         const httpStatus = openaiErrorHttpStatus(error);

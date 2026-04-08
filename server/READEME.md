@@ -163,11 +163,16 @@ Relevant code:
    - **`success`**: `true`
    - **`transcript`**: string (may be empty)
    - **`model`**: model id used
+   - **Optional (GitHub #58):** If the client sends **`verbose`** (multipart field or query) with a truthy value (`1`, `true`, `yes`, `on`), the server uses OpenAI **`response_format: verbose_json`** and adds:
+     - **`duration`**: number (seconds), when the API returns it
+     - **`segments`**: array of `{ start, end, text }` (seconds; one row per phrase)
 4. **Errors:** **`400`** — missing `sessionId`, invalid session, missing file, unsupported MIME (**`code`**: `SESSION_REQUIRED`, `INVALID_SESSION`, `NO_AUDIO_FILE`, `UNSUPPORTED_AUDIO_TYPE`). **`413`** — **`FILE_TOO_LARGE`** (`maxBytes`). **`401`** / **`429`** — OpenAI auth / quota (**`OPENAI_AUTH`**, **`OPENAI_QUOTA`**). Failures record **`UserActivity`** **`TRANSCRIBE_COMPLETE`** **`FAILURE`**; successes record **`SUCCESS`**.
 
 No audio bytes are persisted as library **`File`** rows on this route — only audit metadata. The client saves text through the normal upload API.
 
-**Plain text only:** The implementation uses the default transcription response shape (**`text`** string). It does **not** return word- or segment-level timestamps, and it does **not** identify multiple speakers (**`whisper-1`**). OpenAI’s API supports richer options (e.g. **`verbose_json`** for timing — GitHub **#58**; **`gpt-4o-transcribe-diarize`** with **`diarized_json`** for speaker-labeled segments — GitHub **#59**). The client may capture audio in-browser (**#35**) or upload a file; both hit this same endpoint today.
+**Default response** uses the compact transcription shape (**`transcript`** only). **Segment timestamps** are opt-in via **`verbose`** (**#58**). **Speaker labels** are not returned by **`whisper-1`**; see **`gpt-4o-transcribe-diarize`** / **`diarized_json`** — GitHub **#59**.
+
+**Follow-ups (outside #58 scope):** HTTP-level tests with a stubbed OpenAI client (**#60**). Browser E2E for the verbose checkbox and segment UI — **#24**. Optional **word-level** timing, **subtitle export** (SRT/VTT), or **persisting `segments`** with uploads — **#61**. Combining **#58** segment timing with **#59** speaker labels will need a merged response contract when both land.
 
 Relevant code:
 

@@ -22,6 +22,8 @@ function FileUpload({ onClose, onUploadSuccess }) {
   const [transcript, setTranscript] = useState('');
   const [transcribeModel, setTranscribeModel] = useState('');
   const [transcribeAttempted, setTranscribeAttempted] = useState(false);
+  const [requestVerboseSegments, setRequestVerboseSegments] = useState(false);
+  const [transcriptSegments, setTranscriptSegments] = useState(null);
 
   const [recState, setRecState] = useState('idle');
   const [recordPreviewUrl, setRecordPreviewUrl] = useState(null);
@@ -67,6 +69,8 @@ function FileUpload({ onClose, onUploadSuccess }) {
     setTranscript('');
     setTranscribeModel('');
     setTranscribeAttempted(false);
+    setRequestVerboseSegments(false);
+    setTranscriptSegments(null);
   }, [abortActiveRecording, revokeRecordPreview]);
 
   useEffect(() => {
@@ -138,6 +142,9 @@ function FileUpload({ onClose, onUploadSuccess }) {
     const formData = new FormData();
     formData.append('audio', audioFile);
     formData.append('sessionId', sessionId);
+    if (requestVerboseSegments) {
+      formData.append('verbose', '1');
+    }
 
     try {
       setUploadStatus('Transcribing...');
@@ -148,6 +155,9 @@ function FileUpload({ onClose, onUploadSuccess }) {
       const text = typeof data.transcript === 'string' ? data.transcript : '';
       setTranscript(text);
       setTranscribeModel(data.model || '');
+      setTranscriptSegments(
+        Array.isArray(data.segments) && data.segments.length > 0 ? data.segments : null
+      );
       setTranscribeAttempted(true);
       setUploadStatus(
         text.length > 0
@@ -509,6 +519,7 @@ function FileUpload({ onClose, onUploadSuccess }) {
                         setTranscript('');
                         setTranscribeModel('');
                         setTranscribeAttempted(false);
+                        setTranscriptSegments(null);
                         setUploadStatus('');
                       }}
                     >
@@ -569,6 +580,16 @@ function FileUpload({ onClose, onUploadSuccess }) {
               </div>
             )}
 
+            <div className="form-group file-upload-verbose-option">
+              <label className="file-upload-verbose-label">
+                <input
+                  type="checkbox"
+                  checked={requestVerboseSegments}
+                  onChange={(e) => setRequestVerboseSegments(e.target.checked)}
+                />{' '}
+                Request segment timestamps (Whisper verbose)
+              </label>
+            </div>
             <div className="modal-actions modal-actions--split">
               <button
                 type="button"
@@ -592,6 +613,22 @@ function FileUpload({ onClose, onUploadSuccess }) {
                 />
                 {transcribeModel ? (
                   <p className="file-upload-meta">Model: {transcribeModel}</p>
+                ) : null}
+                {transcriptSegments ? (
+                  <details className="file-upload-segments">
+                    <summary>Segment timings ({transcriptSegments.length})</summary>
+                    <ol className="file-upload-segments__list">
+                      {transcriptSegments.map((seg, i) => (
+                        <li key={`${seg.start}-${seg.end}-${i}`}>
+                          <span className="file-upload-segments__time">
+                            {typeof seg.start === 'number' ? seg.start.toFixed(2) : '?'}s –{' '}
+                            {typeof seg.end === 'number' ? seg.end.toFixed(2) : '?'}s
+                          </span>
+                          {seg.text}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
                 ) : null}
               </div>
             ) : null}

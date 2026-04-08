@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-07 (**#35** FileUpload audio pipeline shipped: **Upload file** | **Record** `MediaRecorder`, **`utils/audioRecording.js`**, branch **`issue-35-fileupload-audio-recorder`**, docs tip **`0d6d47d`**). **#34** **`POST /api/transcribe`** unchanged. Plain transcript only; **#58** (timestamps), **#59** (speaker diarization) backlog.
+Last updated: 2026-04-08 — **#58** documented; follow-ups **#24** (E2E), **#59** (diarization), **#60** (transcribe HTTP tests), **#61** (optional persist/export); see **`docs/github-backlog-issues.md`** and **`server/READEME.md`** §2b.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -50,7 +50,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
-    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34 / #35):** sub-tabs **Upload file** or **Record** → `POST /api/transcribe` (`audio`, `sessionId`), then `.txt` via **`POST /api/upload`**.
+    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34 / #35 / #58):** sub-tabs **Upload file** or **Record** → `POST /api/transcribe` (`audio`, `sessionId`; optional **`verbose`** for segment timestamps), then `.txt` via **`POST /api/upload`** (plain text only; timings are UI-only unless persisted in a future ticket).
   - **Library + analyze**: `LibraryVisualize.js` + **`LibrarySidebar`**, **`LibrarySourcesPanel`**, **`LibraryAccountChip`**
     - Lists files (`GET /api/files`)
     - Reads file content (`GET /api/files/:filename`)
@@ -87,8 +87,8 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 ### Implemented API surface (major endpoints)
 
 #### Files + uploads
-- `POST /api/transcribe` (**#34**)
-  - Multipart `audio` + `sessionId`; OpenAI Whisper; `UserActivity` **`TRANSCRIBE_COMPLETE`**; see **`server/routes/transcribe.js`**
+- `POST /api/transcribe` (**#34**, **#58**)
+  - Multipart `audio` + `sessionId`; optional **`verbose`** → **`verbose_json`** with **`segments`** / **`duration`**; OpenAI Whisper; `UserActivity` **`TRANSCRIBE_COMPLETE`** (`meta.verbose` when applicable); see **`server/routes/transcribe.js`**
 - `POST /api/upload`
   - Upload a file (multer)
   - Validates session exists (by session UUID)

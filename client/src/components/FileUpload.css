@@ -366,6 +366,50 @@
     margin: 0.35rem 0 0 0;
   }
 
+  .file-upload-verbose-option {
+    margin-bottom: 0.75rem;
+  }
+
+  .file-upload-verbose-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    font-weight: 400;
+    color: #444;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .file-upload-verbose-label input {
+    margin-top: 0.2rem;
+  }
+
+  .file-upload-segments {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    color: #333;
+  }
+
+  .file-upload-segments summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #4a90e2;
+  }
+
+  .file-upload-segments__list {
+    margin: 0.5rem 0 0 0;
+    padding-left: 1.25rem;
+  }
+
+  .file-upload-segments__time {
+    display: inline-block;
+    min-width: 7.5rem;
+    margin-right: 0.35rem;
+    font-variant-numeric: tabular-nums;
+    color: #666;
+    font-size: 0.82rem;
+  }
+
   .file-info--inline {
     margin-top: 0.5rem;
   }

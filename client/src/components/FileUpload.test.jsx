@@ -85,3 +85,38 @@ test('transcribe requests /api/transcribe and shows transcript', async () => {
   expect(screen.getByDisplayValue('hello world')).toBeInTheDocument();
   expect(screen.getByText(/Model: whisper-1/)).toBeInTheDocument();
 });
+
+test('transcribe with verbose sends verbose=1 and shows segment timings', async () => {
+  const user = userEvent.setup();
+  apiRequest.mockResolvedValue({
+    success: true,
+    transcript: 'hello world',
+    model: 'whisper-1',
+    segments: [{ start: 0, end: 0.5, text: 'hello' }, { start: 0.5, end: 1, text: ' world' }]
+  });
+
+  renderModal();
+  await user.click(screen.getByRole('tab', { name: /Audio → transcript/i }));
+
+  const audioInput = screen.getByLabelText(/Audio file/i);
+  const file = new File([new ArrayBuffer(8)], 'clip.webm', {
+    type: 'audio/webm'
+  });
+  await user.upload(audioInput, file);
+
+  await user.click(
+    screen.getByRole('checkbox', { name: /Request segment timestamps/i })
+  );
+  await user.click(screen.getByRole('button', { name: /^Transcribe$/i }));
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalled();
+  });
+
+  const [, opts] = apiRequest.mock.calls[0];
+  expect(opts.body).toBeInstanceOf(FormData);
+  expect(opts.body.get('verbose')).toBe('1');
+
+  expect(screen.getByText(/Segment timings \(2\)/)).toBeInTheDocument();
+  expect(screen.getByText(/0\.00s/)).toBeInTheDocument();
+});
