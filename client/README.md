@@ -83,7 +83,7 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
 
 1. **`IdentityProvider`** (in **`client/src/index.js`**, inside **`SessionProvider`**) exposes **`useIdentity()`** with `identityKind: 'guest'` and `isRegistered: false` until sign-in / profiles exist.
 2. **`GuestIdentityBanner`** renders on all routes with a short notice; it will hide once **`isRegistered`** is true in a later milestone.
-3. **Guest → registered migration (future):** when accounts and user-scoped APIs land (**#32**, **#33**), the product will define how existing session-scoped files/graphs attach to a new user (e.g. explicit “link this session” after login). Until then, **do not** log API keys or tokens in the client; the guest banner is informational only.
+3. **Guest → registered migration (future):** **#32** delivers **session- / user-scoped listing** (`GET /api/files`, `GET /api/graphs`); **writes** (`POST /api/upload`, graph save) remain session-only until **#33** (auth, headers, and attaching **`userId`** on create). The product will define how existing session-scoped assets attach to a new user (e.g. explicit “link this session” after login). Until then, **do not** log API keys or tokens in the client; the guest banner is informational only.
 
 ### 2) Upload flow (file + metadata)
 
@@ -94,7 +94,7 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
    - `file`
    - `customName`
    - `sessionId` (from `useSession()`)
-3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo. A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
+3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo (indexed by **`sessionId`**; optional **`userId`** on the model is **not** set from auth on this path yet — **#33**). A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
 4. On failure, the API may return structured JSON (`error`, `details`, `code`). If a **legacy Mongo index** still enforces one file per session, see **`server/READEME.md`** (GitHub **#42**).
 
 ### 3) Library list → analyze → graph render
