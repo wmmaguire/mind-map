@@ -4,11 +4,7 @@ import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
 import { useIdentity } from '../context/IdentityContext';
 import LibrarySidebar from './LibrarySidebar';
-import {
-  apiRequest,
-  getApiErrorMessage,
-  isNetworkError,
-} from '../api/http';
+import { apiRequest, getApiErrorMessage } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import {
   getFilteredSortedFiles,
@@ -129,9 +125,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } catch (error) {
       console.error('Error fetching files:', error);
       const msg = getApiErrorMessage(error);
-      setError(
-        `Failed to fetch files: ${msg}${isNetworkError(error) ? ' Check that the API server is running (e.g. port 5001).' : ''}`
-      );
+      setError(`Failed to fetch files: ${msg}`);
     } finally {
       setFilesLoading(false);
     }
