@@ -254,35 +254,49 @@ svg {
 }
 
 .graph-action-select-wrap .graph-action-select {
-  /* This select is an invisible hitbox over the caret area (to change algorithm). */
-  position: absolute;
-  top: 0;
-  right: 0;
+  flex: 1;
+  min-width: 0;
   height: 100%;
-  width: 52px;
-  opacity: 0;
-  cursor: pointer;
+  margin: 0;
+  padding: 0 28px 0 0;
   border: none;
-  z-index: 2;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 25px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.graph-action-select-wrap .graph-action-select-value {
-  flex: 1;
-  text-align: center;
-  font-size: 14px;
-  line-height: 25px;
+.graph-action-select-wrap .graph-action-select-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 44px;
+  cursor: pointer;
 }
 
 .graph-action-select-wrap .graph-action-select-caret {
   flex-shrink: 0;
   margin-left: auto;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 0.95rem;
   line-height: 1;
   width: 1.25rem;
   text-align: right;
   opacity: 0.95;
   pointer-events: none;
-  z-index: 1;
 }
 
 .graph-action-select-wrap .graph-action-select:focus {
