@@ -1,7 +1,7 @@
 .guest-identity-banner {
   flex-shrink: 0;
   display: grid;
-  align-items: center;
+  align-items: center; /* keeps End preview aligned with account label row */
   gap: 0.35rem 0.65rem;
   padding: 0.28rem 0.75rem;
   min-height: 0;
@@ -47,6 +47,31 @@
   color: #86efac;
 }
 
+/* Single label block: SIGNED IN + user id (id keeps natural casing). */
+.guest-identity-banner__account-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  max-width: min(52ch, 100%);
+  min-width: 0;
+}
+
+.guest-identity-banner__account-label-prefix {
+  flex-shrink: 0;
+}
+
+.guest-identity-banner__account-label-id {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* Label-styled control (replaces heavy dev button). */
 .guest-identity-banner__label--action {
   margin: 0;
@@ -74,16 +99,6 @@
 
 .guest-identity-banner--registered .guest-identity-banner__label--action:hover {
   color: #bbf7d0;
-}
-
-.guest-identity-banner__id {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: min(40ch, 100%);
 }
 
 /* Former Library visualization-header title — now in shell. */

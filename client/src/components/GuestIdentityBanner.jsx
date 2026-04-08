@@ -65,14 +65,16 @@ export default function GuestIdentityBanner() {
       aria-label="Account mode"
     >
       <div className="guest-identity-banner__main">
-        <span className="guest-identity-banner__label guest-identity-banner__label--registered">
-          Signed in
-        </span>
         <span
-          className="guest-identity-banner__id"
+          className="guest-identity-banner__label guest-identity-banner__label--registered guest-identity-banner__account-label"
           title={userId || ''}
         >
-          {displayId || '—'}
+          <span className="guest-identity-banner__account-label-prefix">
+            Signed in
+          </span>
+          <span className="guest-identity-banner__account-label-id">
+            {displayId || '—'}
+          </span>
         </span>
       </div>
       {showTitle && (
@@ -81,7 +83,7 @@ export default function GuestIdentityBanner() {
       {devControls && (
         <button
           type="button"
-          className="guest-identity-banner__label guest-identity-banner__label--action guest-identity-banner__label--action-end"
+          className="guest-identity-banner__label guest-identity-banner__label--action"
           onClick={() => setDevRegisteredUserId(null)}
         >
           End preview
