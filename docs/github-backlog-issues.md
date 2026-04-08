@@ -37,6 +37,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** Epic **#34** (implementation in review — branch **`issue-34-audio-transcribe-pipeline`**, tip **`5b82d63`**) — **`POST /api/transcribe`** (OpenAI **`audio.transcriptions.create`**, model **`OPENAI_TRANSCRIBE_MODEL`** / default **`whisper-1`**, **`server/routes/transcribe.js`**), **`UserActivity`** **`TRANSCRIBE_COMPLETE`**; client **`FileUpload`** tabs **Text file** | **Audio → transcript** → edit → **`POST /api/upload`** as `.txt`. Response is **plain text only** (no word/segment timestamps). **Out of scope for this slice (see issue comments + backlog):** **`MediaRecorder` / in-browser record** — **#35**; **optional Whisper `verbose_json` / segment times** — **#58**; **integration test** with mocked OpenAI for **`/api/transcribe`**; **long & async** audio; browser **E2E** audio → graph — **#24**; **docs:** **`server/READEME.md`** §2b, **`client/README.md`** upload flow + manual E2E.
 
+**Note:** **#58** — optional **segment / word timestamps** for **`POST /api/transcribe`** (`verbose_json` or equivalent); plain text shipped in **#34** (`214abed` docs commit references).
+
 **Note:** Client **#21** — namespaced **union** of per-file analyze graphs (`client/src/utils/mergeGraphs.js`); merged view is disjoint subgraphs by default.
 
 **Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics.
