@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
@@ -14,20 +14,27 @@ function Library({ onClose }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [graphData, setGraphData] = useState(null);
 
-  useEffect(() => {
-    fetchFiles();
-  }, []);
-
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
+    if (!sessionId) return;
     try {
-      const data = await apiRequest('/api/files');
+      const data = await apiRequest(
+        `/api/files?sessionId=${encodeURIComponent(sessionId)}`
+      );
       setFiles(data.files);
     } catch (error) {
       setError(getApiErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setLoading(false);
+      return;
+    }
+    fetchFiles();
+  }, [sessionId, fetchFiles]);
 
   const handleFileSelect = async (file) => {
     try {

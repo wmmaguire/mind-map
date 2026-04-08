@@ -101,8 +101,8 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
 
 **Goal**: transform selected source files into a graph and render it.
 
-1. `LibraryVisualize` fetches the available uploads:
-   - `GET /api/files` → list of uploaded file metadata
+1. `LibraryVisualize` fetches the available uploads (session-scoped; GitHub **#32**):
+   - `GET /api/files?sessionId=<uuid>` → list of **`File`** rows for that guest session
 2. For each selected file, it requests the raw content:
    - `GET /api/files/:filename` → `{ success, content }`
 3. It calls analysis **once per selected file** (parallel requests):
@@ -213,7 +213,7 @@ Commands:
 There is no Playwright/Cypress harness in this repo yet; validate the full stack manually:
 
 1. From the repo root, start API + client: **`npm run dev`** (server on port **5001**, CRA on **3000** with proxy to the API).
-2. Open **`http://localhost:3000`**. Confirm the landing page loads and (with DevTools → Network) **`POST /api/sessions`** succeeds.
+2. Open **`http://localhost:3000`**. Confirm the landing page loads and (with DevTools → Network) **`POST /api/sessions`** succeeds. On **Visualize**, **`GET /api/files?sessionId=…`** and **`GET /api/graphs?sessionId=…`** should include your session UUID (guest scoping — **#32**).
 3. **Upload:** open **Upload**, pick a small `.txt` file, submit; expect success and **`POST /api/upload`** (multipart) **200**.
 4. **Visualize:** go to **Visualize** (or **`/visualize`**). Confirm **`GET /api/files`** lists the upload; select the file, **Analyze Selected**; expect **`GET /api/files/:name`**, **`POST /api/analyze`**, then a graph in the visualization area.
 5. Optional: **Give feedback** (FAB), **Save** graph if you want to verify **`POST /api/graphs/save`** and **`GET /api/graphs`**.

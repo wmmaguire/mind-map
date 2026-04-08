@@ -25,6 +25,8 @@ const graphSchema = new mongoose.Schema({
     nodeCount: Number,
     edgeCount: Number,
     sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
+    /** Optional authenticated owner when accounts exist (#32). */
+    userId: { type: String, trim: true, sparse: true },
   },
   nodes: [nodeSchema],
   links: [linkSchema]
@@ -34,6 +36,7 @@ const graphSchema = new mongoose.Schema({
 
 // Add indexes for common queries
 graphSchema.index({ 'metadata.sessionId': 1 });
+graphSchema.index({ 'metadata.userId': 1 });
 graphSchema.index({ 'metadata.generatedAt': -1 });
 graphSchema.index({ 'nodes.id': 1 });
 

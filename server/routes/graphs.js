@@ -13,6 +13,8 @@ import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
+const USER_ID_HEADER = 'x-mindmap-user-id';
+
 router.post('/graphs/save', async (req, res) => {
   try {
     const { graph, metadata } = req.body;
@@ -78,7 +80,10 @@ router.post('/graphs/save', async (req, res) => {
         lastModified: new Date(),
         nodeCount: processedNodes.length,
         edgeCount: processedLinks.length,
-        sessionId: sessionObjectId
+        sessionId: sessionObjectId,
+        ...(metadata.userId && typeof metadata.userId === 'string'
+          ? { userId: metadata.userId.trim() }
+          : {}),
       },
       nodes: processedNodes,
       links: processedLinks
@@ -101,7 +106,10 @@ router.post('/graphs/save', async (req, res) => {
       metadata: {
         ...dbGraph.metadata,
         sessionId: metadata.sessionId,
-        sourceFiles: metadata.sourceFiles || []
+        sourceFiles: metadata.sourceFiles || [],
+        ...(metadata.userId && typeof metadata.userId === 'string'
+          ? { userId: metadata.userId.trim() }
+          : {}),
       }
     };
 
@@ -141,29 +149,47 @@ router.get('/graphs', async (req, res) => {
   try {
     await fs.mkdir(graphsDir, { recursive: true });
 
+    const userId =
+      (typeof req.query.userId === 'string' && req.query.userId.trim()) ||
+      (typeof req.get(USER_ID_HEADER) === 'string' &&
+        req.get(USER_ID_HEADER).trim()) ||
+      null;
+    const sessionId =
+      typeof req.query.sessionId === 'string' ? req.query.sessionId.trim() : '';
+
     const files = await fs.readdir(graphsDir);
-    const graphs = await Promise.all(
-      files
-        .filter((file) => file.endsWith('.json'))
-        .map(async (file) => {
-          const content = await fs.readFile(path.join(graphsDir, file), 'utf8');
-          const data = JSON.parse(content);
-          return {
-            filename: file,
-            metadata: data.metadata
-          };
-        })
-    );
+    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+
+    const graphs = [];
+    for (const file of jsonFiles) {
+      const content = await fs.readFile(path.join(graphsDir, file), 'utf8');
+      const data = JSON.parse(content);
+      const meta = data.metadata || {};
+      if (userId) {
+        if (meta.userId !== userId) continue;
+      } else if (sessionId) {
+        if (meta.sessionId !== sessionId) continue;
+      }
+      graphs.push({
+        filename: file,
+        metadata: meta,
+      });
+    }
 
     res.json({
       success: true,
-      graphs
+      graphs,
+      listingScope: userId
+        ? 'userId'
+        : sessionId
+          ? 'sessionId'
+          : 'legacy',
     });
   } catch (error) {
     console.error('Error listing graphs:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to list graphs'
+      error: 'Failed to list graphs',
     });
   }
 });

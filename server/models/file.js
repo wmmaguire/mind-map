@@ -6,6 +6,13 @@ const fileSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  /** Optional authenticated owner; guest uploads omit this (#32). */
+  userId: {
+    type: String,
+    trim: true,
+    sparse: true,
+    index: true
+  },
   customName: {
     type: String,
     required: true,

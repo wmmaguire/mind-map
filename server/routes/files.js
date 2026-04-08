@@ -13,6 +13,50 @@ import { recordUserActivity } from '../lib/recordUserActivity.js';
 
 const router = express.Router();
 
+/** Dev/future-auth: optional user id for user-scoped listings (#32). */
+const USER_ID_HEADER = 'x-mindmap-user-id';
+
+function fileDocToListItem(doc) {
+  const basename = path.basename(doc.path);
+  return {
+    _id: doc._id,
+    filename: basename,
+    originalName: doc.originalName,
+    customName: doc.customName,
+    uploadDate:
+      doc.uploadTime instanceof Date
+        ? doc.uploadTime.toISOString()
+        : new Date(doc.uploadTime).toISOString(),
+    fileType: doc.fileType,
+    size: doc.fileSize,
+    sessionId: doc.sessionId,
+    ...(doc.userId ? { userId: doc.userId } : {}),
+  };
+}
+
+async function listAllMetadataJsonFiles() {
+  const metadataFiles = await fs.readdir(metadataDir);
+  const fileList = await Promise.all(
+    metadataFiles
+      .filter((file) => file.endsWith('.json'))
+      .map(async (metaFile) => {
+        try {
+          const metadata = JSON.parse(
+            await fs.readFile(path.join(metadataDir, metaFile), 'utf8')
+          );
+          return {
+            ...metadata,
+            filename: metaFile.replace('.json', ''),
+          };
+        } catch (error) {
+          console.error('Error reading metadata file:', metaFile, error);
+          return null;
+        }
+      })
+  );
+  return fileList.filter((file) => file !== null);
+}
+
 const storage = multer.diskStorage({
   destination(req, file, cb) {
     cb(null, uploadsDir);
@@ -41,39 +85,44 @@ async function removeSessionUploadArtifacts(uploadedFilePath, metadataBasename) 
 
 router.get('/files', async (req, res) => {
   try {
-    console.log('Reading metadata directory:', metadataDir);
-    const metadataFiles = await fs.readdir(metadataDir);
-    console.log('Found metadata files:', metadataFiles);
+    const userId =
+      (typeof req.query.userId === 'string' && req.query.userId.trim()) ||
+      (typeof req.get(USER_ID_HEADER) === 'string' &&
+        req.get(USER_ID_HEADER).trim()) ||
+      null;
+    const sessionId =
+      typeof req.query.sessionId === 'string' ? req.query.sessionId.trim() : '';
 
-    const fileList = await Promise.all(
-      metadataFiles
-        .filter((file) => file.endsWith('.json'))
-        .map(async (metaFile) => {
-          try {
-            const metadata = JSON.parse(
-              await fs.readFile(path.join(metadataDir, metaFile), 'utf8')
-            );
-            return {
-              ...metadata,
-              filename: metaFile.replace('.json', '')
-            };
-          } catch (error) {
-            console.error('Error reading metadata file:', metaFile, error);
-            return null;
-          }
-        })
+    if (userId) {
+      const docs = await File.find({ userId }).sort({ uploadTime: -1 }).lean();
+      res.setHeader('Content-Type', 'application/json');
+      return res.json({
+        files: docs.map(fileDocToListItem),
+        listingScope: 'userId',
+      });
+    }
+
+    if (sessionId) {
+      const docs = await File.find({ sessionId }).sort({ uploadTime: -1 }).lean();
+      res.setHeader('Content-Type', 'application/json');
+      return res.json({
+        files: docs.map(fileDocToListItem),
+        listingScope: 'sessionId',
+      });
+    }
+
+    console.log(
+      'GET /api/files: unscoped listing (metadata dir); pass sessionId or userId for scoped results (#32)'
     );
-
-    const validFiles = fileList.filter((file) => file !== null);
-
+    const validFiles = await listAllMetadataJsonFiles();
     res.setHeader('Content-Type', 'application/json');
-    res.json({ files: validFiles });
+    res.json({ files: validFiles, listingScope: 'legacy' });
   } catch (error) {
-    console.error('Error reading metadata directory:', error);
+    console.error('Error reading files listing:', error);
     res.status(500).json({
       error: 'Failed to read files',
       details: error.message,
-      path: metadataDir
+      path: metadataDir,
     });
   }
 });

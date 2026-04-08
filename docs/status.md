@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 (**#31** guest identity + Library **`actionsFabPlacement`**)
+Last updated: 2026-04-08 (**#31** / **#32** guest identity + scoped library listings)
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -89,7 +89,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
   - Writes metadata JSON file
   - Attempts to store a `File` record in Mongo
 - `GET /api/files`
-  - Lists upload metadata from filesystem (`server/metadata/*.json`)
+  - With **`?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`**, lists from MongoDB **`File`** (GitHub **#32**); otherwise legacy scan of **`server/metadata/*.json`**
 - `GET /api/files/:filename`
   - Reads the uploaded file content from `server/uploads/`
 
@@ -118,7 +118,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - Writes JSON to filesystem (`server/graphs/graph_<timestamp>.json`)
     - Saves a Graph document in Mongo
 - `GET /api/graphs`
-  - Lists saved graphs from filesystem
+  - Lists saved graph JSON files; filtered by **`metadata.sessionId`** or **`metadata.userId`** when query/header provided (**#32**), else lists all (legacy)
 - `GET /api/graphs/:filename`
   - Loads a saved graph from filesystem
   - Optionally merges extra Mongo metadata and records a `GraphView`
@@ -141,7 +141,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 - `UserMetadata` (`server/models/userMetadata.js`)
   - browser/os/screen/language/timezone
 - `File` (`server/models/file.js`)
-  - file metadata + path; linked (conceptually) to session + transforms
+  - file metadata + path; **`sessionId`**; optional **`userId`** (**#32**)
 - `GraphTransform` (`server/models/graphTransform.js`)
   - tracks analysis jobs (status/result), references `Session` and `File`s
 - `Graph` (`server/models/graph.js`)

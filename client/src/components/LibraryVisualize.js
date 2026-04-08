@@ -113,9 +113,12 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   }, []);
 
   const fetchFiles = useCallback(async () => {
+    if (!sessionId) return;
     setFilesLoading(true);
     try {
-      const data = await apiRequest('/api/files');
+      const data = await apiRequest(
+        `/api/files?sessionId=${encodeURIComponent(sessionId)}`
+      );
       if (data && data.files) {
         setFiles(data.files);
       }
@@ -128,17 +131,37 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setFilesLoading(false);
     }
-  }, []);
+  }, [sessionId]);
+
+  const fetchSavedGraphs = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const data = await apiRequest(
+        `/api/graphs?sessionId=${encodeURIComponent(sessionId)}`
+      );
+      if (data && data.graphs) {
+        setSavedGraphs(data.graphs);
+      }
+    } catch (error) {
+      console.warn('Error fetching saved graphs:', error);
+      setSavedGraphs([]);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
+    if (!sessionId) {
+      setFilesLoading(false);
+      return;
+    }
     fetchFiles();
     fetchSavedGraphs();
-  }, [fetchFiles]);
+  }, [sessionId, fetchFiles, fetchSavedGraphs]);
 
   useEffect(() => {
     if (fileRefreshToken === 0) return;
+    if (!sessionId) return;
     fetchFiles();
-  }, [fileRefreshToken, fetchFiles]);
+  }, [fileRefreshToken, fetchFiles, sessionId]);
 
   useEffect(() => {
     if (!deleteToast) return;
@@ -209,18 +232,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     },
     []
   );
-
-  const fetchSavedGraphs = async () => {
-    try {
-      const data = await apiRequest('/api/graphs');
-      if (data && data.graphs) {
-        setSavedGraphs(data.graphs);
-      }
-    } catch (error) {
-      console.warn('Error fetching saved graphs:', error);
-      setSavedGraphs([]);
-    }
-  };
 
   const handleErrorBannerAction = () => {
     const wasFetchError =

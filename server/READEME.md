@@ -70,7 +70,7 @@ The server intentionally stores some data **on disk** and related metadata **in 
 |--------|----------------------|--------------------|------------|
 | **Session identity** | MongoDB `Session` (UUID `sessionId` + `_id`) | — | All API flows that need a session validate against `Session` (or fail). |
 | **Raw upload bytes** | `uploads/` under **`DATA_DIR`** | MongoDB `File` document (`path`, names, `sessionId`, etc.) | A successful **`POST /api/upload`** requires **metadata JSON on disk**, **multer file on disk**, and **`File.save()`**. If the DB write fails, artifacts are removed so disk and DB stay aligned (see upload flow). |
-| **Library file list** | **`metadata/*.json`** (one per upload basename) | MongoDB `File` | **`GET /api/files`** reads the **metadata directory** only—it does **not** query `File` for the list. The upload handler writes both; they should match after a 200, but manual edits or partial deletes can desync listing vs Mongo. |
+| **Library file list** | MongoDB `File` when **`GET /api/files?sessionId=`** or **`?userId=`** (#32) | **`metadata/*.json`** mirror | Scoped listing uses **`File`**; legacy unscoped **`GET /api/files`** still scans **metadata/** only. Upload writes both; drift is possible if metadata is edited by hand. |
 | **Serving file content** | **`GET /api/files/:filename`** reads **`uploads/`** by filename | `File` optional for validation | Content is served from disk path under `uploadsDir`. |
 | **Saved graph snapshot** | Pair: **`graphs/graph_*.json`** + MongoDB `Graph` | `GraphView` when load tracking runs | **`POST /api/graphs/save`** writes **JSON to disk first**, then **`dbGraph.save()`**. If Mongo fails after the file write, a graph JSON file may exist **without** a matching `Graph` document—see GitHub **#44**. **`GET /api/graphs`** lists files in **`graphs/`**; load uses disk JSON and may join Mongo by `metadata.generatedAt`. |
 | **Analyze runs** | MongoDB `GraphTransform` | `UserActivity` (`ANALYZE_COMPLETE`) | Transform is authoritative; audit is supplementary. |
@@ -153,7 +153,8 @@ Relevant code:
 
 **Goal**: allow the UI to list uploaded content and fetch it for analysis.
 
-- `GET /api/files` enumerates JSON files under `server/metadata/` and returns a list to the client.
+- `GET /api/files` — **User/session scoping (GitHub #32):** When **`?sessionId=<uuid>`** is present, the response is built from MongoDB **`File`** documents for that session (guest migration path). When **`?userId=`** or header **`X-Mindmap-User-Id`** is present, results are filtered by **`File.userId`** (accounts). With **no** `sessionId`/`userId`, the handler falls back to enumerating **`server/metadata/`** (legacy unscoped list; not recommended for production).
+- Response may include **`listingScope`**: **`sessionId`**, **`userId`**, or **`legacy`**.
 - `GET /api/files/:filename` reads file content from `server/uploads/` and returns it as JSON `{ success, content }`.
 
 Relevant code:
@@ -221,7 +222,7 @@ Relevant code:
   - writes `server/graphs/graph_<timestamp>.json`
   - also stores a `Graph` document in Mongo
 - `GET /api/graphs`
-  - lists saved graph JSON snapshots in `server/graphs/`
+  - lists saved graph JSON snapshots in `server/graphs/`. **#32:** pass **`?sessionId=`** to include only snapshots whose **`metadata.sessionId`** matches (string compare), or **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**. Omitting both returns **all** snapshots (**legacy**). Response may include **`listingScope`**.
 - `GET /api/graphs/:filename`
   - loads a snapshot from disk
   - optionally enriches/links to Mongo data and records a `GraphView`
