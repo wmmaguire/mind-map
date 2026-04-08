@@ -1678,6 +1678,11 @@ function GraphVisualization({
     onMenuPickGenerate();
   };
 
+  const expansionAlgorithmLabel =
+    expansionAlgorithm === 'randomizedGrowth'
+      ? 'multi-cycle randomized'
+      : 'manual';
+
   const onMenuPickAddNode = () => {
     const snap = graphActionSnapshotRef.current;
     const ids = snap.nodeIds.length ? [...snap.nodeIds] : [];
@@ -1844,33 +1849,42 @@ function GraphVisualization({
                 role="group"
                 aria-label="AI Generation"
               >
-                <div className="generate-button graph-action-menu__action graph-action-select-wrap">
+                <button
+                  type="button"
+                  className="generate-button graph-action-menu__action graph-action-select-wrap"
+                  onClick={() => onMenuPickGenerateWithAlgorithm(expansionAlgorithm)}
+                >
                   <span
                     className="graph-action-menu__action-icon"
                     aria-hidden
                   >
                     ✨
                   </span>
+                  <span className="graph-action-select-value">
+                    {expansionAlgorithmLabel}
+                  </span>
                   <select
                     id="graph-expansion-algorithm"
-                    className="graph-action-select"
-                    aria-label="AI Generation"
+                    className="graph-action-select graph-action-select--caret-hitbox"
+                    aria-label="AI Generation algorithm"
                     value={expansionAlgorithm}
                     onChange={e => {
                       const next = e.target.value;
                       if (!next) return;
                       onMenuPickGenerateWithAlgorithm(next);
                     }}
+                    onClick={e => {
+                      // Let users open the dropdown without triggering the button click.
+                      e.stopPropagation();
+                    }}
                   >
                     <option value="manual">manual</option>
-                    <option value="randomizedGrowth">
-                      multi-cycle randomized
-                    </option>
+                    <option value="randomizedGrowth">multi-cycle randomized</option>
                   </select>
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
                   </span>
-                </div>
+                </button>
               </div>
             )}
           </section>

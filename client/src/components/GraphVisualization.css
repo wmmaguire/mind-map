@@ -249,23 +249,27 @@ svg {
 
 .graph-action-menu-section-body .graph-action-select-wrap {
   box-sizing: border-box;
+  position: relative;
+  width: calc(100% - 24px);
 }
 
 .graph-action-select-wrap .graph-action-select {
-  flex: 1;
-  min-width: 0;
+  /* This select is an invisible hitbox over the caret area (to change algorithm). */
+  position: absolute;
+  top: 0;
+  right: 0;
   height: 100%;
-  margin: 0;
-  padding: 0 4px 0 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: 14px;
-  font-family: inherit;
-  line-height: 25px;
+  width: 44px;
+  opacity: 0;
   cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
+  border: none;
+}
+
+.graph-action-select-wrap .graph-action-select-value {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  line-height: 25px;
 }
 
 .graph-action-select-wrap .graph-action-select-caret {
