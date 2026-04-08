@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 — **#58** documented; follow-ups **#24** (E2E), **#59** (diarization), **#60** (transcribe HTTP tests), **#61** (optional persist/export); see **`docs/github-backlog-issues.md`** and **`server/READEME.md`** §2b.
+Last updated: 2026-04-08 — **#63**-related auth, library account isolation, and docs aligned across **`client/README.md`**, **`server/READEME.md`**, **`docs/github-backlog-issues.md`**; prior **#58** notes + follow-ups **#24**, **#59**, **#60**, **#61** remain in **`server/READEME.md`** §2b.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -41,12 +41,15 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - telemetry (`POST /api/operations`)
     - graph saving metadata
 
-- **Identity + Library shell (GitHub #31 foundation, #33 UI)**
-  - `IdentityContext.jsx`: optional `userId` / `isRegistered` / `identityKind`; optional `REACT_APP_MINDMAP_USER_ID`; in **development**, `setDevRegisteredUserId` for signed-in preview.
+- **Identity + auth + Library shell (GitHub #31 foundation, #33 UI, #63 auth)**
+  - `AuthContext.jsx` / `AuthProvider`: **`/api/auth`** register, login, logout, **`GET /api/me`**, **`PATCH /api/me`** (httpOnly **`mindmap_auth`** cookie).
+  - `index.js`: **`AuthIdentityBridge`** supplies **`user?.id`** to **`IdentityProvider`** so `useIdentity().userId` matches the signed-in account.
+  - `IdentityContext.jsx`: optional `userId` / `isRegistered` / `identityKind`; optional `REACT_APP_MINDMAP_USER_ID`; in **development** with **`REACT_APP_ENABLE_DEV_PREVIEW`**, `setDevRegisteredUserId` for guest preview.
   - `GraphTitleContext.jsx`: `LibraryVisualize` sets the current graph title for the shell banner; cleared when leaving **`/visualize`**.
   - `LibraryUiContext.jsx`: mobile “open library” — `LibraryVisualize` registers visibility + opener; control renders in **`GuestIdentityBanner`** (leading), not a fixed left rail.
-  - **`GuestIdentityBanner`**: consolidated account control (guest preview / signed-in menu), centered graph title, compact mobile Library button.
-  - **#32** covers scoped **listing** APIs; client sends **`X-Mindmap-User-Id`** when `userId` is set. **Server upload** still does not attach **`File.userId`** from auth until a later auth milestone (**#33** follow-up).
+  - **`GuestIdentityBanner`**: sign-in / register modal, signed-in menu (user settings, sign out); optional dev preview when env allows.
+  - **`LibraryAccountChip`**: shows profile **name** when **`useAuth().user`** has one, else truncated id.
+  - **#32** / **#63**: scoped listings; **`POST /api/upload`** sets **`File.userId`** when **`X-Mindmap-User-Id`** is sent. Session-only lists **exclude** account-owned rows so guests cannot see another user’s library after sign-out in the same browser session (**`server/READEME.md`** §3). **Follow-up:** verify header against JWT server-side — see **`docs/github-backlog-issues.md`**.
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`

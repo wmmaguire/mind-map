@@ -16,6 +16,48 @@ const router = express.Router();
 /** Dev/future-auth: optional user id for user-scoped listings (#32). */
 const USER_ID_HEADER = 'x-mindmap-user-id';
 
+/**
+ * Guest / session-only library listing: same browser session may persist after logout.
+ * Rows with a non-empty userId belong to an account and must not appear unless listing by userId.
+ */
+function sessionScopedGuestFilesQuery(sessionId) {
+  return {
+    sessionId,
+    $or: [
+      { userId: { $exists: false } },
+      { userId: null },
+      { userId: '' },
+    ],
+  };
+}
+
+async function canReadUploadedFile(req, filename, filePath) {
+  const headerUserId =
+    typeof req.get(USER_ID_HEADER) === 'string'
+      ? req.get(USER_ID_HEADER).trim()
+      : '';
+  let ownerId = null;
+  const fileDoc = await File.findOne({ path: filePath }).lean();
+  if (fileDoc?.userId && String(fileDoc.userId).trim() !== '') {
+    ownerId = String(fileDoc.userId).trim();
+  } else {
+    try {
+      const metaPath = path.join(metadataDir, `${filename}.json`);
+      const raw = await fs.readFile(metaPath, 'utf8');
+      const meta = JSON.parse(raw);
+      if (typeof meta.userId === 'string' && meta.userId.trim() !== '') {
+        ownerId = meta.userId.trim();
+      }
+    } catch {
+      /* legacy or missing sidecar */
+    }
+  }
+  if (ownerId && headerUserId !== ownerId) {
+    return false;
+  }
+  return true;
+}
+
 function fileDocToListItem(doc) {
   const basename = path.basename(doc.path);
   return {
@@ -103,7 +145,9 @@ router.get('/files', async (req, res) => {
     }
 
     if (sessionId) {
-      const docs = await File.find({ sessionId }).sort({ uploadTime: -1 }).lean();
+      const docs = await File.find(sessionScopedGuestFilesQuery(sessionId))
+        .sort({ uploadTime: -1 })
+        .lean();
       res.setHeader('Content-Type', 'application/json');
       return res.json({
         files: docs.map(fileDocToListItem),
@@ -156,13 +200,20 @@ router.post('/upload', (req, res, next) => {
         });
       }
 
+      const headerUserId = req.get(USER_ID_HEADER);
+      const ownerUserId =
+        typeof headerUserId === 'string' && headerUserId.trim() !== ''
+          ? headerUserId.trim()
+          : null;
+
       const metadata = {
         originalName: req.file.originalname,
         customName: req.body.customName || req.file.originalname.replace(/\.[^/.]+$/, ''),
         uploadDate: new Date().toISOString(),
         fileType: req.file.mimetype,
         size: req.file.size,
-        sessionId: req.body.sessionId
+        sessionId: req.body.sessionId,
+        ...(ownerUserId ? { userId: ownerUserId } : {}),
       };
 
       const metadataBasename = `${req.file.filename}.json`;
@@ -183,6 +234,7 @@ router.post('/upload', (req, res, next) => {
       try {
         const fileRecord = new File({
           sessionId: req.body.sessionId,
+          ...(ownerUserId ? { userId: ownerUserId } : {}),
           customName: metadata.customName,
           originalName: metadata.originalName,
           uploadTime: new Date(metadata.uploadDate),
@@ -282,6 +334,15 @@ router.get('/files/:filename', async (req, res) => {
       });
     }
 
+    const allowed = await canReadUploadedFile(req, filename, filePath);
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        code: 'FORBIDDEN',
+      });
+    }
+
     const content = await fs.readFile(filePath, 'utf8');
     console.log('File read successfully:', {
       filename,
@@ -341,7 +402,37 @@ router.delete('/files/:filename', async (req, res) => {
     });
   }
 
-  if (meta.sessionId !== sessionId) {
+  const headerUserId =
+    typeof req.get(USER_ID_HEADER) === 'string'
+      ? req.get(USER_ID_HEADER).trim()
+      : '';
+
+  let fileDoc;
+  try {
+    fileDoc = await File.findOne({ path: uploadPath }).lean();
+  } catch (e) {
+    console.error('Delete lookup File:', e);
+  }
+
+  const sessionMatch = meta.sessionId === sessionId;
+  const accountMatch =
+    headerUserId &&
+    (fileDoc?.userId === headerUserId ||
+      (typeof meta.userId === 'string' && meta.userId === headerUserId));
+
+  const isAccountOwned =
+    (fileDoc?.userId && String(fileDoc.userId).trim() !== '') ||
+    (typeof meta.userId === 'string' && meta.userId.trim() !== '');
+
+  // Account-owned files must not be deletable via session alone (same session after logout).
+  if (isAccountOwned) {
+    if (!accountMatch) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only delete files you uploaded while signed in to that account',
+      });
+    }
+  } else if (!sessionMatch) {
     return res.status(403).json({
       success: false,
       error: 'You can only delete files uploaded in this session',

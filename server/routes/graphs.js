@@ -17,14 +17,29 @@ const USER_ID_HEADER = 'x-mindmap-user-id';
 
 router.post('/graphs/save', async (req, res) => {
   try {
-    const { graph, metadata } = req.body;
+    const { graph, metadata: rawMeta } = req.body;
 
-    if (!graph || !metadata) {
+    if (!graph || !rawMeta) {
       return res.status(400).json({
         success: false,
         error: 'Missing graph data or metadata'
       });
     }
+
+    const headerUserId =
+      typeof req.get(USER_ID_HEADER) === 'string'
+        ? req.get(USER_ID_HEADER).trim()
+        : '';
+    const bodyUserId =
+      rawMeta.userId && typeof rawMeta.userId === 'string'
+        ? rawMeta.userId.trim()
+        : '';
+    const resolvedUserId = headerUserId || bodyUserId || '';
+
+    const metadata = {
+      ...rawMeta,
+      ...(resolvedUserId ? { userId: resolvedUserId } : {}),
+    };
 
     const uniquePrefix = Date.now().toString(36) + '-';
 
@@ -169,6 +184,13 @@ router.get('/graphs', async (req, res) => {
         if (meta.userId !== userId) continue;
       } else if (sessionId) {
         if (meta.sessionId !== sessionId) continue;
+        // Account-owned graphs must not appear in session-only listing after logout.
+        if (
+          meta.userId != null &&
+          String(meta.userId).trim() !== ''
+        ) {
+          continue;
+        }
       }
       graphs.push({
         filename: file,
@@ -228,6 +250,21 @@ router.get('/graphs/:filename', async (req, res) => {
 
     const content = await fs.readFile(filePath, 'utf8');
     const fileData = JSON.parse(content);
+
+    const metaUid = fileData.metadata?.userId;
+    if (metaUid != null && String(metaUid).trim() !== '') {
+      const headerUserId =
+        typeof req.get(USER_ID_HEADER) === 'string'
+          ? req.get(USER_ID_HEADER).trim()
+          : '';
+      if (headerUserId !== String(metaUid).trim()) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          code: 'FORBIDDEN',
+        });
+      }
+    }
 
     console.log('Loading graph from file:', {
       nodes: fileData.graph.nodes.length,

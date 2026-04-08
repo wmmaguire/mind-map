@@ -1,5 +1,5 @@
 import '../setupPolyfills';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { IdentityProvider } from '../context/IdentityContext';
 import { GraphTitleProvider } from '../context/GraphTitleContext';
 import { LibraryUiProvider } from '../context/LibraryUiContext';
@@ -19,10 +19,13 @@ function wrap(ui) {
 }
 
 describe('GuestIdentityBanner', () => {
-  it('shows compact guest label by default', () => {
+  it('shows sign-in control when unauthenticated (no redundant Guest label)', async () => {
     render(wrap(<GuestIdentityBanner />));
     expect(screen.getByRole('status', { name: /account mode/i })).toBeInTheDocument();
-    expect(screen.getByText('Guest', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText(/Create account/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Sign in/i)).toBeInTheDocument();
+    });
   });
 
   it('shows signed-in id when registered', () => {

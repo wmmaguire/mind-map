@@ -23,6 +23,31 @@ function getTokenFromReq(req) {
   return req.cookies?.[COOKIE_NAME];
 }
 
+async function getAuthenticatedUser(req) {
+  const token = getTokenFromReq(req);
+  if (!token) {
+    return { error: { status: 401, body: { success: false, error: 'Not authenticated', code: 'NOT_AUTHENTICATED' } } };
+  }
+  try {
+    const decoded = verifyAuthToken(token);
+    const userId = decoded?.sub ? String(decoded.sub) : null;
+    if (!userId) {
+      return { error: { status: 401, body: { success: false, error: 'Invalid token', code: 'INVALID_TOKEN' } } };
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return { error: { status: 401, body: { success: false, error: 'Unknown user', code: 'UNKNOWN_USER' } } };
+    }
+    return { user };
+  } catch {
+    return { error: { status: 401, body: { success: false, error: 'Invalid token', code: 'INVALID_TOKEN' } } };
+  }
+}
+
+function userPublicJson(user) {
+  return { id: String(user._id), email: user.emailLower, name: user.name || '' };
+}
+
 export function installAuthCookieParsing(app) {
   app.use(cookieParser());
 }
@@ -53,7 +78,7 @@ export default function createAuthRouter() {
     }
     const token = signAuthToken({ sub: String(r.user._id) });
     res.cookie(COOKIE_NAME, token, cookieOptions());
-    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower, name: r.user.name || '' } });
+    return res.json({ success: true, user: userPublicJson(r.user) });
   });
 
   router.post('/login', async (req, res) => {
@@ -64,7 +89,7 @@ export default function createAuthRouter() {
     }
     const token = signAuthToken({ sub: String(r.user._id) });
     res.cookie(COOKIE_NAME, token, cookieOptions());
-    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower, name: r.user.name || '' } });
+    return res.json({ success: true, user: userPublicJson(r.user) });
   });
 
   router.post('/logout', async (_req, res) => {
@@ -73,24 +98,31 @@ export default function createAuthRouter() {
   });
 
   router.get('/me', async (req, res) => {
-    const token = getTokenFromReq(req);
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'Not authenticated', code: 'NOT_AUTHENTICATED' });
+    const result = await getAuthenticatedUser(req);
+    if (result.error) {
+      return res.status(result.error.status).json(result.error.body);
     }
-    try {
-      const decoded = verifyAuthToken(token);
-      const userId = decoded?.sub ? String(decoded.sub) : null;
-      if (!userId) {
-        return res.status(401).json({ success: false, error: 'Invalid token', code: 'INVALID_TOKEN' });
-      }
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(401).json({ success: false, error: 'Unknown user', code: 'UNKNOWN_USER' });
-      }
-      return res.json({ success: true, user: { id: String(user._id), email: user.emailLower, name: user.name || '' } });
-    } catch (e) {
-      return res.status(401).json({ success: false, error: 'Invalid token', code: 'INVALID_TOKEN' });
+    return res.json({ success: true, user: userPublicJson(result.user) });
+  });
+
+  router.patch('/me', async (req, res) => {
+    const result = await getAuthenticatedUser(req);
+    if (result.error) {
+      return res.status(result.error.status).json(result.error.body);
     }
+    const { name } = req.body || {};
+    if (name !== undefined) {
+      if (typeof name !== 'string') {
+        return res.status(400).json({ success: false, error: 'name must be a string', code: 'INVALID_NAME' });
+      }
+      const trimmed = name.trim();
+      if (trimmed.length > 120) {
+        return res.status(400).json({ success: false, error: 'name is too long (max 120)', code: 'INVALID_NAME' });
+      }
+      result.user.name = trimmed;
+      await result.user.save();
+    }
+    return res.json({ success: true, user: userPublicJson(result.user) });
   });
 
   return router;

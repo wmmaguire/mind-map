@@ -116,10 +116,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     if (!sessionId) return;
     setFilesLoading(true);
     try {
-      const data = await apiRequest(
-        `/api/files?sessionId=${encodeURIComponent(sessionId)}`,
-        listingAuth
-      );
+      const path = userId
+        ? '/api/files'
+        : `/api/files?sessionId=${encodeURIComponent(sessionId)}`;
+      const data = await apiRequest(path, listingAuth);
       if (data && data.files) {
         setFiles(data.files);
       }
@@ -130,15 +130,15 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setFilesLoading(false);
     }
-  }, [sessionId, listingAuth]);
+  }, [sessionId, userId, listingAuth]);
 
   const fetchSavedGraphs = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const data = await apiRequest(
-        `/api/graphs?sessionId=${encodeURIComponent(sessionId)}`,
-        listingAuth
-      );
+      const path = userId
+        ? '/api/graphs'
+        : `/api/graphs?sessionId=${encodeURIComponent(sessionId)}`;
+      const data = await apiRequest(path, listingAuth);
       if (data && data.graphs) {
         setSavedGraphs(data.graphs);
       }
@@ -146,7 +146,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       console.warn('Error fetching saved graphs:', error);
       setSavedGraphs([]);
     }
-  }, [sessionId, listingAuth]);
+  }, [sessionId, userId, listingAuth]);
 
   useEffect(() => {
     if (!sessionId) {

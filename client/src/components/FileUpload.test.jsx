@@ -5,6 +5,7 @@ import {
   SessionProvider,
   resetSessionBootstrapForTests
 } from '../context/SessionContext';
+import { IdentityProvider } from '../context/IdentityContext';
 
 jest.mock('../api/http', () => ({
   apiRequest: jest.fn(),
@@ -24,7 +25,9 @@ beforeEach(() => {
 function renderModal() {
   return render(
     <SessionProvider>
-      <FileUpload onClose={() => {}} />
+      <IdentityProvider>
+        <FileUpload onClose={() => {}} />
+      </IdentityProvider>
     </SessionProvider>
   );
 }

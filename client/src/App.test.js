@@ -1,5 +1,5 @@
 import './setupPolyfills';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import {
@@ -35,7 +35,7 @@ test('renders app title', () => {
   expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
 });
 
-test('shows guest identity banner', () => {
+test('shows guest identity banner', async () => {
   render(
     <BrowserRouter>
       <SessionProvider>
@@ -52,5 +52,7 @@ test('shows guest identity banner', () => {
     </BrowserRouter>
   );
   expect(screen.getByRole('status', { name: /account mode/i })).toBeInTheDocument();
-  expect(screen.getByText('Guest', { exact: true })).toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.getByText(/Sign in/i)).toBeInTheDocument();
+  });
 });

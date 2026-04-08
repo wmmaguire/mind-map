@@ -58,6 +58,17 @@ export function AuthProvider({ children }) {
     setAuthState({ status: 'guest', user: null });
   }, []);
 
+  const updateProfile = useCallback(async ({ name }) => {
+    const data = await apiRequest('/api/auth/me', {
+      method: 'PATCH',
+      json: { name },
+    });
+    if (data?.success && data.user) {
+      setAuthState({ status: 'authenticated', user: data.user });
+    }
+    return data;
+  }, []);
+
   const value = useMemo(() => ({
     status: authState.status,
     user: authState.user,
@@ -66,7 +77,8 @@ export function AuthProvider({ children }) {
     register,
     login,
     logout,
-  }), [authState.status, authState.user, refreshMe, register, login, logout]);
+    updateProfile,
+  }), [authState.status, authState.user, refreshMe, register, login, logout, updateProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

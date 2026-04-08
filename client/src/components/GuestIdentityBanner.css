@@ -195,6 +195,19 @@
   color: #f8fafc;
 }
 
+.guest-identity-banner__auth-field--readonly input {
+  cursor: default;
+  opacity: 0.85;
+  background: #1e293b;
+}
+
+.guest-identity-banner__settings-hint {
+  margin: -4px 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
 .guest-identity-banner__auth-error {
   border: 1px solid rgba(248, 113, 113, 0.5);
   background: rgba(248, 113, 113, 0.12);
@@ -226,12 +239,16 @@
   cursor: not-allowed;
 }
 
-.guest-identity-banner__label {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 0.65rem;
-  color: #94a3b8;
+.guest-identity-banner__auth-actions--split {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.guest-identity-banner__auth-actions--split button:first-child {
+  border-color: #475569;
+  background: transparent;
+  color: #e2e8f0;
+  font-weight: 600;
 }
 
 /* Consolidated account controls (guest preview + registered menu trigger) */

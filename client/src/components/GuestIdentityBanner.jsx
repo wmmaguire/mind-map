@@ -22,7 +22,14 @@ export default function GuestIdentityBanner() {
     userId,
     setDevRegisteredUserId,
   } = useIdentity();
-  const { status: authStatus, login, register, logout } = useAuth();
+  const {
+    status: authStatus,
+    user: authUser,
+    login,
+    register,
+    logout,
+    updateProfile,
+  } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
 
@@ -39,6 +46,12 @@ export default function GuestIdentityBanner() {
   const displayId =
     userId && userId.length > 28 ? `${userId.slice(0, 26)}…` : userId;
 
+  const accountSubtitle = authUser?.name?.trim()
+    ? authUser.name.length > 28
+      ? `${authUser.name.slice(0, 26)}…`
+      : authUser.name
+    : displayId;
+
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWrapRef = useRef(null);
 
@@ -49,6 +62,11 @@ export default function GuestIdentityBanner() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -82,9 +100,6 @@ export default function GuestIdentityBanner() {
               </span>
               <span className="library-mobile-rail__label">Library</span>
             </button>
-          )}
-          {!(devControls) && (
-            <span className="guest-identity-banner__label">Guest</span>
           )}
         </div>
         {showTitle ? (
@@ -285,9 +300,9 @@ export default function GuestIdentityBanner() {
             </span>
             <span
               className="guest-identity-banner__account-control-id"
-              title={userId || ''}
+              title={authUser?.name?.trim() ? authUser.name : userId || ''}
             >
-              {displayId || '—'}
+              {accountSubtitle || '—'}
             </span>
             <span className="guest-identity-banner__account-control-chevron" aria-hidden>
               {menuOpen ? '▴' : '▾'}
@@ -305,18 +320,21 @@ export default function GuestIdentityBanner() {
               >
                 {userId || '—'}
               </div>
-              <button
-                type="button"
-                className="guest-identity-banner__menu-item"
-                role="menuitem"
-                onClick={() => {
-                  if (devControls) setDevRegisteredUserId(null);
-                  setMenuOpen(false);
-                }}
-                disabled={!devControls}
-              >
-                End preview (guest)
-              </button>
+              {authStatus === 'authenticated' && authUser ? (
+                <button
+                  type="button"
+                  className="guest-identity-banner__menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setSettingsName(authUser.name || '');
+                    setSettingsError('');
+                    setSettingsOpen(true);
+                    setMenuOpen(false);
+                  }}
+                >
+                  User settings
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="guest-identity-banner__menu-item"
@@ -330,6 +348,71 @@ export default function GuestIdentityBanner() {
               </button>
             </div>
           )}
+          {settingsOpen && authUser ? (
+            <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account settings">
+              <div className="guest-identity-banner__auth-modal">
+                <div className="guest-identity-banner__auth-header">
+                  <strong>Account settings</strong>
+                  <button
+                    type="button"
+                    className="guest-identity-banner__auth-close"
+                    onClick={() => setSettingsOpen(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <form
+                  className="guest-identity-banner__auth-form"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setSettingsBusy(true);
+                    setSettingsError('');
+                    try {
+                      await updateProfile({ name: settingsName });
+                      setSettingsOpen(false);
+                    } catch (err) {
+                      setSettingsError(err?.message || 'Could not save');
+                    } finally {
+                      setSettingsBusy(false);
+                    }
+                  }}
+                >
+                  <label className="guest-identity-banner__auth-field">
+                    Name
+                    <input
+                      type="text"
+                      value={settingsName}
+                      onChange={(e) => setSettingsName(e.target.value)}
+                      autoComplete="name"
+                      maxLength={120}
+                      placeholder="Display name"
+                    />
+                  </label>
+                  <label className="guest-identity-banner__auth-field guest-identity-banner__auth-field--readonly">
+                    Email
+                    <input type="email" value={authUser.email || ''} readOnly tabIndex={-1} />
+                  </label>
+                  <p className="guest-identity-banner__settings-hint">
+                    Email cannot be changed here.
+                  </p>
+                  {settingsError ? (
+                    <div className="guest-identity-banner__auth-error" role="alert">
+                      {settingsError}
+                    </div>
+                  ) : null}
+                  <div className="guest-identity-banner__auth-actions guest-identity-banner__auth-actions--split">
+                    <button type="button" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={settingsBusy}>
+                      {settingsBusy ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
         </>
       </div>
     </aside>

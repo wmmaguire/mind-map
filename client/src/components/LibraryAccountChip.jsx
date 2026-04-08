@@ -3,6 +3,7 @@ import {
   IDENTITY_KIND_GUEST,
   useIdentity,
 } from '../context/IdentityContext';
+import { useAuth } from '../context/AuthContext';
 import './LibraryAccountChip.css';
 
 /**
@@ -11,6 +12,7 @@ import './LibraryAccountChip.css';
  */
 export default function LibraryAccountChip() {
   const { identityKind, isRegistered, userId } = useIdentity();
+  const { user: authUser } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -42,6 +44,15 @@ export default function LibraryAccountChip() {
   const shortId =
     userId && userId.length > 14 ? `${userId.slice(0, 12)}…` : userId;
 
+  const hasName = Boolean(authUser?.name?.trim());
+  const displayLabel = hasName
+    ? authUser.name.length > 28
+      ? `${authUser.name.slice(0, 26)}…`
+      : authUser.name
+    : shortId;
+  const idTitle = userId || '';
+  const chipTitle = hasName ? `${authUser.name} (${idTitle})` : idTitle;
+
   return (
     <div
       className="library-account-chip library-account-chip--registered"
@@ -55,8 +66,8 @@ export default function LibraryAccountChip() {
         onClick={() => setMenuOpen((o) => !o)}
       >
         <span className="library-account-chip__badge">Signed in</span>
-        <span className="library-account-chip__id" title={userId || ''}>
-          {shortId}
+        <span className="library-account-chip__id" title={chipTitle}>
+          {displayLabel}
         </span>
         <span className="library-account-chip__chevron" aria-hidden>
           {menuOpen ? '▲' : '▼'}
