@@ -49,7 +49,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
   - `LibraryUiContext.jsx`: mobile “open library” — `LibraryVisualize` registers visibility + opener; control renders in **`GuestIdentityBanner`** (leading), not a fixed left rail.
   - **`GuestIdentityBanner`**: sign-in / register modal, signed-in menu (user settings, sign out); optional dev preview when env allows.
   - **`LibraryAccountChip`**: shows profile **name** when **`useAuth().user`** has one, else truncated id.
-  - **#32** / **#63**: scoped listings; **`POST /api/upload`** sets **`File.userId`** when **`X-Mindmap-User-Id`** is sent. Session-only lists **exclude** account-owned rows so guests cannot see another user’s library after sign-out in the same browser session (**`server/READEME.md`** §3). **Follow-up:** verify header against JWT server-side — see **`docs/github-backlog-issues.md`**.
+  - **#32** / **#63**: scoped listings; **`POST /api/upload`** sets **`File.userId`** when **`X-Mindmap-User-Id`** is sent. Session-only lists **exclude** account-owned rows so guests cannot see another user’s library after sign-out in the same browser session (**`server/READEME.md`** §3). **Follow-up:** verify header against JWT server-side — **#64** (**`docs/github-backlog-issues.md`**).
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
