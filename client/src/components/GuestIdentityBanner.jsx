@@ -11,6 +11,12 @@ export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
 
 /**
  * Compact shell strip: account mode, optional graph title (from Library), dev preview (#31 / #33).
+ *
+ * **Future (post-demo):** consolidate identity UI so “who is signed in” and related actions
+ * live in one place—similar to the guest branch’s label-styled **`Preview …`** control
+ * (`guest-identity-banner__label--action`)—instead of spreading **Signed in**, user id, **End preview**,
+ * and the graph title across separate nodes. Likely a single trigger (button or menu) with
+ * account summary + sign-out / preview toggles inside.
  */
 export default function GuestIdentityBanner() {
   const {
