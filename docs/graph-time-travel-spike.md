@@ -33,9 +33,20 @@ Users only see the latest graph state in the Library visualization. There is no 
 ## Validation (issue #36 checklist)
 
 - [x] Spike doc records model choice and migration (this file).
-- [x] Minimal replay of two states: edit the graph twice (or analyze then edit) and use **Earlier** / **Later** or the slider to move between states.
+- [x] Minimal replay of two states: edit the graph twice (or analyze then edit) and use the banner **◀** / **▶**, the **range** slider, or **Play** / **Pause** to move through states.
+
+## Implementation map (phase 1)
+
+| Piece | Role |
+|-------|------|
+| `client/src/utils/graphHistory.js` | Normalize / materialize snapshots; reducer (`RESET`, `COMMIT`, `GOTO`, `STEP`); max **30** entries |
+| `client/src/utils/graphHistory.test.js` | Unit tests for reducer + round-trip |
+| `LibraryVisualize.js` | Owns history state; **`goToHistoryIndex`** is declared early (before any `useMemo` that references it) to avoid TDZ / HMR ordering bugs; registers controls via context |
+| `client/src/context/GraphHistoryUiContext.jsx` | `payload` + `setPayload` bridge to the shell banner |
+| `index.js` | Wraps app with **`GraphHistoryUiProvider`** (inside **`LibraryUiProvider`**) |
+| `GuestIdentityBanner.jsx` / `.css` | **History** row under graph title: step buttons, slider, **Play**/**Pause** (default **1.8s** per step, loops to first after last) |
 
 ## References
 
 - GitHub **#36** (epic)
-- Implementation: `client/src/utils/graphHistory.js`, `LibraryVisualize.js`, `LibraryVisualize.css`
+- Follow-ups: **`docs/github-backlog-issues.md`** (*#36 phase 1 follow-ons* and backlog issue template)

@@ -51,6 +51,58 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#68** / **#69** — **Backlog (future algorithms):** **#68** — multi-cycle randomized **strategy slider** (low-community ←→ random ←→ high-community) for choosing attachment targets and optional per-cycle **deletions** with the same bias; **#69** — **Explosion** mode: zoom in close enough to a node to trigger a Wikipedia-backed, **fully-connected** subgraph expansion. See `https://github.com/wmmaguire/mind-map/issues/68` and `https://github.com/wmmaguire/mind-map/issues/69`.
 
+**Note:** **#36 (phase 1, Apr 2026)** — **Graph time travel (client slice):** bounded in-memory **snapshot stack** in **`LibraryVisualize`** (`graphHistory.js`, max **30**); **History** UI lives in **`GuestIdentityBanner`** (center column under graph title): **◀** / **▶**, range slider, position readout, **Play** / **Pause** (auto-step **~1.8s**, loops last→first). **`GraphHistoryUiContext`** registers the active control API from **`/visualize`** only. History resets on **Analyze**, **load saved graph**, or clearing the graph. **Not** persisted server-side; **Save graph** writes the **current** canvas state only. **Fix:** **`goToHistoryIndex`** `useCallback` is declared **before** any `useMemo` that references it to avoid **`ReferenceError: Cannot access before initialization`** under HMR. **Follow-ups** outside this slice: see *Backlog: Graph time travel phase 2+* template below and GitHub issue (create if missing). Suggested comments: **#36** (summary), **#33** / **#29** (banner density + shell), **#16** (event log alignment), **#24** / **#52** / **#56** / **#57** (E2E, stacking, focus, SR).
+
+### Backlog: Graph time travel phase 2+ — create on GitHub if missing
+
+**Title:** `Backlog: Graph time travel phase 2+ (persist, diff, UX)`
+
+**Body:**
+
+```markdown
+## Context
+Phase 1 of **#36** shipped client-only snapshot history + banner UI (**Play**/**Pause**, slider). This issue tracks durable and product follow-ons.
+
+## Backlog (out of scope for phase 1)
+
+1. **Server-persisted revisions** — Versioned graph snapshots (API list/load by revision); optional hydrate last *N* into the client scrubber.
+2. **Event-log replay** — Align append-only ops with **`GraphOperation` / `UserActivity`** (**#16**) for compact history and audit.
+3. **Diff / compare mode** — Side-by-side or highlighted delta between two revisions (depends on persistence).
+4. **Configurable play delay** — User setting or on-control input for **Play** interval (currently fixed **1.8s**).
+5. **Narrow banner / mobile** — History controls compete with title; collapse to menu, single-row overflow, or move to graph chrome (**#33**, **#52**).
+6. **Focus & a11y** — **`aria-live`** announcements on history step (**#57**); focus order when opening **/visualize** (**#56**).
+7. **Tests** — RTL test for **`GraphHistoryBannerControls`** + integration that **`LibraryVisualize`** registers payload (**#24**).
+8. **Optional: pause on graph interaction** — Auto-pause **Play** when user edits the graph to avoid fighting auto-advance.
+
+Refs: #36 #16 #24 #33 #52 #56 #57
+```
+
+### Suggested issue comments (#36 phase 1)
+
+**On #36 — comment body:**
+
+```markdown
+**Phase 1 shipped (branch `issue-36-graph-time-travel`):** Client-only graph **history** (max 30 snapshots) on **`/visualize`**; **`LibraryVisualize`** commits on **`onDataUpdate`**, resets on analyze/load/clear. UI is in **`GuestIdentityBanner`** (under graph title): step buttons, slider, **Play**/**Pause** (~1.8s loop). **`GraphHistoryUiContext`** bridges library → banner. Docs: **`docs/graph-time-travel-spike.md`**, **`docs/github-backlog-issues.md`**. **TDZ fix:** `goToHistoryIndex` declared before dependent `useMemo`. Remaining work tracked under *Backlog: Graph time travel phase 2+* in **`docs/github-backlog-issues.md`** (and/or a dedicated GitHub issue).
+```
+
+**On #33 — comment body:**
+
+```markdown
+**Update (#36):** **`GuestIdentityBanner`** center column now stacks **graph title** + optional **History** row (graph replay). Adds density on **`/visualize`** when ≥2 history snapshots; may need mobile/overflow polish (**#52**, **#53**) or a future “overflow menu” pattern.
+```
+
+**On #29 — comment body:**
+
+```markdown
+**Related (#36):** Graph **history** replay controls share the top shell with the existing **`graph-edit-mode-chip`** (bottom) for modal/generate flows—two different “status” surfaces; consider unified UX in a later polish pass (**#56**).
+```
+
+**On #16 — comment body:**
+
+```markdown
+**Future hook (#36):** Phase 1 history is **browser-only** snapshots. A durable **#36** phase 2 could append compact **graph edit** events (or snapshot refs) alongside existing **`UserActivity` / `GraphOperation`** telemetry for audit and optional server-side replay.
+```
+
 **Note:** **#62 (client UX follow-on, Apr 2026)** — **Generate** modal: primary button **Apply** (loading **Applying…**); **inline validation** under the title when manual mode has no highlighted anchors at open time or when randomized mode needs at least as many graph nodes as **connections per new node**; on valid **Apply** the modal **closes immediately** and the **`graph-edit-mode-chip`** shows **Generating (AI)** with **`aria-busy`**, an **animated progress bar** (**indeterminate** for manual and before the first randomized cycle; **determinate** by cycle for multi-cycle runs), and **Stop after this cycle** on the chip for randomized mode (no **Cancel** on the chip during generate—intentional for now). **#37** **`dryRun` / Preview budget** is **not** wired in this modal anymore; caps remain enforced server-side. **Failure** paths still use **`window.alert`**. **Follow-ups:** file a new backlog issue using the template in *Suggested GitHub backlog issue (post–#62)* below, and paste the *Suggested issue comments* onto **#62**, **#29**, and **#37** (or ask a maintainer with GitHub CLI/auth).
 
 ### Suggested GitHub backlog issue (post–#62) — create manually
