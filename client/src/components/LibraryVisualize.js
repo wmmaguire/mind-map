@@ -12,6 +12,12 @@ import {
   getFilteredSortedFiles,
   FILE_SORT_NAME_ASC,
 } from '../utils/libraryFileList';
+import {
+  graphHistoryReducer,
+  initialGraphHistoryState,
+  materializeGraphSnapshot,
+  DEFAULT_GRAPH_HISTORY_MAX,
+} from '../utils/graphHistory';
 import './LibraryVisualize.css';
 
 const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
@@ -62,6 +68,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [savedGraphs, setSavedGraphs] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [graphData, setGraphData] = useState(null);
+  const [graphHistory, setGraphHistory] = useState(initialGraphHistoryState);
+  const historyOpts = useMemo(
+    () => ({ maxDepth: DEFAULT_GRAPH_HISTORY_MAX }),
+    []
+  );
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -279,6 +290,31 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     setSelectedFiles(new Set());
   }, []);
 
+  const goToHistoryIndex = useCallback(
+    (nextIndex) => {
+      setGraphHistory((prev) => {
+        if (nextIndex < 0 || nextIndex >= prev.entries.length) return prev;
+        const g = materializeGraphSnapshot(prev.entries[nextIndex]);
+        setGraphData(g);
+        setCurrentSource((p) =>
+          p
+            ? {
+              ...p,
+              nodeCount: g.nodes.length,
+              edgeCount: g.links.length,
+            }
+            : p
+        );
+        return graphHistoryReducer(
+          prev,
+          { type: 'GOTO', index: nextIndex },
+          historyOpts
+        );
+      });
+    },
+    [historyOpts]
+  );
+
   const handleDeleteSelected = useCallback(async () => {
     if (selectedFiles.size === 0 || !sessionId) return;
     if (
@@ -299,6 +335,13 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       setSelectedFiles(new Set());
       setGraphData(null);
       setCurrentSource(null);
+      setGraphHistory(
+        graphHistoryReducer(
+          initialGraphHistoryState,
+          { type: 'RESET', graph: { nodes: [], links: [] } },
+          historyOpts
+        )
+      );
       await fetchFiles();
       setDeleteToast({
         type: 'success',
@@ -317,7 +360,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setDeletingFiles(false);
     }
-  }, [selectedFiles, sessionId, fetchFiles, listingAuth]);
+  }, [selectedFiles, sessionId, fetchFiles, listingAuth, historyOpts]);
 
   const handleFileListKeyDown = useCallback((e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -413,11 +456,19 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           target: nodeMap.get(typeof link.target === 'object' ? link.target.id : link.target)
         }));
 
-        setGraphData({
+        const loaded = {
           nodes: graphData.nodes,
-          links: reconstructedLinks
-        });
-        
+          links: reconstructedLinks,
+        };
+        setGraphData(loaded);
+        setGraphHistory(
+          graphHistoryReducer(
+            initialGraphHistoryState,
+            { type: 'RESET', graph: loaded },
+            historyOpts
+          )
+        );
+
         setSelectedFiles(new Set());
         setCurrentSource({
           ...data.data.metadata,
@@ -502,19 +553,34 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           graph: r.data,
         }))
       );
-      setGraphData({
+      const nextGraph = {
         ...combinedGraph,
         nodes: combinedGraph.nodes.map((n) => ({
           ...n,
           size: 20,
           color: defaultNodeColor,
         })),
-      });
+      };
+      setGraphData(nextGraph);
+      setGraphHistory(
+        graphHistoryReducer(
+          initialGraphHistoryState,
+          { type: 'RESET', graph: nextGraph },
+          historyOpts
+        )
+      );
 
     } catch (error) {
       console.error('Analysis error:', error);
       setError(`Failed to analyze files: ${getApiErrorMessage(error)}`);
       setGraphData(null);
+      setGraphHistory(
+        graphHistoryReducer(
+          initialGraphHistoryState,
+          { type: 'RESET', graph: { nodes: [], links: [] } },
+          historyOpts
+        )
+      );
     } finally {
       setAnalyzing(false);
       setShowContextModal(false);
@@ -562,7 +628,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     };
 
     setGraphData(processedData);
-    
+    setGraphHistory((prev) =>
+      graphHistoryReducer(prev, { type: 'COMMIT', graph: processedData }, historyOpts)
+    );
+
     // Update metadata
     setCurrentSource(prev => ({
       ...prev,
@@ -648,6 +717,51 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       )}
 
       <div className="visualization-panel">
+        {graphHistory.entries.length >= 2 && graphData && (
+          <div
+            className="library-graph-history"
+            role="region"
+            aria-label="Graph history replay"
+          >
+            <span className="library-graph-history__label" id="library-graph-history-label">
+              History
+            </span>
+            <button
+              type="button"
+              className="library-graph-history__step"
+              onClick={() => goToHistoryIndex(graphHistory.index - 1)}
+              disabled={graphHistory.index <= 0}
+              aria-label="Show earlier graph state"
+            >
+              Earlier
+            </button>
+            <input
+              type="range"
+              className="library-graph-history__range"
+              min={0}
+              max={graphHistory.entries.length - 1}
+              step={1}
+              value={graphHistory.index}
+              onChange={(e) => goToHistoryIndex(Number(e.target.value))}
+              aria-labelledby="library-graph-history-label"
+              aria-valuetext={`State ${graphHistory.index + 1} of ${graphHistory.entries.length}`}
+            />
+            <span className="library-graph-history__position" aria-hidden>
+              {graphHistory.index + 1} / {graphHistory.entries.length}
+            </span>
+            <button
+              type="button"
+              className="library-graph-history__step"
+              onClick={() => goToHistoryIndex(graphHistory.index + 1)}
+              disabled={
+                graphHistory.index >= graphHistory.entries.length - 1
+              }
+              aria-label="Show later graph state"
+            >
+              Later
+            </button>
+          </div>
+        )}
         <div className="graph-container library-graph-mount">
           <GraphVisualization
             actionsFabPlacement="libraryGraphMount"
