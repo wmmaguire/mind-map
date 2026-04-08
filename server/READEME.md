@@ -100,7 +100,7 @@ The server intentionally stores some data **on disk** and related metadata **in 
 - `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
 - `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`/api/auth/me`**, **`PATCH /api/auth/me`** (JWT **`mindmap_auth`** httpOnly cookie; GitHub **#63**)
-- `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats)
+- `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats, read-only share token — **#39**)
 - `routes/`: other modules (sessions, feedback, graph operations)
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, UserActivity, etc.)
 - `lib/`: shared helpers (`recordUserActivity.js`, `sessionObjectId.js`)
@@ -270,8 +270,9 @@ Relevant code:
   - lists saved graph JSON snapshots in `server/graphs/`. **#32:** pass **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**, or **`?sessionId=`** for guest session snapshots **excluding** any JSON whose **`metadata.userId`** is set (account-owned graphs are not listed in session-only mode). Omitting both returns **all** snapshots (**legacy**). Response may include **`listingScope`**.
 - `POST /api/graphs/save` — **`metadata.userId`** is taken from **`X-Mindmap-User-Id`** when present, else from the request body (header wins).
 - `GET /api/graphs/:filename`
-  - loads a snapshot from disk. If **`metadata.userId`** is set, requires matching **`X-Mindmap-User-Id`** or returns **403**.
-  - optionally enriches/links to Mongo data and records a `GraphView`
+  - Loads a snapshot from disk. If **`metadata.userId`** is set, requires matching **`X-Mindmap-User-Id`** **or** a valid **`?shareToken=`** that matches **`metadata.shareReadToken`** (constant-time compare; **#39**).
+  - **Share links (#39):** Mint or rotate with **`POST /api/graphs/:filename/share-read-token`** (**`X-Mindmap-User-Id`** must equal **`metadata.userId`**; only graphs saved while signed in). The token is **never** echoed on **`GET`** responses. **`POST /api/graphs/save`** returns **403** if **`?shareToken=`** is present so share secrets do not authorize writes. Share viewers omit **`dbId`** in metadata. **Future comments/collaboration (#39)** should define owner vs viewer roles explicitly; share tokens remain read-only.
+  - Optionally enriches/links to Mongo data and records a `GraphView`
 
 Relevant code:
 

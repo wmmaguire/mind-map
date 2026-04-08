@@ -27,6 +27,8 @@ const graphSchema = new mongoose.Schema({
     sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
     /** Optional authenticated owner when accounts exist (#32). */
     userId: { type: String, trim: true, sparse: true },
+    /** Opaque read-only share secret for GET /api/graphs/:file (#39); never returned in API bodies. */
+    shareReadToken: { type: String, trim: true, sparse: true },
   },
   nodes: [nodeSchema],
   links: [linkSchema]

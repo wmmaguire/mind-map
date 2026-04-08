@@ -140,6 +140,7 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
   - `GET /api/graphs`
 - Load a saved graph:
   - `GET /api/graphs/:filename`
+- **Read-only share links (GitHub #39):** Signed-in owners use **Copy read-only link** on **`/visualize`** (mints **`POST /api/graphs/:filename/share-read-token`**). Recipients open **`/visualize?shareGraph=<filename>&shareToken=<secret>`** — the Library sidebar hides uploads/saves; **`GraphVisualization`** runs in **`readOnly`** mode (no Actions FAB / edits). The server rejects **`POST /api/graphs/save?shareToken=…`** so tokens never authorize writes.
 
 ### 5) Interactive editing + telemetry
 

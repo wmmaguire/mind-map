@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
@@ -55,6 +56,10 @@ function readStoredSections() {
 }
 
 function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
+  const [searchParams] = useSearchParams();
+  const shareGraph = searchParams.get('shareGraph');
+  const shareToken = searchParams.get('shareToken');
+
   const { sessionId } = useSession();
   const { userId } = useIdentity();
   const { setGraphTitle } = useGraphTitle();
@@ -95,6 +100,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     () => readStoredSections().graphs
   );
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  /** GitHub #39: opened via ?shareGraph=&shareToken= */
+  const [shareViewerMode, setShareViewerMode] = useState(false);
+  const [shareLinkToast, setShareLinkToast] = useState(null);
 
   const goToHistoryIndex = useCallback(
     (nextIndex) => {
@@ -149,6 +157,47 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const listingAuth = useMemo(
     () => (userId ? { auth: { userId } } : {}),
     [userId]
+  );
+
+  const applyLoadedGraphFromApi = useCallback(
+    (data, filename, { viaShare }) => {
+      const graphPayload = data.data.graph;
+      const nodeMap = new Map();
+      graphPayload.nodes.forEach((node) => {
+        nodeMap.set(node.id, node);
+      });
+
+      const reconstructedLinks = graphPayload.links.map((link) => ({
+        ...link,
+        source: nodeMap.get(
+          typeof link.source === 'object' ? link.source.id : link.source
+        ),
+        target: nodeMap.get(
+          typeof link.target === 'object' ? link.target.id : link.target
+        ),
+      }));
+
+      const loaded = {
+        nodes: graphPayload.nodes,
+        links: reconstructedLinks,
+      };
+      setGraphData(loaded);
+      setGraphHistory(
+        graphHistoryReducer(
+          initialGraphHistoryState,
+          { type: 'RESET', graph: loaded },
+          historyOpts
+        )
+      );
+
+      setSelectedFiles(new Set());
+      setCurrentSource({
+        ...data.data.metadata,
+        sourceFile: filename,
+      });
+      setShareViewerMode(Boolean(viaShare));
+    },
+    [historyOpts]
   );
 
   const fetchFiles = useCallback(async () => {
@@ -207,6 +256,42 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     const id = setTimeout(() => setDeleteToast(null), 3000);
     return () => clearTimeout(id);
   }, [deleteToast]);
+
+  useEffect(() => {
+    if (!shareLinkToast) return;
+    const id = setTimeout(() => setShareLinkToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [shareLinkToast]);
+
+  useEffect(() => {
+    const g = shareGraph?.trim();
+    const t = shareToken?.trim();
+    if (!sessionId || !g || !t) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setError(null);
+        const path = `/api/graphs/${encodeURIComponent(g)}?shareToken=${encodeURIComponent(t)}`;
+        const data = await apiRequest(path, {});
+        if (cancelled) return;
+        if (data.success) {
+          applyLoadedGraphFromApi(data, g, { viaShare: true });
+        } else {
+          throw new Error(data.error || 'Failed to load shared graph');
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(`Failed to open shared graph: ${getApiErrorMessage(e)}`);
+          setShareViewerMode(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, shareGraph, shareToken, applyLoadedGraphFromApi]);
 
   useEffect(() => {
     try {
@@ -468,41 +553,14 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
   const handleLoadGraph = async (filename) => {
     try {
-      const data = await apiRequest(`/api/graphs/${filename}`, listingAuth);
+      const data = await apiRequest(
+        `/api/graphs/${encodeURIComponent(filename)}`,
+        listingAuth
+      );
 
       if (data.success) {
-        const graphData = data.data.graph;
-        const nodeMap = new Map();
-        graphData.nodes.forEach(node => {
-          nodeMap.set(node.id, node);
-        });
+        applyLoadedGraphFromApi(data, filename, { viaShare: false });
 
-        const reconstructedLinks = graphData.links.map(link => ({
-          ...link,
-          source: nodeMap.get(typeof link.source === 'object' ? link.source.id : link.source),
-          target: nodeMap.get(typeof link.target === 'object' ? link.target.id : link.target)
-        }));
-
-        const loaded = {
-          nodes: graphData.nodes,
-          links: reconstructedLinks,
-        };
-        setGraphData(loaded);
-        setGraphHistory(
-          graphHistoryReducer(
-            initialGraphHistoryState,
-            { type: 'RESET', graph: loaded },
-            historyOpts
-          )
-        );
-
-        setSelectedFiles(new Set());
-        setCurrentSource({
-          ...data.data.metadata,
-          sourceFile: filename
-        });
-
-        // If there's a dbId in the metadata, fetch view stats
         if (data.data.metadata.dbId) {
           try {
             await apiRequest(
@@ -521,6 +579,42 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       setError(`Failed to load graph: ${getApiErrorMessage(error)}`);
     }
   };
+
+  const canMintShareReadLink = Boolean(
+    userId &&
+      graphData &&
+      currentSource?.sourceFile &&
+      !shareViewerMode &&
+      String(currentSource?.userId || '') === String(userId)
+  );
+
+  const handleCopyShareReadLink = useCallback(async () => {
+    const fn = currentSource?.sourceFile;
+    if (!fn || !userId) return;
+    try {
+      const data = await apiRequest(
+        `/api/graphs/${encodeURIComponent(fn)}/share-read-token`,
+        { method: 'POST', ...listingAuth }
+      );
+      if (!data.success) {
+        throw new Error(data.error || 'Could not create share link');
+      }
+      const { shareReadToken: token } = data;
+      const u = new URL(window.location.href);
+      const shareUrl = `${u.origin}/visualize?shareGraph=${encodeURIComponent(fn)}&shareToken=${encodeURIComponent(token)}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setShareLinkToast({
+        type: 'success',
+        message:
+          'Read-only link copied. Recipients can view this graph but cannot save or use graph actions here.',
+      });
+    } catch (e) {
+      setShareLinkToast({
+        type: 'error',
+        message: getApiErrorMessage(e),
+      });
+    }
+  }, [currentSource?.sourceFile, userId, listingAuth]);
 
   const handleFileSelect = (file) => {
     setSelectedFiles(prev => {
@@ -693,6 +787,14 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           {deleteToast.message}
         </div>
       )}
+      {shareLinkToast && (
+        <div
+          className={`library-file-action-toast library-file-action-toast--${shareLinkToast.type}`}
+          role={shareLinkToast.type === 'error' ? 'alert' : 'status'}
+        >
+          {shareLinkToast.message}
+        </div>
+      )}
       <LibrarySidebar
         isMobile={isMobile}
         showSidebar={showSidebar}
@@ -728,6 +830,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           onAnalyzeClick: handleAnalyzeClick,
           onSaveClick: handleSaveClick,
           onLoadGraph: handleLoadGraph,
+          shareViewerMode,
         }}
       />
 
@@ -744,11 +847,31 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       )}
 
       <div className="visualization-panel">
+        {shareViewerMode && (
+          <div className="library-share-viewer-banner" role="status">
+            Viewing a shared graph (read-only). Graph actions and library saves are
+            disabled.
+          </div>
+        )}
+        {canMintShareReadLink && (
+          <div className="library-share-owner-toolbar">
+            <button
+              type="button"
+              className="library-share-copy-link-btn"
+              onClick={handleCopyShareReadLink}
+            >
+              Copy read-only link
+            </button>
+          </div>
+        )}
         <div className="graph-container library-graph-mount">
           <GraphVisualization
             actionsFabPlacement="libraryGraphMount"
             data={graphData || { nodes: [], links: [] }}
-            onDataUpdate={handleGraphDataUpdate}
+            onDataUpdate={
+              shareViewerMode ? () => {} : handleGraphDataUpdate
+            }
+            readOnly={shareViewerMode}
             width={graphViewportWidth}
             height={graphViewportHeight}
           />

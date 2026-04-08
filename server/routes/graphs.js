@@ -1,6 +1,6 @@
 /**
  * Persisted graph snapshots: save, list, load, view stats.
- * Paths: /api/graphs/save, /api/graphs, /api/graphs/:filename, /api/graphs/:graphId/views
+ * Paths: /api/graphs/save, /api/graphs, POST …/share-read-token, /api/graphs/:filename, /api/graphs/:graphId/views
  */
 import express from 'express';
 import path from 'path';
@@ -10,6 +10,11 @@ import Graph from '../models/graph.js';
 import GraphView from '../models/graphView.js';
 import { graphsDir } from '../config.js';
 import { recordUserActivity } from '../lib/recordUserActivity.js';
+import {
+  evaluateOwnedGraphRead,
+  redactGraphMetadataForResponse,
+} from '../lib/graphShareRead.js';
+import crypto from 'crypto';
 
 const router = express.Router();
 
@@ -17,6 +22,16 @@ const USER_ID_HEADER = 'x-mindmap-user-id';
 
 router.post('/graphs/save', async (req, res) => {
   try {
+    const shareTokQ =
+      req.query.shareToken != null ? String(req.query.shareToken).trim() : '';
+    if (shareTokQ !== '') {
+      return res.status(403).json({
+        success: false,
+        error: 'Share token cannot authorize writes',
+        code: 'SHARE_READ_ONLY',
+      });
+    }
+
     const { graph, metadata: rawMeta } = req.body;
 
     if (!graph || !rawMeta) {
@@ -217,6 +232,87 @@ router.get('/graphs', async (req, res) => {
 });
 
 /** More specific than /graphs/:filename — register views route first. */
+/**
+ * Mint or rotate a read-only share token (account-owned graphs only, GitHub #39).
+ * Requires `X-Mindmap-User-Id` matching `metadata.userId` on the snapshot file.
+ */
+router.post('/graphs/:filename/share-read-token', async (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(graphsDir, filename);
+
+    const headerUserId =
+      typeof req.get(USER_ID_HEADER) === 'string'
+        ? req.get(USER_ID_HEADER).trim()
+        : '';
+    if (!headerUserId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Account identity required to create a share link',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    let content;
+    try {
+      content = await fs.readFile(filePath, 'utf8');
+    } catch {
+      return res.status(404).json({
+        success: false,
+        error: 'Graph not found',
+        code: 'NOT_FOUND',
+      });
+    }
+
+    const fileData = JSON.parse(content);
+    const metaUid = fileData.metadata?.userId;
+    if (metaUid == null || String(metaUid).trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Share links are only available for graphs saved while signed in (metadata.userId).',
+        code: 'SHARE_REQUIRES_ACCOUNT_GRAPH',
+      });
+    }
+    if (headerUserId !== String(metaUid).trim()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    fileData.metadata = {
+      ...fileData.metadata,
+      shareReadToken: token,
+    };
+
+    await fs.writeFile(filePath, JSON.stringify(fileData, null, 2));
+
+    try {
+      await Graph.findOneAndUpdate(
+        { 'metadata.generatedAt': fileData.metadata.generatedAt },
+        { $set: { 'metadata.shareReadToken': token } }
+      );
+    } catch (dbErr) {
+      console.warn('Could not persist shareReadToken on Graph document:', dbErr);
+    }
+
+    return res.json({
+      success: true,
+      shareReadToken: token,
+      filename,
+    });
+  } catch (error) {
+    console.error('share-read-token error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create share token',
+    });
+  }
+});
+
 router.get('/graphs/:graphId/views', async (req, res) => {
   try {
     const views = await GraphView.find({ graphId: req.params.graphId })
@@ -246,24 +342,30 @@ router.get('/graphs/:graphId/views', async (req, res) => {
 
 router.get('/graphs/:filename', async (req, res) => {
   try {
-    const filePath = path.join(graphsDir, req.params.filename);
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(graphsDir, filename);
 
     const content = await fs.readFile(filePath, 'utf8');
     const fileData = JSON.parse(content);
 
-    const metaUid = fileData.metadata?.userId;
-    if (metaUid != null && String(metaUid).trim() !== '') {
-      const headerUserId =
-        typeof req.get(USER_ID_HEADER) === 'string'
-          ? req.get(USER_ID_HEADER).trim()
-          : '';
-      if (headerUserId !== String(metaUid).trim()) {
-        return res.status(403).json({
-          success: false,
-          error: 'Forbidden',
-          code: 'FORBIDDEN',
-        });
-      }
+    const headerUserId =
+      typeof req.get(USER_ID_HEADER) === 'string'
+        ? req.get(USER_ID_HEADER).trim()
+        : '';
+    const queryShareToken =
+      typeof req.query.shareToken === 'string' ? req.query.shareToken : '';
+
+    const { allowed, viaShare } = evaluateOwnedGraphRead(
+      fileData.metadata,
+      headerUserId,
+      queryShareToken
+    );
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        code: 'FORBIDDEN',
+      });
     }
 
     console.log('Loading graph from file:', {
@@ -295,7 +397,7 @@ router.get('/graphs/:filename', async (req, res) => {
           sessionId,
           metadata: {
             loadSource: 'file',
-            filename: req.params.filename
+            filename,
           }
         });
 
@@ -308,7 +410,7 @@ router.get('/graphs/:filename', async (req, res) => {
             status: 'SUCCESS',
             resourceType: 'GraphView',
             resourceId: graphView._id,
-            summary: `Loaded graph file ${req.params.filename}`,
+            summary: `Loaded graph file ${filename}`,
             meta: { graphId: String(dbGraph._id) }
           });
         } catch (viewErr) {
@@ -318,7 +420,7 @@ router.get('/graphs/:filename', async (req, res) => {
             sessionUuid: fileData.metadata.sessionId,
             action: 'GRAPH_VIEW_RECORD',
             status: 'FAILURE',
-            summary: `Graph view not persisted for ${req.params.filename}`,
+            summary: `Graph view not persisted for ${filename}`,
             errorMessage: viewErr.message
           });
         }
@@ -336,9 +438,16 @@ router.get('/graphs/:filename', async (req, res) => {
       }))
     });
 
+    const safeMeta = redactGraphMetadataForResponse(fileData.metadata, {
+      shareViewer: viaShare,
+    });
+
     res.json({
       success: true,
-      data: fileData
+      data: {
+        ...fileData,
+        metadata: safeMeta,
+      },
     });
   } catch (error) {
     console.error('Error loading graph:', error);

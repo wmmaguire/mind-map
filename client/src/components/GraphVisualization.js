@@ -16,6 +16,8 @@ function GraphVisualization({
    * `libraryGraphMount`: FAB absolutely positioned top-right of the graph container (Library + SVG).
    */
   actionsFabPlacement = 'fixedViewport',
+  /** When true (shared read-only link, #39): no Actions menu, no canvas edits that call the server. */
+  readOnly = false,
 }) {
   const svgRef = useRef();
   const selectedNodeIds = useRef(new Set());
@@ -124,6 +126,7 @@ function GraphVisualization({
 
   const openGraphActionMenuAt = useCallback(
     (clientX, clientY) => {
+      if (readOnly) return;
       captureGraphActionSnapshot();
       const w = 260;
       const h = 300;
@@ -131,10 +134,11 @@ function GraphVisualization({
       const y = Math.max(8, Math.min(clientY, window.innerHeight - h - 8));
       setGraphActionMenu({ x, y });
     },
-    [captureGraphActionSnapshot]
+    [captureGraphActionSnapshot, readOnly]
   );
 
   const toggleGraphActionsFromFab = useCallback(() => {
+    if (readOnly) return;
     setGraphActionMenu(prev => {
       if (prev) return null;
       captureGraphActionSnapshot();
@@ -157,7 +161,7 @@ function GraphVisualization({
         y: 100,
       };
     });
-  }, [captureGraphActionSnapshot]);
+  }, [captureGraphActionSnapshot, readOnly]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -200,11 +204,12 @@ function GraphVisualization({
     if (!svg) return undefined;
     const onContextMenu = (e) => {
       e.preventDefault();
+      if (readOnly) return;
       openGraphActionMenuAt(e.clientX, e.clientY);
     };
     svg.addEventListener('contextmenu', onContextMenu);
     return () => svg.removeEventListener('contextmenu', onContextMenu);
-  }, [openGraphActionMenuAt]);
+  }, [openGraphActionMenuAt, readOnly]);
 
   const trackOperation = useCallback(
     async (operationType, details, startTime = Date.now(), error = null) => {
@@ -598,6 +603,13 @@ function GraphVisualization({
       .on('drag', dragged)
       .on('end', dragended);
 
+    const noOpDrag = d3
+      .drag()
+      .on('start', () => {})
+      .on('drag', () => {})
+      .on('end', () => {});
+    const dragBehavior = readOnly ? noOpDrag : drag;
+
     // Update node selection with click and drag handlers
     const node = g.selectAll('.node')
       .data(data.nodes)
@@ -735,7 +747,7 @@ function GraphVisualization({
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px');
       })
-      .call(drag);
+      .call(dragBehavior);
 
     // Update link selection with click handler
     g.selectAll('.link-group')
@@ -1080,7 +1092,7 @@ function GraphVisualization({
         .enter()
         .append('g')
         .attr('class', 'node')
-        .call(drag)
+        .call(dragBehavior)
         .on('click', (event, d) => {
           event.stopPropagation();
           
@@ -1268,7 +1280,7 @@ function GraphVisualization({
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, width, height]);
+  }, [data, selectedNodes, width, height, readOnly]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -1697,7 +1709,7 @@ function GraphVisualization({
     );
   };
 
-  const actionsFabButton = (
+  const actionsFabButton = readOnly ? null : (
     <button
       ref={graphActionsFabRef}
       type="button"
@@ -2328,7 +2340,7 @@ function GraphVisualization({
       )}
 
       <svg ref={svgRef} className="graph-visualization"></svg>
-      {actionsFabButton}
+      {actionsFabButton || null}
     </div>
   );
 }
@@ -2368,6 +2380,11 @@ GraphVisualization.propTypes = {
   width: PropTypes.number,
   height: PropTypes.number,
   actionsFabPlacement: PropTypes.oneOf(['fixedViewport', 'libraryGraphMount']),
+  readOnly: PropTypes.bool,
+};
+
+GraphVisualization.defaultProps = {
+  readOnly: false,
 };
 
 export default GraphVisualization; 

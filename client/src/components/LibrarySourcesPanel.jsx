@@ -40,9 +40,19 @@ export default function LibrarySourcesPanel({
   onAnalyzeClick,
   onSaveClick,
   onLoadGraph,
+  shareViewerMode = false,
 }) {
   return (
     <>
+      {shareViewerMode && (
+        <div className="library-share-viewer-sidebar-note" role="status">
+          <p>
+            <strong>Shared view.</strong> Uploads and saving are disabled.{' '}
+            <Link to="/visualize">Open your library</Link> without share parameters
+            to use the full Library.
+          </p>
+        </div>
+      )}
       <section
         className="library-section"
         aria-labelledby="library-section-files"
@@ -68,7 +78,11 @@ export default function LibrarySourcesPanel({
             className="library-section__body file-list"
             aria-busy={filesLoading}
           >
-            {filesLoading ? (
+            {shareViewerMode ? (
+              <p className="no-files no-files--muted">
+                File list is hidden in shared read-only view.
+              </p>
+            ) : filesLoading ? (
               <div
                 className="file-list-skeleton"
                 aria-hidden
@@ -269,7 +283,7 @@ export default function LibrarySourcesPanel({
         </h3>
         {graphsSectionOpen && (
           <div className="library-section__body saved-graphs-section">
-            {graphData && (
+            {graphData && !shareViewerMode && (
               <button
                 onClick={onSaveClick}
                 disabled={saving}
@@ -279,7 +293,11 @@ export default function LibrarySourcesPanel({
               </button>
             )}
             <div className="saved-graphs">
-              {savedGraphs.length === 0 ? (
+              {shareViewerMode ? (
+                <p className="no-saved-graphs">
+                  Loading other saved graphs is disabled while viewing a shared link.
+                </p>
+              ) : savedGraphs.length === 0 ? (
                 <p className="no-saved-graphs">No saved graphs yet.</p>
               ) : (
                 savedGraphs.map((graph, index) => (
@@ -342,9 +360,11 @@ LibrarySourcesPanel.propTypes = {
   onAnalyzeClick: PropTypes.func.isRequired,
   onSaveClick: PropTypes.func.isRequired,
   onLoadGraph: PropTypes.func.isRequired,
+  shareViewerMode: PropTypes.bool,
 };
 
 LibrarySourcesPanel.defaultProps = {
   error: null,
   graphData: null,
+  shareViewerMode: false,
 };
