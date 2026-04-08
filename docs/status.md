@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 — **#37** slice: **`POST /api/generate-node`** budgets + **`dryRun`** preview (**`server/READEME.md`** §5). **#63** auth, library account isolation, and docs across **`client/README.md`**, **`server/READEME.md`**, **`docs/github-backlog-issues.md`**. **#58** notes + follow-ups **#24**, **#59**, **#60**, **#61** in **`server/READEME.md`** §2b.
+Last updated: 2026-04-08 — **#62** client polish: Generate modal **Apply**, inline validation, **auto-close** on submit, on-canvas **`graph-edit-mode-chip`** with **progress bar** (indeterminate / per-cycle determinate) + **Stop after this cycle** on the chip; docs in **`client/README.md`**, **`docs/github-backlog-issues.md`**. Still: **#37** **`dryRun`** / budget **Preview** not exposed in the Generate UI (server API unchanged). Earlier same day: **#37** server slice, **#63** auth docs, **#58** follow-ups in **`server/READEME.md`** §2b.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -66,7 +66,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - Add node, add relationship, delete node/link
     - AI expansion via `POST /api/generate-node`
     - Tracks operations via `POST /api/operations`
-    - **Graph actions UI** (GitHub **#27**) uses the **Actions** FAB and context menu, not a fixed toolbar. **Dead CSS** for the pre–#27 controls shell was removed in **#28** (`GraphVisualization.css`, `LibraryVisualize.css`). **#29** adds **Generate (AI)** vs **Edit graph** accordion sections (Library-style toggles), **link-flow** copy, a bottom **`graph-edit-mode-chip`** when a modal flow is active, and scrollable menu height. **#30** adds touch-sized targets and basic a11y for the Actions menu (**`role="group"`**, focus management, **`aria-hidden`** on decorative icons). **#31** (foundation): **`actionsFabPlacement`** — Library uses **`libraryGraphMount`** so the FAB is anchored to the graph panel (absolute over the SVG); default elsewhere is viewport-fixed. See **`docs/github-backlog-issues.md`** and **`client/README.md`**.
+    - **Graph actions UI** (GitHub **#27**) uses the **Actions** FAB and context menu, not a fixed toolbar. **Dead CSS** for the pre–#27 controls shell was removed in **#28** (`GraphVisualization.css`, `LibraryVisualize.css`). **#29** adds **Generate (AI)** vs **Edit graph** accordion sections (Library-style toggles), **link-flow** copy, a bottom **`graph-edit-mode-chip`** when a modal flow is active **or while AI generation runs** after the Generate modal closes, and scrollable menu height. **#30** adds touch-sized targets and basic a11y for the Actions menu (**`role="group"`**, focus management, **`aria-hidden`** on decorative icons). **#31** (foundation): **`actionsFabPlacement`** — Library uses **`libraryGraphMount`** so the FAB is anchored to the graph panel (absolute over the SVG); default elsewhere is viewport-fixed. See **`docs/github-backlog-issues.md`** and **`client/README.md`**.
 
 #### Backend
 - **Entry point**: `server/server.js` (ES modules; server `package.json` uses `"type": "module"`).

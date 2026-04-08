@@ -49,6 +49,55 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#62** — **Graph expansion modes:** dropdown to choose **manual generate** (current **`/api/generate-node`**) vs **multi-cycle randomized growth** (parameterized AI nodes per cycle, connections per node, cycle count; random attachment to existing nodes). Supersedes the cancelled **#37** budget-preview experiment; see GitHub **#62** for acceptance criteria and open questions.
 
+**Note:** **#62 (client UX follow-on, Apr 2026)** — **Generate** modal: primary button **Apply** (loading **Applying…**); **inline validation** under the title when manual mode has no highlighted anchors at open time or when randomized mode needs at least as many graph nodes as **connections per new node**; on valid **Apply** the modal **closes immediately** and the **`graph-edit-mode-chip`** shows **Generating (AI)** with **`aria-busy`**, an **animated progress bar** (**indeterminate** for manual and before the first randomized cycle; **determinate** by cycle for multi-cycle runs), and **Stop after this cycle** on the chip for randomized mode (no **Cancel** on the chip during generate—intentional for now). **#37** **`dryRun` / Preview budget** is **not** wired in this modal anymore; caps remain enforced server-side. **Failure** paths still use **`window.alert`**. **Follow-ups:** file a new backlog issue using the template in *Suggested GitHub backlog issue (post–#62)* below, and paste the *Suggested issue comments* onto **#62**, **#29**, and **#37** (or ask a maintainer with GitHub CLI/auth).
+
+### Suggested GitHub backlog issue (post–#62) — create manually
+
+**Title:** `Backlog: Graph AI generate UX polish (post–#62)`
+
+**Body:**
+
+```markdown
+## Context
+Follow-ups from **#62** expansion modes and recent **Generate** modal / on-canvas chip work (Apply, inline validation, auto-close on submit, **`graph-edit-mode-chip`** progress bar, Stop after this cycle on the chip).
+
+## Backlog (out of scope for the #62 implementation slice)
+
+1. **Non-blocking errors** — Replace `window.alert` on generate failure with toast or inline message (align with **#50** / general **#22** error UX).
+2. **Browser E2E** (**#24**) — Flow: open Generate → **Apply** → modal closes immediately → chip shows **Generating** + animated bar → multi-cycle: bar advances per cycle → **Stop after this cycle** on chip.
+3. **`dryRun` / Preview budget** (**#37**) — Product decision: **re-expose** client “Preview budget” (`dryRun: true`) in the Generate modal, or document **server-only** `dryRun` and keep UI minimal.
+4. **Cancel / abort in-flight manual generate** — Today only randomized mode has **Stop after this cycle**; manual has no Abort. Consider **`AbortController`** + clear UX if we allow cancel mid-request.
+5. **Intra-cycle progress** — Determinate bar reflects **completed / total cycles** only; finer progress needs API/streaming changes.
+6. **Unit tests** — Extend **`GraphVisualization.test.js`**: validation messages, disabled **Apply**, generating chip / **`role="progressbar"`** when applicable.
+7. **Screen reader / live updates** (**#57**) — e.g. **`aria-live`** announcements when cycle advances; verify focus management after modal **auto-close** on Apply (related polish **#56**).
+
+Refs: #62 #37 #24 #50 #57 #56
+```
+
+### Suggested issue comments (paste into GitHub)
+
+**On #62 — comment body:**
+
+```markdown
+**Client update (Apr 2026):** Generate modal UX polish on top of expansion modes:
+- Primary submit is **Apply** (shows **Applying…** while the request is in flight, though the modal now **auto-closes** on valid submit).
+- **Inline validation** under the modal title when manual mode was opened without highlights, or when randomized mode needs at least as many graph nodes as **connections per new node**.
+- After **Apply**, progress is on the fixed **`graph-edit-mode-chip`**: **Generating (AI)** + **animated progress bar** (indeterminate for manual / before first cycle; determinate by cycle for multi-cycle). **Stop after this cycle** moved to the chip for randomized runs.
+- **Follow-ups** (alerts vs toast, E2E, optional `dryRun` UI, abort manual, tests, a11y) are listed in a dedicated backlog issue—see *Suggested GitHub backlog issue (post–#62)* in `docs/github-backlog-issues.md` (or the linked issue once filed).
+```
+
+**On #29 — comment body:**
+
+```markdown
+**Update:** The **`graph-edit-mode-chip`** is no longer only for “modal open” flows. While **`POST /api/generate-node`** runs after **Apply**, the chip shows **Generating (AI)** + progress UI even though the Generate modal has **auto-closed**, so users still get on-canvas status without the overlay. Other modal flows (add concept, relationship, connect) unchanged.
+```
+
+**On #37 — comment body:**
+
+```markdown
+**Client note:** The **Generate** modal in **`GraphVisualization`** no longer exposes **Preview budget** / **`dryRun: true`**; server-side **`dryRun`** and budget caps from **#37** remain available to API clients. If we want budget preview back in the UI, track it under the post–**#62** polish backlog (or a dedicated ticket) so product + API contract stay aligned.
+```
+
 **Note:** Client **#35** (branch **`issue-35-fileupload-audio-recorder`**, tip **`0d6d47d`**) — **`FileUpload`** **Audio → transcript**: sub-tabs **Upload file** | **Record** (`getUserMedia`, **`MediaRecorder`**, preview, discard / record again), **`utils/audioRecording.js`** (25 MB preflight). Depends on **#34**. **#58** adds optional segment timings UI (checkbox + **details**). **Out of scope:** **#24** (Playwright/Cypress with mic + verbose path), Safari **`webm`** interop hardening, optional waveform UI, integration test mocking **`MediaRecorder`**, a11y polish for segment list (**#57**-related).
 
 **Note:** Client **#21** — namespaced **union** of per-file analyze graphs (`client/src/utils/mergeGraphs.js`); merged view is disjoint subgraphs by default.

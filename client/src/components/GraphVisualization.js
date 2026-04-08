@@ -30,6 +30,9 @@ function GraphVisualization({
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
   const [showGraphActionsHelp, setShowGraphActionsHelp] = useState(false);
+  /** Ids highlighted when Generate modal was opened (manual mode needs ≥1). */
+  const [generateFormAnchorIds, setGenerateFormAnchorIds] = useState([]);
+  const [generateSubmitError, setGenerateSubmitError] = useState(null);
   const expansionAlgorithmMeta =
     expansionAlgorithm === 'randomizedGrowth'
       ? {
@@ -92,6 +95,8 @@ function GraphVisualization({
     setGenerateProgress(null);
     randomizedGrowthCancelRef.current = false;
     setShowGraphActionsHelp(false);
+    setGenerateFormAnchorIds([]);
+    setGenerateSubmitError(null);
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -1271,9 +1276,32 @@ function GraphVisualization({
       generateSourceIdsRef.current != null
         ? [...generateSourceIdsRef.current]
         : Array.from(selectedNodeIds.current).map(String);
+    const selectedNodesPayload = sourceIdSnapshot
+      .map(id => data.nodes.find(node => String(node.id) === String(id)))
+      .filter(Boolean);
+
+    if (expansionAlgorithm === 'manual' && selectedNodesPayload.length === 0) {
+      setGenerateSubmitError(
+        'Manual generation needs at least one highlighted node. Close this form, highlight one or more nodes, then open AI Generation again.'
+      );
+      return;
+    }
+    if (
+      expansionAlgorithm === 'randomizedGrowth' &&
+      data.nodes.length < rgConnectionsPerNewNode
+    ) {
+      setGenerateSubmitError(
+        `Randomized growth needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
+      );
+      return;
+    }
+
+    setGenerateSubmitError(null);
     setIsGenerating(true);
     setGenerateProgress(null);
     randomizedGrowthCancelRef.current = false;
+    // Close the modal immediately once Apply is valid; progress is shown via on-canvas chip.
+    setShowGenerateForm(false);
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
     let operationError = null;
@@ -1281,10 +1309,6 @@ function GraphVisualization({
     let cyclesCompleted = 0;
 
     try {
-      const selectedNodesPayload = sourceIdSnapshot
-        .map(id => data.nodes.find(node => String(node.id) === String(id)))
-        .filter(Boolean);
-
       console.log(
         'Selected nodes for generation:',
         selectedNodesPayload.map(n => `${n.label} (${n.id})`)
@@ -1372,7 +1396,6 @@ function GraphVisualization({
 
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
-      setShowGenerateForm(false);
     } catch (error) {
       console.error('Error generating nodes:', error);
       operationStatus = 'FAILURE';
@@ -1614,6 +1637,8 @@ function GraphVisualization({
   const onMenuPickGenerate = () => {
     const snap = graphActionSnapshotRef.current;
     generateSourceIdsRef.current = [...snap.nodeIds];
+    setGenerateFormAnchorIds([...snap.nodeIds]);
+    setGenerateSubmitError(null);
     connectNewNodeToIdsRef.current = [];
     setPendingConnectIdsForAddForm([]);
     setGraphActionMenu(null);
@@ -1698,7 +1723,41 @@ function GraphVisualization({
   );
 
   let activeGraphEditBanner = null;
-  if (showGenerateForm) {
+  if (isGenerating) {
+    const baseHint =
+      expansionAlgorithm === 'randomizedGrowth'
+        ? 'Generating (multi-cycle randomized).'
+        : 'Generating (manual).';
+    const progressHint =
+      expansionAlgorithm === 'randomizedGrowth' && generateProgress
+        ? `Cycle ${generateProgress.current}/${generateProgress.total}…`
+        : 'Working…';
+    const progressBar =
+      expansionAlgorithm === 'randomizedGrowth' && generateProgress
+        ? {
+          mode: 'determinate',
+          current: generateProgress.current,
+          total: generateProgress.total,
+        }
+        : { mode: 'indeterminate' };
+    activeGraphEditBanner = {
+      title: 'Generating (AI)',
+      hint: `${baseHint} ${progressHint}`,
+      progressBar,
+      actions:
+        expansionAlgorithm === 'randomizedGrowth'
+          ? [
+            {
+              key: 'stop-after-cycle',
+              label: 'Stop after this cycle',
+              onClick: () => {
+                randomizedGrowthCancelRef.current = true;
+              },
+            },
+          ]
+          : [],
+    };
+  } else if (showGenerateForm) {
     activeGraphEditBanner = {
       title: 'Generate (AI)',
       hint:
@@ -1725,6 +1784,19 @@ function GraphVisualization({
         'Enter relationship text for each highlighted node, or skip connections.',
     };
   }
+
+  const generateFormValidationMessage =
+    showGenerateForm &&
+    expansionAlgorithm === 'manual' &&
+    generateFormAnchorIds.length === 0
+      ? 'Manual generation needs at least one highlighted node. Close this form, highlight one or more nodes, then open AI Generation again.'
+      : showGenerateForm &&
+        expansionAlgorithm === 'randomizedGrowth' &&
+        data.nodes.length < rgConnectionsPerNewNode
+        ? `Randomized growth needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
+        : null;
+  const generateFormErrorDisplay =
+    generateFormValidationMessage || generateSubmitError;
 
   return (
     <div className="graph-visualization-container">
@@ -2076,12 +2148,24 @@ function GraphVisualization({
             <h2 id="graph-generate-modal-title">
               {expansionAlgorithmMeta.title}
             </h2>
+            {generateFormErrorDisplay && (
+              <p
+                className="graph-generate-form-error"
+                role="alert"
+                id="graph-generate-form-error"
+              >
+                {generateFormErrorDisplay}
+              </p>
+            )}
             <p className="graph-generate-algorithm-description">
               {expansionAlgorithmMeta.description}
             </p>
             <form
               onSubmit={handleGenerate}
               aria-labelledby="graph-generate-modal-title"
+              aria-describedby={
+                generateFormErrorDisplay ? 'graph-generate-form-error' : undefined
+              }
             >
               <label>
                 {expansionAlgorithm === 'manual'
@@ -2095,6 +2179,7 @@ function GraphVisualization({
                   value={numNodesToAdd}
                   onChange={e => {
                     setNumNodesToAdd(parseInt(e.target.value, 10) || 1);
+                    setGenerateSubmitError(null);
                   }}
                 />
               </label>
@@ -2109,6 +2194,7 @@ function GraphVisualization({
                       value={rgConnectionsPerNewNode}
                       onChange={e => {
                         setRgConnectionsPerNewNode(parseInt(e.target.value, 10) || 1);
+                        setGenerateSubmitError(null);
                       }}
                     />
                   </label>
@@ -2121,6 +2207,7 @@ function GraphVisualization({
                       value={rgNumCycles}
                       onChange={e => {
                         setRgNumCycles(parseInt(e.target.value, 10) || 1);
+                        setGenerateSubmitError(null);
                       }}
                     />
                   </label>
@@ -2144,8 +2231,11 @@ function GraphVisualization({
                 </div>
               )}
               <div className="form-buttons">
-                <button type="submit" disabled={isGenerating}>
-                  {isGenerating ? 'Generating...' : 'Confirm'}
+                <button
+                  type="submit"
+                  disabled={isGenerating || Boolean(generateFormErrorDisplay)}
+                >
+                  {isGenerating ? 'Applying…' : 'Apply'}
                 </button>
                 <button type="button" onClick={exitGraphEditModes}>
                   Cancel
@@ -2158,8 +2248,11 @@ function GraphVisualization({
 
       {activeGraphEditBanner && (
         <div
-          className="graph-edit-mode-chip"
+          className={`graph-edit-mode-chip${
+            activeGraphEditBanner.progressBar ? ' graph-edit-mode-chip--generating' : ''
+          }`}
           role="status"
+          aria-busy={Boolean(activeGraphEditBanner.progressBar)}
           aria-live="polite"
           aria-label={`${activeGraphEditBanner.title}. ${activeGraphEditBanner.hint}`}
         >
@@ -2170,15 +2263,66 @@ function GraphVisualization({
             <p className="graph-edit-mode-chip__hint">
               {activeGraphEditBanner.hint}
             </p>
+            {activeGraphEditBanner.progressBar && (
+              <div className="graph-edit-mode-chip__progress">
+                {activeGraphEditBanner.progressBar.mode === 'determinate' ? (
+                  <div
+                    className="graph-edit-mode-chip__progress-track"
+                    role="progressbar"
+                    aria-valuemin={1}
+                    aria-valuemax={activeGraphEditBanner.progressBar.total}
+                    aria-valuenow={activeGraphEditBanner.progressBar.current}
+                    aria-valuetext={`Cycle ${activeGraphEditBanner.progressBar.current} of ${activeGraphEditBanner.progressBar.total}`}
+                  >
+                    <div
+                      className="graph-edit-mode-chip__progress-fill"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            (100 * activeGraphEditBanner.progressBar.current) /
+                              activeGraphEditBanner.progressBar.total
+                          )
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="graph-edit-mode-chip__progress-track graph-edit-mode-chip__progress-track--indeterminate"
+                    role="progressbar"
+                    aria-valuetext="Working"
+                  >
+                    <div className="graph-edit-mode-chip__progress-indeterminate" />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="graph-edit-mode-chip__actions">
-            <button
-              type="button"
-              className="graph-edit-mode-chip__cancel"
-              onClick={exitGraphEditModes}
-            >
-              Cancel
-            </button>
+            {Array.isArray(activeGraphEditBanner.actions) ? (
+              activeGraphEditBanner.actions.length > 0 ? (
+                activeGraphEditBanner.actions.map(action => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    className="graph-edit-mode-chip__cancel"
+                    onClick={action.onClick}
+                  >
+                    {action.label}
+                  </button>
+                ))
+              ) : null
+            ) : (
+              <button
+                type="button"
+                className="graph-edit-mode-chip__cancel"
+                onClick={exitGraphEditModes}
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       )}
