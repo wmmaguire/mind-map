@@ -26,8 +26,12 @@ export default function GuestIdentityBanner() {
   const { graphTitle } = useGraphTitle();
   const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
 
+  // Dev-only preview is now opt-in so real auth UI is testable in development (#63).
+  // Set REACT_APP_ENABLE_DEV_PREVIEW=true to restore the old behavior.
   const devControls =
-    process.env.NODE_ENV === 'development' && setDevRegisteredUserId;
+    process.env.NODE_ENV === 'development' &&
+    process.env.REACT_APP_ENABLE_DEV_PREVIEW === 'true' &&
+    setDevRegisteredUserId;
 
   const isGuest = !isRegistered || identityKind === IDENTITY_KIND_GUEST;
   const showTitle = graphTitle != null && graphTitle !== '';
