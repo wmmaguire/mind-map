@@ -56,6 +56,9 @@ describe('GraphVisualization graph action menu', () => {
     expect(
       screen.getByRole('button', { name: /^Open AI Generation form$/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Open graph actions help/i })
+    ).toBeInTheDocument();
   });
 
   it('collapses and expands AI Generation section via accordion toggle', () => {

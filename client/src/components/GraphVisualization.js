@@ -31,6 +31,7 @@ function GraphVisualization({
   const [rgNumCycles, setRgNumCycles] = useState(2);
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
+  const [showGraphActionsHelp, setShowGraphActionsHelp] = useState(false);
   const expansionAlgorithmMeta =
     expansionAlgorithm === 'randomizedGrowth'
       ? {
@@ -93,6 +94,7 @@ function GraphVisualization({
     setGenerateBudgetPreview(null);
     setGenerateProgress(null);
     randomizedGrowthCancelRef.current = false;
+    setShowGraphActionsHelp(false);
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -170,6 +172,7 @@ function GraphVisualization({
       const t = e.target;
       if (graphActionMenuRef.current?.contains(t)) return;
       if (graphActionsFabRef.current?.contains(t)) return;
+      if (showGraphActionsHelp) return;
       setGraphActionMenu(null);
     };
     document.addEventListener('mousedown', onDocPointerDown);
@@ -178,7 +181,7 @@ function GraphVisualization({
       document.removeEventListener('mousedown', onDocPointerDown);
       document.removeEventListener('touchstart', onDocPointerDown);
     };
-  }, [graphActionMenu]);
+  }, [graphActionMenu, showGraphActionsHelp]);
 
   /** Move focus into the panel when it opens (#30: keyboard / AT). */
   useEffect(() => {
@@ -1796,6 +1799,15 @@ function GraphVisualization({
               Graph actions
             </span>
             <button
+              type="button"
+              className="graph-action-menu-help"
+              onClick={() => setShowGraphActionsHelp(true)}
+              aria-label="Open graph actions help"
+              title="Help"
+            >
+              ?
+            </button>
+            <button
               ref={graphActionMenuCloseRef}
               type="button"
               className="graph-action-menu-close"
@@ -1805,12 +1817,41 @@ function GraphVisualization({
               ×
             </button>
           </div>
-          <div className="graph-action-menu-hint">
-            Uses your current highlight.{' '}
-            <strong>Tap Actions</strong> (top-right) to open; tap again,{' '}
-            <strong>×</strong>, or outside to close. On desktop, right-click the
-            graph works too. Keyboard: Escape.
-          </div>
+          {showGraphActionsHelp && (
+            <div className="modal-overlay">
+              <div
+                className="modal-content"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Graph actions help"
+              >
+                <h2>Help</h2>
+                <div className="graph-actions-help-body">
+                  <h3>Graph actions menu</h3>
+                  <p>
+                    Uses your current highlight. <strong>Tap Actions</strong>{' '}
+                    (top-right) to open; tap again, <strong>×</strong>, or outside
+                    to close. On desktop, right-click the graph works too. Keyboard:
+                    Escape.
+                  </p>
+                  <h3>Add Relationship</h3>
+                  <p>
+                    To add a link between two ideas, select both on the graph (two
+                    highlights), open Actions, then tap Add Relationship and
+                    describe the connection.
+                  </p>
+                </div>
+                <div className="modal-buttons">
+                  <button
+                    type="button"
+                    onClick={() => setShowGraphActionsHelp(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <section
             className="graph-action-menu-section graph-action-menu-section--collapsible"
             aria-labelledby="graph-action-menu-section-generate-label"
@@ -1927,7 +1968,6 @@ function GraphVisualization({
                   type="button"
                   className="add-relationship-button graph-action-menu__action"
                   onClick={onMenuPickAddRelationship}
-                  aria-describedby="graph-action-menu-relationship-hint"
                 >
                   <span className="graph-action-menu__action-icon" aria-hidden>
                     🔗
@@ -1946,14 +1986,6 @@ function GraphVisualization({
                   </span>
                   <span className="graph-action-menu__action-label">Delete</span>
                 </button>
-                <p
-                  className="graph-action-menu-link-hint"
-                  id="graph-action-menu-relationship-hint"
-                >
-                  To add a link between two ideas, select both on the graph (two
-                  highlights), open Actions, then tap Add Relationship and describe
-                  the connection.
-                </p>
               </div>
             )}
           </section>
