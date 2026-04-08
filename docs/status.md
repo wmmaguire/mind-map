@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-07 (**#35** FileUpload audio: **Upload file** | **Record** `MediaRecorder`, 25 MB client check, **`utils/audioRecording.js`** — branch **`issue-35-fileupload-audio-recorder`**). **#34** server **`POST /api/transcribe`** unchanged. Plain text only (**#58** for timestamps).
+Last updated: 2026-04-07 (**#35** FileUpload audio pipeline shipped: **Upload file** | **Record** `MediaRecorder`, **`utils/audioRecording.js`**, branch **`issue-35-fileupload-audio-recorder`**, docs tip **`0d6d47d`**). **#34** **`POST /api/transcribe`** unchanged. Plain transcript only; **#58** (timestamps), **#59** (speaker diarization) backlog.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:

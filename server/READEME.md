@@ -167,7 +167,7 @@ Relevant code:
 
 No audio bytes are persisted as library **`File`** rows on this route — only audit metadata. The client saves text through the normal upload API.
 
-**Plain text only:** The implementation uses the default transcription response shape (**`text`** string). It does **not** return word- or segment-level timestamps. OpenAI’s API supports richer formats (e.g. **`verbose_json`**) if a future change needs “when things were said” in the UI.
+**Plain text only:** The implementation uses the default transcription response shape (**`text`** string). It does **not** return word- or segment-level timestamps, and it does **not** identify multiple speakers (**`whisper-1`**). OpenAI’s API supports richer options (e.g. **`verbose_json`** for timing — GitHub **#58**; **`gpt-4o-transcribe-diarize`** with **`diarized_json`** for speaker-labeled segments — GitHub **#59**). The client may capture audio in-browser (**#35**) or upload a file; both hit this same endpoint today.
 
 Relevant code:
 
