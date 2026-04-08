@@ -51,11 +51,13 @@ describe('GraphVisualization graph action menu', () => {
     expect(
       screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
-    expect(screen.getByText('Generate (AI)')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^AI Generation$/i })
+    ).toBeInTheDocument();
     expect(screen.getByText('Edit graph')).toBeInTheDocument();
   });
 
-  it('collapses and expands Generate (AI) via section toggle (accordion)', () => {
+  it('collapses and expands AI Generation section via accordion toggle', () => {
     render(
       <GraphVisualization
         data={minimalData}
@@ -73,14 +75,14 @@ describe('GraphVisualization graph action menu', () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /^Generate \(AI\)$/i })
+      screen.getByRole('button', { name: /^AI Generation$/i })
     );
     expect(
       screen.queryByRole('combobox', { name: /^AI Generation$/i })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /^Generate \(AI\)$/i })
+      screen.getByRole('button', { name: /^AI Generation$/i })
     );
     expect(
       screen.getByRole('combobox', { name: /^AI Generation$/i })

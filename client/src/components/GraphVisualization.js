@@ -1834,7 +1834,7 @@ function GraphVisualization({
                 <span className="graph-action-menu-section-chevron" aria-hidden>
                   {graphActionMenuSectionsOpen.generate ? '▼' : '▶'}
                 </span>
-                Generate (AI)
+                AI Generation
               </button>
             </h3>
             {graphActionMenuSectionsOpen.generate && (
@@ -1842,22 +1842,32 @@ function GraphVisualization({
                 id="graph-action-menu-panel-generate"
                 className="graph-action-menu-section-body"
                 role="group"
-                aria-label="Generate with AI"
+                aria-label="AI Generation"
               >
-                <select
-                  id="graph-expansion-algorithm"
-                  className="generate-button graph-action-menu__action"
-                  aria-label="AI Generation"
-                  value={expansionAlgorithm}
-                  onChange={e => {
-                    const next = e.target.value;
-                    if (!next) return;
-                    onMenuPickGenerateWithAlgorithm(next);
-                  }}
-                >
-                  <option value="manual">manual</option>
-                  <option value="randomizedGrowth">multi-cycle randomized</option>
-                </select>
+                <div className="generate-button graph-action-menu__action graph-action-select-wrap">
+                  <span
+                    className="graph-action-menu__action-icon"
+                    aria-hidden
+                  >
+                    ✨
+                  </span>
+                  <select
+                    id="graph-expansion-algorithm"
+                    className="graph-action-select"
+                    aria-label="AI Generation"
+                    value={expansionAlgorithm}
+                    onChange={e => {
+                      const next = e.target.value;
+                      if (!next) return;
+                      onMenuPickGenerateWithAlgorithm(next);
+                    }}
+                  >
+                    <option value="manual">manual</option>
+                    <option value="randomizedGrowth">
+                      multi-cycle randomized
+                    </option>
+                  </select>
+                </div>
               </div>
             )}
           </section>

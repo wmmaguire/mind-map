@@ -247,6 +247,36 @@ svg {
   margin-top: 0;
 }
 
+.graph-action-menu-section-body .graph-action-select-wrap {
+  box-sizing: border-box;
+}
+
+.graph-action-select-wrap .graph-action-select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0 4px 0 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 25px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.graph-action-select-wrap .graph-action-select:focus {
+  outline: none;
+}
+
+.graph-action-select-wrap .graph-action-select option {
+  color: #1e293b;
+  background: #fff;
+}
+
 .graph-action-menu .delete-button {
   margin-bottom: 12px;
 }
