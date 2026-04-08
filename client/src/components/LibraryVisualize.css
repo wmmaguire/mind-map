@@ -48,46 +48,7 @@
   border: 1px solid #fecaca;
 }
 
-/* Left edge rail: open library on small viewports (GitHub #25) */
-.library-mobile-rail {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 48px;
-  z-index: 998;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 4px;
-  border: none;
-  border-right: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #334155;
-  cursor: pointer;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
-}
-
-.library-mobile-rail:focus-visible {
-  outline: 2px solid #4299e1;
-  outline-offset: 2px;
-}
-
-.library-mobile-rail__icon {
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.library-mobile-rail__label {
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
-}
+/* Mobile “open library” control lives in GuestIdentityBanner (LibraryUiContext). */
 
 .sidebar {
   width: 300px;
@@ -1533,22 +1494,5 @@
 
   .library-visualize .visualization-panel {
     padding-bottom: 0 !important;
-  }
-
-  /* Graph area starts right of the fixed library rail; full viewport height */
-  .library-visualize--rail .visualization-panel {
-    margin-left: 48px;
-    width: calc(100% - 48px);
-    max-width: calc(100% - 48px);
-    box-sizing: border-box;
-    min-height: 100dvh;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .library-visualize--rail .graph-container {
-    flex: 1;
-    min-height: 0;
   }
 }

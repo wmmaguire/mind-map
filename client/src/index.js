@@ -7,6 +7,7 @@ import reportWebVitals from './reportWebVitals';
 import { SessionProvider } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
+import { LibraryUiProvider } from './context/LibraryUiContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -17,7 +18,9 @@ root.render(
           initialRegisteredUserId={process.env.REACT_APP_MINDMAP_USER_ID}
         >
           <GraphTitleProvider>
-            <App />
+            <LibraryUiProvider>
+              <App />
+            </LibraryUiProvider>
           </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>

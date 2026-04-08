@@ -2,12 +2,15 @@ import '../setupPolyfills';
 import { render, screen } from '@testing-library/react';
 import { IdentityProvider } from '../context/IdentityContext';
 import { GraphTitleProvider } from '../context/GraphTitleContext';
+import { LibraryUiProvider } from '../context/LibraryUiContext';
 import GuestIdentityBanner, { DEV_PREVIEW_USER_ID } from './GuestIdentityBanner';
 
 function wrap(ui) {
   return (
     <IdentityProvider>
-      <GraphTitleProvider>{ui}</GraphTitleProvider>
+      <GraphTitleProvider>
+        <LibraryUiProvider>{ui}</LibraryUiProvider>
+      </GraphTitleProvider>
     </IdentityProvider>
   );
 }
@@ -23,7 +26,9 @@ describe('GuestIdentityBanner', () => {
     render(
       <IdentityProvider initialRegisteredUserId="acct-test-1">
         <GraphTitleProvider>
-          <GuestIdentityBanner />
+          <LibraryUiProvider>
+            <GuestIdentityBanner />
+          </LibraryUiProvider>
         </GraphTitleProvider>
       </IdentityProvider>
     );

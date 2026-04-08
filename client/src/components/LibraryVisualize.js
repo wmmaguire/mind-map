@@ -4,6 +4,7 @@ import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
 import { useIdentity } from '../context/IdentityContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
+import { useLibraryUi } from '../context/LibraryUiContext';
 import LibrarySidebar from './LibrarySidebar';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
@@ -50,6 +51,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const { sessionId } = useSession();
   const { userId } = useIdentity();
   const { setGraphTitle } = useGraphTitle();
+  const { registerMobileLibraryRail } = useLibraryUi();
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [deletingFiles, setDeletingFiles] = useState(false);
@@ -188,6 +190,24 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       /* ignore */
     }
   }, [filesSectionOpen, graphsSectionOpen]);
+
+  const openLibrarySidebar = useCallback(() => {
+    setShowSidebar(true);
+  }, []);
+
+  useEffect(() => {
+    const mobile = dimensions.width <= 768;
+    registerMobileLibraryRail(
+      mobile && !showSidebar,
+      openLibrarySidebar
+    );
+    return () => registerMobileLibraryRail(false, null);
+  }, [
+    dimensions.width,
+    showSidebar,
+    openLibrarySidebar,
+    registerMobileLibraryRail,
+  ]);
 
   useEffect(() => {
     setGraphTitle(currentSource?.name || 'Unnamed Graph');
@@ -568,9 +588,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const graphViewportHeight = Math.max(200, dimensions.height);
 
   return (
-    <div
-      className={`library-visualize${isMobile && !showSidebar ? ' library-visualize--rail' : ''}`}
-    >
+    <div className="library-visualize">
       {deleteToast && (
         <div
           className={`library-file-action-toast library-file-action-toast--${deleteToast.type}`}
@@ -579,20 +597,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           {deleteToast.message}
         </div>
       )}
-      {isMobile && !showSidebar && (
-        <button
-          type="button"
-          className="library-mobile-rail"
-          onClick={() => setShowSidebar(true)}
-          aria-label="Open Library"
-        >
-          <span className="library-mobile-rail__icon" aria-hidden>
-            📚
-          </span>
-          <span className="library-mobile-rail__label">Library</span>
-        </button>
-      )}
-
       <LibrarySidebar
         isMobile={isMobile}
         showSidebar={showSidebar}

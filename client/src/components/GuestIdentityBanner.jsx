@@ -4,6 +4,7 @@ import {
   useIdentity,
 } from '../context/IdentityContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
+import { useLibraryUi } from '../context/LibraryUiContext';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
@@ -21,6 +22,7 @@ export default function GuestIdentityBanner() {
     setDevRegisteredUserId,
   } = useIdentity();
   const { graphTitle } = useGraphTitle();
+  const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
 
   const devControls =
     process.env.NODE_ENV === 'development' && setDevRegisteredUserId;
@@ -54,6 +56,19 @@ export default function GuestIdentityBanner() {
         aria-label="Account mode"
       >
         <div className="guest-identity-banner__leading">
+          {mobileRailVisible && (
+            <button
+              type="button"
+              className="library-mobile-rail library-mobile-rail--banner"
+              onClick={openMobileLibrary}
+              aria-label="Open Library"
+            >
+              <span className="library-mobile-rail__icon" aria-hidden>
+                📚
+              </span>
+              <span className="library-mobile-rail__label">Library</span>
+            </button>
+          )}
           {!(devControls) && (
             <span className="guest-identity-banner__label">Guest</span>
           )}
@@ -93,7 +108,21 @@ export default function GuestIdentityBanner() {
       aria-live="polite"
       aria-label="Account mode"
     >
-      <div className="guest-identity-banner__leading" aria-hidden />
+      <div className="guest-identity-banner__leading">
+        {mobileRailVisible && (
+          <button
+            type="button"
+            className="library-mobile-rail library-mobile-rail--banner"
+            onClick={openMobileLibrary}
+            aria-label="Open Library"
+          >
+            <span className="library-mobile-rail__icon" aria-hidden>
+              📚
+            </span>
+            <span className="library-mobile-rail__label">Library</span>
+          </button>
+        )}
+      </div>
       {showTitle ? (
         <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
       ) : (

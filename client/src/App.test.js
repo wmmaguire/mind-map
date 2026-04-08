@@ -8,6 +8,7 @@ import {
 } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
+import { LibraryUiProvider } from './context/LibraryUiContext';
 
 beforeEach(() => {
   resetSessionBootstrapForTests();
@@ -20,7 +21,9 @@ test('renders app title', () => {
       <SessionProvider>
         <IdentityProvider>
           <GraphTitleProvider>
-            <App />
+            <LibraryUiProvider>
+              <App />
+            </LibraryUiProvider>
           </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>
@@ -35,7 +38,9 @@ test('shows guest identity banner', () => {
       <SessionProvider>
         <IdentityProvider>
           <GraphTitleProvider>
-            <App />
+            <LibraryUiProvider>
+              <App />
+            </LibraryUiProvider>
           </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>

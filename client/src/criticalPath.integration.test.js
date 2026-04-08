@@ -8,6 +8,7 @@ import {
 } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
+import { LibraryUiProvider } from './context/LibraryUiContext';
 import App from './App';
 
 const sessionId = 'test-session-uuid';
@@ -54,7 +55,9 @@ function renderApp(initialEntries) {
       <SessionProvider>
         <IdentityProvider>
           <GraphTitleProvider>
-            <App />
+            <LibraryUiProvider>
+              <App />
+            </LibraryUiProvider>
           </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>
