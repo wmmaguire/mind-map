@@ -23,8 +23,6 @@ function GraphVisualization({
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
-  /** Server dry-run (#37): estimated links / caps before OpenAI */
-  const [generateBudgetPreview, setGenerateBudgetPreview] = useState(null);
   /** GitHub #62: manual (single call, link to all highlights) vs multi-cycle randomized */
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
   const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
@@ -91,7 +89,6 @@ function GraphVisualization({
     selectedNodeId.current = null;
     setGraphActionMenu(null);
     generateSourceIdsRef.current = null;
-    setGenerateBudgetPreview(null);
     setGenerateProgress(null);
     randomizedGrowthCancelRef.current = false;
     setShowGraphActionsHelp(false);
@@ -1268,52 +1265,6 @@ function GraphVisualization({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
   }, [data, selectedNodes, width, height]);
 
-  const handlePreviewGenerateBudget = async (event) => {
-    event.preventDefault();
-    const sourceIdSnapshot =
-      generateSourceIdsRef.current != null
-        ? [...generateSourceIdsRef.current]
-        : Array.from(selectedNodeIds.current).map(String);
-    setIsGenerating(true);
-    setGenerateBudgetPreview(null);
-    try {
-      const selectedPayload = sourceIdSnapshot
-        .map((id) => data.nodes.find((node) => String(node.id) === String(id)))
-        .filter(Boolean);
-      if (selectedPayload.length === 0) {
-        window.alert('Highlight at least one node on the graph before previewing.');
-        return;
-      }
-      const json = {
-        selectedNodes: selectedPayload,
-        numNodes: numNodesToAdd,
-        dryRun: true
-      };
-      if (expansionAlgorithm === 'randomizedGrowth') {
-        json.expansionAlgorithm = 'randomizedGrowth';
-        json.connectionsPerNewNode = rgConnectionsPerNewNode;
-        json.numCycles = rgNumCycles;
-      }
-      const result = await apiRequest('/api/generate-node', {
-        method: 'POST',
-        json
-      });
-      if (!result.success) {
-        throw new Error(
-          result.details || result.error || 'Preview failed'
-        );
-      }
-      if (result.preview) {
-        setGenerateBudgetPreview(result.preview);
-      }
-    } catch (error) {
-      console.error('Preview budget error:', error);
-      window.alert('Preview failed: ' + getApiErrorMessage(error));
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const handleGenerate = async (event) => {
     event.preventDefault();
     const sourceIdSnapshot =
@@ -1421,7 +1372,6 @@ function GraphVisualization({
 
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
-      setGenerateBudgetPreview(null);
       setShowGenerateForm(false);
     } catch (error) {
       console.error('Error generating nodes:', error);
@@ -1669,7 +1619,6 @@ function GraphVisualization({
     setGraphActionMenu(null);
     setShowAddForm(false);
     setRelationshipForm({ show: false, relationship: '' });
-    setGenerateBudgetPreview(null);
     randomizedGrowthCancelRef.current = false;
     setGenerateProgress(null);
     setShowGenerateForm(true);
@@ -1677,7 +1626,6 @@ function GraphVisualization({
 
   const onMenuPickGenerateWithAlgorithm = (algorithm) => {
     setExpansionAlgorithm(algorithm);
-    setGenerateBudgetPreview(null);
     onMenuPickGenerate();
   };
 
@@ -1755,8 +1703,8 @@ function GraphVisualization({
       title: 'Generate (AI)',
       hint:
         expansionAlgorithm === 'manual'
-          ? 'Optional Preview budget estimates size without calling the model; Confirm runs one generation.'
-          : 'Multi-cycle mode runs one API batch per cycle (rate limits apply). Preview shows totals; you can stop between cycles.',
+          ? 'Confirm runs one generation.'
+          : 'Multi-cycle mode runs one API batch per cycle (rate limits apply). You can stop between cycles.',
     };
   } else if (showAddForm) {
     activeGraphEditBanner = {
@@ -1903,7 +1851,6 @@ function GraphVisualization({
                       const next = e.target.value;
                       if (!next) return;
                       setExpansionAlgorithm(next);
-                      setGenerateBudgetPreview(null);
                     }}
                     onClick={e => {
                       // Allow changing algorithm without opening the form.
@@ -2148,7 +2095,6 @@ function GraphVisualization({
                   value={numNodesToAdd}
                   onChange={e => {
                     setNumNodesToAdd(parseInt(e.target.value, 10) || 1);
-                    setGenerateBudgetPreview(null);
                   }}
                 />
               </label>
@@ -2162,10 +2108,7 @@ function GraphVisualization({
                       max="12"
                       value={rgConnectionsPerNewNode}
                       onChange={e => {
-                        setRgConnectionsPerNewNode(
-                          parseInt(e.target.value, 10) || 1
-                        );
-                        setGenerateBudgetPreview(null);
+                        setRgConnectionsPerNewNode(parseInt(e.target.value, 10) || 1);
                       }}
                     />
                   </label>
@@ -2178,91 +2121,28 @@ function GraphVisualization({
                       value={rgNumCycles}
                       onChange={e => {
                         setRgNumCycles(parseInt(e.target.value, 10) || 1);
-                        setGenerateBudgetPreview(null);
                       }}
                     />
                   </label>
                 </>
               )}
-              {generateBudgetPreview?.expansionAlgorithm ===
-              'randomizedGrowth' ? (
-                  <div
-                    className="graph-generate-budget-preview"
-                    role="status"
-                  >
-                    <p>
-                    About <strong>
-                        {generateBudgetPreview.estimatedTotalNewNodes}
-                      </strong>{' '}
-                    new nodes over{' '}
-                      <strong>{generateBudgetPreview.numCycles}</strong> cycle
-                      {generateBudgetPreview.numCycles === 1 ? '' : 's'} (
-                      <strong>{generateBudgetPreview.numNodesPerCycle}</strong> per
-                    cycle), ~{' '}
-                      <strong>{generateBudgetPreview.estimatedNewLinks}</strong>{' '}
-                    random links (
-                      <strong>
-                        {generateBudgetPreview.connectionsPerNewNode}
-                      </strong>{' '}
-                    per new node). Caps: max{' '}
-                      {generateBudgetPreview.caps.maxNewNodes} nodes per API call, max{' '}
-                      {generateBudgetPreview.caps.maxCycles} cycles (client), max{' '}
-                      {generateBudgetPreview.caps.maxConnectionsPerNewNode}{' '}
-                    connections per node.
-                    </p>
-                    <p className="graph-generate-budget-preview__rule">
-                      {generateBudgetPreview.attachmentRule}
-                    </p>
-                  </div>
-                ) : generateBudgetPreview ? (
-                  <div
-                    className="graph-generate-budget-preview"
-                    role="status"
-                  >
-                    <p>
-                    Add <strong>{generateBudgetPreview.numNodes}</strong> new node
-                      {generateBudgetPreview.numNodes === 1 ? '' : 's'}, each linked
-                    to all{' '}
-                      <strong>{generateBudgetPreview.selectedCount}</strong>{' '}
-                    highlighted node
-                      {generateBudgetPreview.selectedCount === 1 ? '' : 's'} (~
-                      <strong>{generateBudgetPreview.estimatedNewLinks}</strong> new
-                    links). Caps: max {generateBudgetPreview.caps.maxNewNodes} nodes
-                    per run, max {generateBudgetPreview.caps.maxSelected}{' '}
-                    highlights.
-                    </p>
-                  </div>
-                ) : (
-                  <p className="graph-generate-budget-hint">
-                  Optional: <strong>Preview budget</strong> estimates size without
-                  calling OpenAI.
-                  </p>
-                )}
               {generateProgress && expansionAlgorithm === 'randomizedGrowth' && (
                 <p className="graph-generate-progress" role="status">
                   Cycle {generateProgress.current} of {generateProgress.total}…
                 </p>
               )}
-              <div className="form-buttons">
-                <button
-                  type="button"
-                  onClick={handlePreviewGenerateBudget}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? '…' : 'Preview budget'}
-                </button>
-                {isGenerating &&
-                  expansionAlgorithm === 'randomizedGrowth' && (
+              {isGenerating && expansionAlgorithm === 'randomizedGrowth' && (
+                <div className="form-buttons">
                   <button
                     type="button"
                     onClick={() => {
                       randomizedGrowthCancelRef.current = true;
                     }}
                   >
-                      Stop after this cycle
+                    Stop after this cycle
                   </button>
-                )}
-              </div>
+                </div>
+              )}
               <div className="form-buttons">
                 <button type="submit" disabled={isGenerating}>
                   {isGenerating ? 'Generating...' : 'Confirm'}
