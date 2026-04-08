@@ -23,6 +23,23 @@
   border-bottom-color: #14532d;
 }
 
+/* Second strip: share + playback only (below main GuestIdentityBanner). */
+.guest-identity-banner--playback-strip {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 0.28rem 0.75rem;
+  border-bottom-color: #14532d;
+}
+
+.guest-identity-banner__playback-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: min(100%, 28rem);
+  min-width: 0;
+}
+
 .guest-identity-banner__leading {
   grid-column: 1;
   justify-self: start;
@@ -113,6 +130,73 @@
   white-space: nowrap;
 }
 
+/* #36 / #39 — Library visualize: optional share + graph history (GuestIdentityBanner) */
+.guest-identity-banner__graph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+  width: 100%;
+  max-width: min(100%, 28rem);
+  padding: 0.1rem 0;
+}
+
+.guest-identity-banner__save-graph-btn {
+  flex-shrink: 0;
+  min-height: 1.65rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  line-height: 1.2;
+  color: #f0fdf4;
+  background: #15803d;
+  border: 1px solid #166534;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 5rem;
+}
+
+.guest-identity-banner__save-graph-btn:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.guest-identity-banner__save-graph-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.guest-identity-banner__save-graph-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.guest-identity-banner__library-share-btn {
+  flex-shrink: 0;
+  min-height: 1.65rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #475569;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.guest-identity-banner__library-share-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.guest-identity-banner__library-share-btn:focus {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
 /* #36 graph history — banner strip (Library → visualize) */
 .guest-identity-banner__graph-history {
   display: flex;
@@ -120,18 +204,10 @@
   align-items: center;
   justify-content: center;
   gap: 0.25rem 0.4rem;
-  width: 100%;
-  max-width: min(100%, 28rem);
-  padding: 0.1rem 0;
-}
-
-.guest-identity-banner__graph-history-label {
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #94a3b8;
-  margin-right: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
 }
 
 .guest-identity-banner__graph-history-btn {
@@ -194,6 +270,46 @@
   background: #fbbf24;
   border-color: #f59e0b;
   color: #422006;
+}
+
+/* Keeps step-forward (▶) and speed block together so the select stays right of ▶. */
+.guest-identity-banner__graph-history-forward-group {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.guest-identity-banner__graph-history-speed {
+  display: flex;
+  align-items: center;
+  min-width: 3.5rem;
+  max-width: 4.75rem;
+}
+
+.guest-identity-banner__graph-history-speed-select {
+  min-height: 1.65rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.guest-identity-banner__graph-history-speed-select:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.guest-identity-banner__graph-history-speed-select:focus {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
 }
 
 .guest-identity-banner__center-gap {

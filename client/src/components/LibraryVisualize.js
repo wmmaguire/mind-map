@@ -20,11 +20,12 @@ import {
   FILE_SORT_NAME_ASC,
 } from '../utils/libraryFileList';
 import {
-  graphHistoryReducer,
-  initialGraphHistoryState,
-  materializeGraphSnapshot,
-  DEFAULT_GRAPH_HISTORY_MAX,
-} from '../utils/graphHistory';
+  cloneGraphForCommit,
+  ensurePlaybackTimestamps,
+  getSortedUniquePlaybackTimes,
+  buildGraphAtPlaybackTime,
+  mergePlaybackTimesFromEdit,
+} from '../utils/graphPlayback';
 import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
 import './LibraryVisualize.css';
 
@@ -79,13 +80,18 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [fileSort, setFileSort] = useState(FILE_SORT_NAME_ASC);
   const [savedGraphs, setSavedGraphs] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
-  const [graphData, setGraphData] = useState(null);
-  const [graphHistory, setGraphHistory] = useState(initialGraphHistoryState);
-  const historyOpts = useMemo(
-    () => ({ maxDepth: DEFAULT_GRAPH_HISTORY_MAX }),
-    []
-  );
-  const { setPayload: setGraphHistoryBannerPayload } = useGraphHistoryUi();
+  /** Full graph (persisted ordering via per-entity createdAt / legacy timestamp). */
+  const [committedGraph, setCommittedGraph] = useState(null);
+  /** Index into {@link getSortedUniquePlaybackTimes}(committedGraph). */
+  const [playbackStepIndex, setPlaybackStepIndex] = useState(0);
+  /** Placeholder so stale HMR / `[historyOpts]` hook deps cannot throw ReferenceError. */
+  const historyOpts = useMemo(() => ({}), []);
+  void historyOpts;
+  const {
+    setPayload: setGraphHistoryBannerPayload,
+    setSharePayload: setGraphShareBannerPayload,
+    setSavePayload: setGraphSaveBannerPayload,
+  } = useGraphHistoryUi();
 
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
@@ -113,30 +119,26 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   /** Stable noop so GraphVisualization is not handed a new callback every render in share mode. */
   const noopGraphDataUpdate = useCallback(() => {}, []);
 
-  const goToHistoryIndex = useCallback(
-    (nextIndex) => {
-      setGraphHistory((prev) => {
-        if (nextIndex < 0 || nextIndex >= prev.entries.length) return prev;
-        const g = materializeGraphSnapshot(prev.entries[nextIndex]);
-        setGraphData(g);
-        setCurrentSource((p) =>
-          p
-            ? {
-              ...p,
-              nodeCount: g.nodes.length,
-              edgeCount: g.links.length,
-            }
-            : p
-        );
-        return graphHistoryReducer(
-          prev,
-          { type: 'GOTO', index: nextIndex },
-          historyOpts
-        );
-      });
-    },
-    [historyOpts]
+  const playbackTimes = useMemo(
+    () => getSortedUniquePlaybackTimes(committedGraph),
+    [committedGraph]
   );
+
+  const displayGraph = useMemo(() => {
+    if (!committedGraph) return { nodes: [], links: [] };
+    const times = playbackTimes;
+    if (times.length === 0) return committedGraph;
+    const maxIdx = times.length - 1;
+    const idx = Math.min(Math.max(0, playbackStepIndex), maxIdx);
+    const cutoff = times[idx];
+    return buildGraphAtPlaybackTime(committedGraph, cutoff);
+  }, [committedGraph, playbackTimes, playbackStepIndex]);
+
+  const maxPlaybackIdx = Math.max(0, playbackTimes.length - 1);
+  const playbackAtEnd =
+    !committedGraph ||
+    playbackTimes.length === 0 ||
+    playbackStepIndex >= maxPlaybackIdx;
 
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
@@ -188,16 +190,13 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
       const loaded = {
         nodes: graphPayload.nodes,
-        links: reconstructedLinks,
+        links: reconstructedLinks.filter((l) => l.source && l.target),
       };
-      setGraphData(loaded);
-      setGraphHistory(
-        graphHistoryReducer(
-          initialGraphHistoryState,
-          { type: 'RESET', graph: loaded },
-          historyOpts
-        )
-      );
+      const cloned = cloneGraphForCommit(loaded);
+      if (cloned) ensurePlaybackTimestamps(cloned);
+      setCommittedGraph(cloned);
+      const times = getSortedUniquePlaybackTimes(cloned);
+      setPlaybackStepIndex(times.length > 0 ? times.length - 1 : 0);
 
       setSelectedFiles(new Set());
       setCurrentSource({
@@ -206,7 +205,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       });
       setShareViewerMode(Boolean(viaShare));
     },
-    [historyOpts]
+    []
   );
 
   const fetchFiles = useCallback(async () => {
@@ -352,9 +351,12 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   ]);
 
   useEffect(() => {
-    setGraphTitle(currentSource?.name || 'Unnamed Graph');
+    const raw = currentSource?.name;
+    const title =
+      typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : null;
+    setGraphTitle(currentSource ? title : null);
     return () => setGraphTitle(null);
-  }, [currentSource?.name, setGraphTitle]);
+  }, [currentSource, setGraphTitle]);
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -422,28 +424,18 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   }, []);
 
   const graphHistoryBannerPayload = useMemo(() => {
-    if (graphHistory.entries.length < 2 || !graphData) return null;
-    const n = graphHistory.entries.length;
-    const idx = graphHistory.index;
+    if (!committedGraph || playbackTimes.length < 2) return null;
+    const n = playbackTimes.length;
+    const idx = Math.min(Math.max(0, playbackStepIndex), n - 1);
     return {
       entryCount: n,
       index: idx,
-      goEarlier: () => goToHistoryIndex(Math.max(0, idx - 1)),
-      goLater: () => goToHistoryIndex(Math.min(n - 1, idx + 1)),
-      goToIndex: goToHistoryIndex,
+      goEarlier: () => setPlaybackStepIndex((i) => Math.max(0, i - 1)),
+      goLater: () => setPlaybackStepIndex((i) => Math.min(n - 1, i + 1)),
+      goToIndex: (i) =>
+        setPlaybackStepIndex(Math.min(Math.max(0, Number(i)), n - 1)),
     };
-  }, [graphHistory, graphData, goToHistoryIndex]);
-
-  useLayoutEffect(() => {
-    setGraphHistoryBannerPayload(graphHistoryBannerPayload);
-  }, [graphHistoryBannerPayload, setGraphHistoryBannerPayload]);
-
-  useLayoutEffect(
-    () => () => {
-      setGraphHistoryBannerPayload(null);
-    },
-    [setGraphHistoryBannerPayload]
-  );
+  }, [committedGraph, playbackTimes, playbackStepIndex]);
 
   const handleDeleteSelected = useCallback(async () => {
     if (selectedFiles.size === 0 || !sessionId) return;
@@ -463,15 +455,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         await apiRequest(path, { method: 'DELETE', ...listingAuth });
       }
       setSelectedFiles(new Set());
-      setGraphData(null);
+      setCommittedGraph(null);
+      setPlaybackStepIndex(0);
       setCurrentSource(null);
-      setGraphHistory(
-        graphHistoryReducer(
-          initialGraphHistoryState,
-          { type: 'RESET', graph: { nodes: [], links: [] } },
-          historyOpts
-        )
-      );
       await fetchFiles();
       setDeleteToast({
         type: 'success',
@@ -490,7 +476,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setDeletingFiles(false);
     }
-  }, [selectedFiles, sessionId, fetchFiles, listingAuth, historyOpts]);
+  }, [selectedFiles, sessionId, fetchFiles, listingAuth]);
 
   const handleFileListKeyDown = useCallback((e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -508,7 +494,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     boxes[nextIndex]?.focus();
   }, []);
 
-  const handleSaveClick = () => {
+  const handleSaveClick = useCallback(() => {
     const defaultName = Array.from(selectedFiles)
       .map(f => f.customName || f.originalName.replace(/\.[^/.]+$/, ''))
       .join(' + ');
@@ -516,17 +502,17 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     setGraphName(defaultName);
     setGraphDescription(`Graph generated from ${selectedFiles.size} source${selectedFiles.size > 1 ? 's' : ''}`);
     setShowSaveDialog(true);
-  };
+  }, [selectedFiles]);
 
   const handleSaveGraph = async () => {
-    if (!graphData || !graphName.trim()) return;
+    if (!committedGraph || !graphName.trim()) return;
 
     try {
       setSaving(true);
       
       const graphToSave = {
-        nodes: graphData.nodes,
-        links: graphData.links.map(link => ({
+        nodes: committedGraph.nodes,
+        links: committedGraph.links.map(link => ({
           ...link,
           source: typeof link.source === 'object' ? link.source.id : link.source,
           target: typeof link.target === 'object' ? link.target.id : link.target
@@ -539,8 +525,8 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         sessionId,
         sourceFiles: Array.from(selectedFiles).map(f => f.originalName),
         generatedAt: new Date().toISOString(),
-        nodeCount: graphData.nodes.length,
-        edgeCount: graphData.links.length,
+        nodeCount: committedGraph.nodes.length,
+        edgeCount: committedGraph.links.length,
         ...(userId ? { userId } : {}),
       };
 
@@ -600,7 +586,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
   const canMintShareReadLink = Boolean(
     userId &&
-      graphData &&
+      committedGraph &&
       currentSource?.sourceFile &&
       !shareViewerMode &&
       String(currentSource?.userId || '') === String(userId)
@@ -633,6 +619,44 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       });
     }
   }, [currentSource?.sourceFile, userId, listingAuth]);
+
+  const libraryShareBannerPayload = useMemo(() => {
+    if (!canMintShareReadLink) return null;
+    return { onShareClick: handleCopyShareReadLink };
+  }, [canMintShareReadLink, handleCopyShareReadLink]);
+
+  const librarySaveBannerPayload = useMemo(() => {
+    if (!committedGraph || shareViewerMode) return null;
+    return {
+      onSaveClick: handleSaveClick,
+      saving,
+    };
+  }, [committedGraph, shareViewerMode, handleSaveClick, saving]);
+
+  useLayoutEffect(() => {
+    setGraphHistoryBannerPayload(graphHistoryBannerPayload);
+  }, [graphHistoryBannerPayload, setGraphHistoryBannerPayload]);
+
+  useLayoutEffect(() => {
+    setGraphShareBannerPayload(libraryShareBannerPayload);
+  }, [libraryShareBannerPayload, setGraphShareBannerPayload]);
+
+  useLayoutEffect(() => {
+    setGraphSaveBannerPayload(librarySaveBannerPayload);
+  }, [librarySaveBannerPayload, setGraphSaveBannerPayload]);
+
+  useLayoutEffect(
+    () => () => {
+      setGraphHistoryBannerPayload(null);
+      setGraphShareBannerPayload(null);
+      setGraphSaveBannerPayload(null);
+    },
+    [
+      setGraphHistoryBannerPayload,
+      setGraphShareBannerPayload,
+      setGraphSaveBannerPayload,
+    ]
+  );
 
   const handleFileSelect = (file) => {
     setSelectedFiles(prev => {
@@ -700,26 +724,17 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           color: defaultNodeColor,
         })),
       };
-      setGraphData(nextGraph);
-      setGraphHistory(
-        graphHistoryReducer(
-          initialGraphHistoryState,
-          { type: 'RESET', graph: nextGraph },
-          historyOpts
-        )
-      );
+      const cloned = cloneGraphForCommit(nextGraph);
+      if (cloned) ensurePlaybackTimestamps(cloned);
+      setCommittedGraph(cloned);
+      const times = getSortedUniquePlaybackTimes(cloned);
+      setPlaybackStepIndex(times.length > 0 ? times.length - 1 : 0);
 
     } catch (error) {
       console.error('Analysis error:', error);
       setError(`Failed to analyze files: ${getApiErrorMessage(error)}`);
-      setGraphData(null);
-      setGraphHistory(
-        graphHistoryReducer(
-          initialGraphHistoryState,
-          { type: 'RESET', graph: { nodes: [], links: [] } },
-          historyOpts
-        )
-      );
+      setCommittedGraph(null);
+      setPlaybackStepIndex(0);
     } finally {
       setAnalyzing(false);
       setShowContextModal(false);
@@ -734,6 +749,13 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
   const handleGraphDataUpdate = useCallback(
     (newData) => {
+      if (shareViewerMode) return;
+      const times = getSortedUniquePlaybackTimes(committedGraph);
+      const lastIdx = Math.max(0, times.length - 1);
+      if (committedGraph && times.length > 0 && playbackStepIndex < lastIdx) {
+        return;
+      }
+
       const nodeMap = new Map();
       newData.nodes.forEach((node) => {
         nodeMap.set(node.id, node);
@@ -768,23 +790,20 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         links: processedLinks,
       };
 
-      setGraphData(processedData);
-      setGraphHistory((prev) =>
-        graphHistoryReducer(
-          prev,
-          { type: 'COMMIT', graph: processedData },
-          historyOpts
-        )
-      );
+      const merged = mergePlaybackTimesFromEdit(processedData, committedGraph);
+      ensurePlaybackTimestamps(merged);
+      setCommittedGraph(merged);
+      const nextTimes = getSortedUniquePlaybackTimes(merged);
+      setPlaybackStepIndex(nextTimes.length > 0 ? nextTimes.length - 1 : 0);
 
       setCurrentSource((prev) => ({
         ...prev,
-        nodeCount: processedData.nodes.length,
-        edgeCount: processedData.links.length,
+        nodeCount: merged.nodes.length,
+        edgeCount: merged.links.length,
         lastModified: new Date().toISOString(),
       }));
     },
-    [historyOpts]
+    [shareViewerMode, committedGraph, playbackStepIndex]
   );
 
   const isMobile = dimensions.width <= 768;
@@ -844,8 +863,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           analyzing,
           deletingFiles,
           savedGraphs,
-          graphData,
-          saving,
+          graphData: committedGraph,
           onOpenUpload,
           onSelectAllFiltered: handleSelectAllFiltered,
           onClearFileSelection: handleClearFileSelection,
@@ -853,7 +871,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           onFileSelect: handleFileSelect,
           onFileListKeyDown: handleFileListKeyDown,
           onAnalyzeClick: handleAnalyzeClick,
-          onSaveClick: handleSaveClick,
           onLoadGraph: handleLoadGraph,
           shareViewerMode,
         }}
@@ -878,25 +895,16 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
             disabled.
           </div>
         )}
-        {canMintShareReadLink && (
-          <div className="library-share-owner-toolbar">
-            <button
-              type="button"
-              className="library-share-copy-link-btn"
-              onClick={handleCopyShareReadLink}
-            >
-              Copy read-only link
-            </button>
-          </div>
-        )}
         <div className="graph-container library-graph-mount">
           <GraphVisualization
             actionsFabPlacement="libraryGraphMount"
-            data={graphData || { nodes: [], links: [] }}
+            data={displayGraph}
             onDataUpdate={
-              shareViewerMode ? noopGraphDataUpdate : handleGraphDataUpdate
+              shareViewerMode || !playbackAtEnd
+                ? noopGraphDataUpdate
+                : handleGraphDataUpdate
             }
-            readOnly={shareViewerMode}
+            readOnly={shareViewerMode || !playbackAtEnd}
             width={graphViewportWidth}
             height={graphViewportHeight}
           />
@@ -950,11 +958,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
                 <div className="metadata-grid">
                   <div className="metadata-item">
                     <span className="metadata-label">Nodes</span>
-                    <span className="metadata-value">{graphData?.nodes.length || 0}</span>
+                    <span className="metadata-value">{committedGraph?.nodes.length || 0}</span>
                   </div>
                   <div className="metadata-item">
                     <span className="metadata-label">Edges</span>
-                    <span className="metadata-value">{graphData?.links.length || 0}</span>
+                    <span className="metadata-value">{committedGraph?.links.length || 0}</span>
                   </div>
                   <div className="metadata-item">
                     <span className="metadata-label">Sources</span>

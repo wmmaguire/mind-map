@@ -1452,12 +1452,14 @@ function GraphVisualization({
     e.preventDefault();
     const startTime = Date.now();
 
+    const createdAt = Date.now();
     const newNode = {
       id: `node_${Date.now()}`,
       label: newNodeData.label,
       description: newNodeData.description,
       wikiUrl: newNodeData.wikiUrl,
-      timestamp: Date.now(),
+      createdAt,
+      timestamp: createdAt,
       x: width / 2,
       y: height / 2,
       vx: 0,
@@ -1515,13 +1517,16 @@ function GraphVisualization({
       setConnectNewNodeLinksForm(null);
       return;
     }
+    let linkSeq = Date.now();
     const newLinks = targets.map((t, i) => {
       const targetObj = data.nodes.find(n => String(n.id) === String(t.id));
+      linkSeq += 1;
       return {
         source: newNodeObj,
         target: targetObj,
         relationship: relationshipInputs[i].trim(),
-        timestamp: Date.now(),
+        createdAt: linkSeq,
+        timestamp: linkSeq,
       };
     }).filter(l => l.target);
 
@@ -1567,11 +1572,13 @@ function GraphVisualization({
     e.preventDefault();
     const startTime = Date.now();
     
+    const createdAt = Date.now();
     const newLink = {
       source: selectedNodes[0],
       target: selectedNodes[1],
       relationship: relationshipForm.relationship,
-      timestamp: Date.now()
+      createdAt,
+      timestamp: createdAt,
     };
 
     const newData = {
@@ -2353,6 +2360,7 @@ GraphVisualization.propTypes = {
         label: PropTypes.string.isRequired,
         description: PropTypes.string,
         wikiUrl: PropTypes.string,
+        createdAt: PropTypes.number,
         timestamp: PropTypes.number,
         x: PropTypes.number,
         y: PropTypes.number,
@@ -2372,6 +2380,7 @@ GraphVisualization.propTypes = {
           PropTypes.object
         ]).isRequired,
         relationship: PropTypes.string,
+        createdAt: PropTypes.number,
         timestamp: PropTypes.number
       })
     ).isRequired

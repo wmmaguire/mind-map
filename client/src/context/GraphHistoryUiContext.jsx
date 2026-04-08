@@ -9,8 +9,8 @@ import PropTypes from 'prop-types';
 const noop = () => {};
 
 /**
- * Bridges Library graph history controls into {@link GuestIdentityBanner} (#36).
- * Without {@link GraphHistoryUiProvider}, `setPayload` is a no-op and `payload` stays null.
+ * Bridges Library graph history + optional share control into {@link GraphPlaybackBanner} (#36 / #39).
+ * Without {@link GraphHistoryUiProvider}, `setPayload` / `setSharePayload` / `setSavePayload` are no-ops.
  *
  * @typedef {object} GraphHistoryUiPayload
  * @property {number} entryCount
@@ -18,18 +18,38 @@ const noop = () => {};
  * @property {() => void} goEarlier
  * @property {() => void} goLater
  * @property {(i: number) => void} goToIndex
+ *
+ * @typedef {object} GraphHistorySharePayload
+ * @property {() => void} onShareClick
+ *
+ * @typedef {object} GraphHistorySavePayload
+ * @property {() => void} onSaveClick
+ * @property {boolean} saving
  */
 
 const GraphHistoryUiContext = createContext({
   payload: null,
   setPayload: noop,
+  sharePayload: null,
+  setSharePayload: noop,
+  savePayload: null,
+  setSavePayload: noop,
 });
 
 export function GraphHistoryUiProvider({ children }) {
   const [payload, setPayload] = useState(null);
+  const [sharePayload, setSharePayload] = useState(null);
+  const [savePayload, setSavePayload] = useState(null);
   const value = useMemo(
-    () => ({ payload, setPayload }),
-    [payload, setPayload]
+    () => ({
+      payload,
+      setPayload,
+      sharePayload,
+      setSharePayload,
+      savePayload,
+      setSavePayload,
+    }),
+    [payload, sharePayload, savePayload]
   );
   return (
     <GraphHistoryUiContext.Provider value={value}>

@@ -91,8 +91,24 @@ export function mergeAnalyzedGraphs(items) {
     return { nodes: [], links: [] };
   }
 
-  const namespaced = items.map(({ namespace, graph }) =>
-    namespaceGraph(graph, namespace)
-  );
-  return unionGraphs(namespaced);
+  let seq = Date.now();
+  const bump = () => {
+    seq += 1;
+    return seq;
+  };
+
+  const nodes = [];
+  const links = [];
+  for (const { namespace, graph } of items) {
+    const ng = namespaceGraph(graph, namespace);
+    for (const node of ng.nodes) {
+      const t = bump();
+      nodes.push({ ...node, createdAt: t, timestamp: t });
+    }
+    for (const link of ng.links) {
+      const t = bump();
+      links.push({ ...link, createdAt: t, timestamp: t });
+    }
+  }
+  return { nodes, links };
 }

@@ -12,16 +12,27 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
 
   const baseX = currentData.nodes[0]?.x ?? width / 2;
   const baseY = currentData.nodes[0]?.y ?? height / 2;
-  const mergeTimestamp = Date.now();
+  let seq = Date.now();
+  const bump = () => {
+    seq += 1;
+    return seq;
+  };
 
   generatedPatch.nodes.forEach(node => {
+    const ts =
+      (typeof node.createdAt === 'number' && Number.isFinite(node.createdAt))
+        ? node.createdAt
+        : (typeof node.timestamp === 'number' && Number.isFinite(node.timestamp))
+          ? node.timestamp
+          : bump();
     const processedNode = {
       ...node,
       x: baseX + (Math.random() - 0.5) * 200,
       y: baseY + (Math.random() - 0.5) * 200,
       vx: 0,
       vy: 0,
-      timestamp: node.timestamp ?? mergeTimestamp
+      createdAt: ts,
+      timestamp: ts,
     };
     nodeMap.set(String(node.id), processedNode);
   });
@@ -57,11 +68,18 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
     const targetNode = nodeMap.get(targetId);
 
     if (sourceNode && targetNode) {
+      const ts =
+        (typeof link.createdAt === 'number' && Number.isFinite(link.createdAt))
+          ? link.createdAt
+          : (typeof link.timestamp === 'number' && Number.isFinite(link.timestamp))
+            ? link.timestamp
+            : bump();
       processedLinks.push({
         source: sourceNode,
         target: targetNode,
         relationship: link.relationship,
-        timestamp: link.timestamp ?? mergeTimestamp
+        createdAt: ts,
+        timestamp: ts,
       });
     }
   });

@@ -56,6 +56,10 @@ describe('mergeAnalyzedGraphs', () => {
     ]);
     expect(merged.nodes).toHaveLength(2);
     expect(merged.nodes.map((n) => n.id).sort()).toEqual(['fileA__1', 'fileB__1']);
+    const t0 = merged.nodes[0].createdAt;
+    const t1 = merged.nodes[1].createdAt;
+    expect(typeof t0).toBe('number');
+    expect(t1).toBeGreaterThan(t0);
   });
 
   it('returns empty for empty input', () => {

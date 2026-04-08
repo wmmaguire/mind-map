@@ -30,7 +30,6 @@ export default function LibrarySourcesPanel({
   deletingFiles,
   savedGraphs,
   graphData,
-  saving,
   onOpenUpload,
   onSelectAllFiltered,
   onClearFileSelection,
@@ -38,7 +37,6 @@ export default function LibrarySourcesPanel({
   onFileSelect,
   onFileListKeyDown,
   onAnalyzeClick,
-  onSaveClick,
   onLoadGraph,
   shareViewerMode = false,
 }) {
@@ -283,15 +281,6 @@ export default function LibrarySourcesPanel({
         </h3>
         {graphsSectionOpen && (
           <div className="library-section__body saved-graphs-section">
-            {graphData && !shareViewerMode && (
-              <button
-                onClick={onSaveClick}
-                disabled={saving}
-                className="save-current-button"
-              >
-                {saving ? 'Saving...' : 'Save Current Graph'}
-              </button>
-            )}
             <div className="saved-graphs">
               {shareViewerMode ? (
                 <p className="no-saved-graphs">
@@ -350,7 +339,6 @@ LibrarySourcesPanel.propTypes = {
   deletingFiles: PropTypes.bool.isRequired,
   savedGraphs: PropTypes.array.isRequired,
   graphData: PropTypes.object,
-  saving: PropTypes.bool.isRequired,
   onOpenUpload: PropTypes.func.isRequired,
   onSelectAllFiltered: PropTypes.func.isRequired,
   onClearFileSelection: PropTypes.func.isRequired,
@@ -358,7 +346,6 @@ LibrarySourcesPanel.propTypes = {
   onFileSelect: PropTypes.func.isRequired,
   onFileListKeyDown: PropTypes.func.isRequired,
   onAnalyzeClick: PropTypes.func.isRequired,
-  onSaveClick: PropTypes.func.isRequired,
   onLoadGraph: PropTypes.func.isRequired,
   shareViewerMode: PropTypes.bool,
 };

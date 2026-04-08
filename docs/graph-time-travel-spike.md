@@ -2,51 +2,60 @@
 
 ## Problem
 
-Users only see the latest graph state in the Library visualization. There is no lightweight way to step backward through recent edits for comparison or recovery before we invest in full server-side versioning.
+Users need to step through how a graph was built for comparison or recovery, including after **reload** or **new session**, without requiring full server-side versioning in the first iteration.
 
-## Model choice (this spike)
+## Model choice
 
-**Phase 1 (shipped in this spike): client-only snapshot stack**
+### Current (Apr 2026): per-entity timestamps + playback strip
 
-- While viewing a graph on **`/visualize`**, the Library shell keeps a bounded list of **normalized graph snapshots** (nodes + links with link endpoints as primitive ids).
-- Each successful edit that flows through **`GraphVisualization` → `onDataUpdate`** appends a new snapshot (**redo** branch is truncated if the user had stepped backward).
-- **Analyze** and **load saved graph** reset history to a single snapshot (new session for that graph).
-- **UI:** when at least **two** snapshots exist, **History** controls appear in the **`GuestIdentityBanner`** (center column under the graph title): **◀** / **▶**, a **range** scrubber, position readout, and **Play** / **Pause** (auto-advance every **1.8s**, looping to the first state after the last). The graph panel no longer hosts this strip so the SVG uses the full visualization height.
+Replay is driven by **unique sorted timestamps** on each **node** and **link** (`createdAt`, with fallback to legacy `timestamp`). The committed graph in **`LibraryVisualize`** is the source of truth; the scrubber selects a **cutoff time** and **`buildGraphAtPlaybackTime`** renders entities with time ≤ cutoff (links only if both endpoints are visible).
 
-**Longer term (hybrid, not implemented here)**
+- **New / edited entities** get monotonic times via **`mergePlaybackTimesFromEdit`** and **`ensurePlaybackTimestamps`** (legacy graphs without times get stable synthetic order).
+- **Analyze (multi-file):** **`mergeAnalyzedGraphs`** assigns increasing **`createdAt`** per namespaced node/link in file order.
+- **Generate / manual adds:** **`GraphVisualization`** and **`mergeGenerateResult`** set **`createdAt`** + **`timestamp`**.
+- **Persistence:** saved JSON includes times so **reload** preserves replay order.
 
-- **Server snapshots** (e.g. versioned rows or files keyed by graph id + revision) for durability and sharing.
-- **Event log** (append-only operations, aligned with **`UserActivity` / `GraphOperation`** — see **#16**) for compact storage and selective replay.
-- **Diff mode** between two revisions (separate backlog).
+**UI**
 
-## Migration path
+- **`GuestIdentityBanner`**: graph **title** only (center column); title is **blank** when no graph is loaded or metadata has no non-empty name.
+- **`GraphPlaybackBanner`** (`App.js`, second strip below the identity banner): **save** (`save`), **Play** / scrubber / speed, **share** (owners, #39)—styled like the shell strip. Controls register via **`GraphHistoryUiContext`** (`payload` for history, `sharePayload`, `savePayload`).
+- **Save** moved from **`LibrarySourcesPanel`** into the playback strip.
 
-- No database or API migration in Phase 1.
-- When server versioning exists: on load, fetch revision list → optionally **hydrate** the client stack from the last *N* server revisions, or replace the scrubber with server-driven steps.
+**Speed:** Play interval = **1800 ms / speed multiplier**; speed options persisted in **`localStorage`** (`mindmap.graphHistoryPlaySpeed`).
+
+### Legacy: in-memory snapshot stack (superseded for replay)
+
+The earlier **#36 phase 1** used a bounded snapshot stack in **`graphHistory.js`** (`graphHistoryReducer`, max 30). **Library replay no longer uses that reducer**; **`graphHistory.js`** remains for **`normalizeGraphSnapshot` / `materializeGraphSnapshot`** and **unit tests** (`graphHistory.test.js`). See **follow-ups** in **`docs/github-backlog-issues.md`** (cleanup + tests).
+
+## Longer term (not implemented)
+
+- **Server snapshots** / revisions (API list/load by revision).
+- **Event log** replay aligned with **`UserActivity` / `GraphOperation`** (**#16**).
+- **Diff mode** between revisions.
 
 ## Limits
 
-- Default **30** snapshots (`DEFAULT_GRAPH_HISTORY_MAX` in `client/src/utils/graphHistory.js`).
-- History is **tab memory only**; refresh clears it.
-- **Undo** from history does not revert server-side saves; “Save graph” always persists the **current** on-screen state.
+- History scrubber needs **≥2 unique playback times** to show (otherwise nothing to scrub).
+- **Undo** via scrubbing does not revert server saves; **Save** persists the **full** committed graph.
 
-## Validation (issue #36 checklist)
+## Validation
 
-- [x] Spike doc records model choice and migration (this file).
-- [x] Minimal replay of two states: edit the graph twice (or analyze then edit) and use the banner **◀** / **▶**, the **range** slider, or **Play** / **Pause** to move through states.
+- [x] Spike doc records model and UI placement (this file).
+- [x] Unit tests: **`graphPlayback.test.js`**, **`graphHistory.test.js`** (legacy reducer), **`mergeGraphs.test.js`**, **`mergeGenerateResult.test.js`**.
 
-## Implementation map (phase 1)
+## Implementation map
 
 | Piece | Role |
 |-------|------|
-| `client/src/utils/graphHistory.js` | Normalize / materialize snapshots; reducer (`RESET`, `COMMIT`, `GOTO`, `STEP`); max **30** entries |
-| `client/src/utils/graphHistory.test.js` | Unit tests for reducer + round-trip |
-| `LibraryVisualize.js` | Owns history state; **`goToHistoryIndex`** is declared early (before any `useMemo` that references it) to avoid TDZ / HMR ordering bugs; registers controls via context |
-| `client/src/context/GraphHistoryUiContext.jsx` | `payload` + `setPayload` bridge to the shell banner |
-| `index.js` | Wraps app with **`GraphHistoryUiProvider`** (inside **`LibraryUiProvider`**) |
-| `GuestIdentityBanner.jsx` / `.css` | **History** row under graph title: step buttons, slider, **Play**/**Pause** (default **1.8s** per step, loops to first after last) |
+| `client/src/utils/graphPlayback.js` | `getPlaybackTime`, `ensurePlaybackTimestamps`, `getSortedUniquePlaybackTimes`, `buildGraphAtPlaybackTime`, `mergePlaybackTimesFromEdit`, `cloneGraphForCommit` |
+| `client/src/utils/graphPlayback.test.js` | Unit tests |
+| `client/src/utils/graphHistory.js` | Snapshot normalize/materialize + **reducer** (tests; not used for Library replay path) |
+| `LibraryVisualize.js` | `committedGraph`, `playbackStepIndex`, `displayGraph`; registers **`GraphHistoryUiContext`** payloads |
+| `GraphPlaybackBanner.jsx` | Second shell strip; **`GraphHistoryBannerControls`** |
+| `GraphHistoryUiContext.jsx` | `payload`, `sharePayload`, `savePayload` + setters |
+| `App.js` | Renders **`GraphPlaybackBanner`** below **`GuestIdentityBanner`** |
+| `GuestIdentityBanner.jsx` / `.css` | Identity + title only (playback styles shared via imports) |
 
 ## References
 
-- GitHub **#36** (epic)
-- Follow-ups: **`docs/github-backlog-issues.md`**, GitHub **#70** (phase 2+ backlog)
+- GitHub **#36** (epic), **#39** (read-only share), **#70** (phase 2+ backlog)

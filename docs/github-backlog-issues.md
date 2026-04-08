@@ -51,7 +51,7 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#68** / **#69** — **Backlog (future algorithms):** **#68** — multi-cycle randomized **strategy slider** (low-community ←→ random ←→ high-community) for choosing attachment targets and optional per-cycle **deletions** with the same bias; **#69** — **Explosion** mode: zoom in close enough to a node to trigger a Wikipedia-backed, **fully-connected** subgraph expansion. See `https://github.com/wmmaguire/mind-map/issues/68` and `https://github.com/wmmaguire/mind-map/issues/69`.
 
-**Note:** **#36 (phase 1, Apr 2026)** — **Graph time travel (client slice):** bounded in-memory **snapshot stack** in **`LibraryVisualize`** (`graphHistory.js`, max **30**); **History** UI lives in **`GuestIdentityBanner`** (center column under graph title): **◀** / **▶**, range slider, position readout, **Play** / **Pause** (auto-step **~1.8s**, loops last→first). **`GraphHistoryUiContext`** registers the active control API from **`/visualize`** only. History resets on **Analyze**, **load saved graph**, or clearing the graph. **Not** persisted server-side; **Save graph** writes the **current** canvas state only. **Fix:** **`goToHistoryIndex`** `useCallback` is declared **before** any `useMemo` that references it to avoid **`ReferenceError: Cannot access before initialization`** under HMR. **Follow-ups** outside this slice: GitHub **#70** (*Backlog: Graph time travel phase 2+*) and the template below. Suggested comments: **#36** (summary), **#33** / **#29** (banner density + shell), **#16** (event log alignment), **#24** / **#52** / **#56** / **#57** (E2E, stacking, focus, SR).
+**Note:** **#36 (timestamp playback, Apr 2026)** — **Graph time travel (client slice):** replay uses **per-entity** **`createdAt`** (fallback **`timestamp`**) and **`buildGraphAtPlaybackTime`** in **`graphPlayback.js`**; **`LibraryVisualize`** keeps **`committedGraph`** + **`playbackStepIndex`**. **UI:** **`GraphPlaybackBanner`** (second strip in **`App.js`**, below **`GuestIdentityBanner`**) — **save**, **◀** / **▶**, range slider, **Play** / **Pause**, **speed** (interval **1800 ms / speed**, persisted in **`localStorage`**), **share** (**#39**). **`GraphHistoryUiContext`** exposes **`payload`**, **`sharePayload`**, **`savePayload`**. Identity banner is **title-only** (graph title **blank** when unnamed). **`graphHistory.js`** snapshot **reducer** is **not** used for this path (kept for **`normalizeGraphSnapshot`** / **`materializeGraphSnapshot`** + **`graphHistory.test.js`**). **Follow-ups:** GitHub **#70** (*Backlog: Graph time travel phase 2+*) and *Backlog: Graph playback implementation follow-ups* below. Suggested comments: **#36**, **#33**, **#39**, **#29**, **#16**, **#24** / **#52** / **#56** / **#57** / **#70**.
 
 ### Backlog: Graph time travel phase 2+ — GitHub **#70**
 
@@ -61,34 +61,43 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 ```markdown
 ## Context
-Phase 1 of **#36** shipped client-only snapshot history + banner UI (**Play**/**Pause**, slider). This issue tracks durable and product follow-ons.
+**#36** now uses **timestamp-based** replay (**`graphPlayback.js`**) + **`GraphPlaybackBanner`** (save / scrubber / speed / share). This issue tracks durable and product follow-ons **outside** that slice.
 
-## Backlog (out of scope for phase 1)
+## Backlog (out of scope for current #36 implementation)
 
 1. **Server-persisted revisions** — Versioned graph snapshots (API list/load by revision); optional hydrate last *N* into the client scrubber.
 2. **Event-log replay** — Align append-only ops with **`GraphOperation` / `UserActivity`** (**#16**) for compact history and audit.
 3. **Diff / compare mode** — Side-by-side or highlighted delta between two revisions (depends on persistence).
-4. **Configurable play delay** — User setting or on-control input for **Play** interval (currently fixed **1.8s**).
-5. **Narrow banner / mobile** — History controls compete with title; collapse to menu, single-row overflow, or move to graph chrome (**#33**, **#52**).
+4. **Play timing** — **Done (Apr 2026):** speed select + **`localStorage`** (`mindmap.graphHistoryPlaySpeed`). **Follow-on:** account-synced preference or custom ms input.
+5. **Narrow viewport / mobile** — Playback strip density + overflow (**#33**, **#52**); optional move controls to graph chrome.
 6. **Focus & a11y** — **`aria-live`** announcements on history step (**#57**); focus order when opening **/visualize** (**#56**).
-7. **Tests** — RTL test for **`GraphHistoryBannerControls`** + integration that **`LibraryVisualize`** registers payload (**#24**).
+7. **Tests** — RTL / integration for **`GraphPlaybackBanner`** / **`GraphHistoryBannerControls`** + **`LibraryVisualize`** registration (**#24**).
 8. **Optional: pause on graph interaction** — Auto-pause **Play** when user edits the graph to avoid fighting auto-advance.
+9. **`graphHistory.js` cleanup** — Document or remove unused **reducer** from the app path if tests migrate to **`graphPlayback`**-only fixtures; keep normalize/materialize if still needed.
 
 Refs: #36 #16 #24 #33 #52 #56 #57
 ```
 
-### Suggested issue comments (#36 phase 1)
+**Note:** **#71** — **Backlog: Graph save — optional server validation of entity timestamps (`createdAt`)** — optional normalize/validate on **`POST /api/graphs/save`**; complements **#70** server revisions. See `https://github.com/wmmaguire/mind-map/issues/71`.
+
+### Suggested issue comments (#36 timestamp playback)
 
 **On #36 — comment body:**
 
 ```markdown
-**Phase 1 shipped (branch `issue-36-graph-time-travel`):** Client-only graph **history** (max 30 snapshots) on **`/visualize`**; **`LibraryVisualize`** commits on **`onDataUpdate`**, resets on analyze/load/clear. UI is in **`GuestIdentityBanner`** (under graph title): step buttons, slider, **Play**/**Pause** (~1.8s loop). **`GraphHistoryUiContext`** bridges library → banner. Docs: **`docs/graph-time-travel-spike.md`**, **`docs/github-backlog-issues.md`**. **TDZ fix:** `goToHistoryIndex` declared before dependent `useMemo`. Remaining work: **#70** (*Backlog: Graph time travel phase 2+*).
+**Update (Apr 2026):** Replay is **timestamp-based** (`graphPlayback.js`, per-entity `createdAt` / legacy `timestamp`), not the earlier in-memory snapshot stack. **`GraphPlaybackBanner`** (second strip below **`GuestIdentityBanner`**) hosts **save**, **Play** / scrubber / **speed** (persisted), and **share**; **`GraphHistoryUiContext`** registers `payload`, `sharePayload`, `savePayload`. Identity banner stays **title-only**; title is **blank** when no graph name. **`graphHistory.js`** reducer remains for normalize/materialize + tests only. Docs: **`docs/graph-time-travel-spike.md`**. Remaining: **#70** and implementation follow-ups in **`docs/github-backlog-issues.md`**.
 ```
 
 **On #33 — comment body:**
 
 ```markdown
-**Update (#36):** **`GuestIdentityBanner`** center column now stacks **graph title** + optional **History** row (graph replay). Adds density on **`/visualize`** when ≥2 history snapshots; may need mobile/overflow polish (**#52**, **#53**) or a future “overflow menu” pattern.
+**Update (#36, Apr 2026):** Graph **replay / save / share** moved to **`GraphPlaybackBanner`** (dedicated second strip). **`GuestIdentityBanner`** keeps **graph title** + auth + mobile Library only—reduces crowding vs stacking history under the title. Narrow-viewport overflow for the **playback** strip is still a polish item (**#52**, **#70**).
+```
+
+**On #39 — comment body:**
+
+```markdown
+**Update (#36 / shell):** **Copy read-only link** for signed-in owners lives on **`GraphPlaybackBanner`** (alongside save + playback), using the same **`GraphHistoryUiContext`** **`sharePayload`** bridge from **`LibraryVisualize`**. Recipient URL + **`readOnly`** behavior unchanged.
 ```
 
 **On #29 — comment body:**
@@ -100,7 +109,13 @@ Refs: #36 #16 #24 #33 #52 #56 #57
 **On #16 — comment body:**
 
 ```markdown
-**Future hook (#36):** Phase 1 history is **browser-only** snapshots. A durable **#36** phase 2 could append compact **graph edit** events (or snapshot refs) alongside existing **`UserActivity` / `GraphOperation`** telemetry for audit and optional server-side replay. Product scope for that slice: **#70**.
+**Future hook (#36):** Client replay is **timestamp-ordered** graph state (no server revision list yet). A durable **#36** phase 2 could append compact **graph edit** events (or snapshot refs) alongside existing **`UserActivity` / `GraphOperation`** telemetry for audit and optional server-side replay. Product scope for that slice: **#70**.
+```
+
+**On #70 — comment body (sync checklist with implementation):**
+
+```markdown
+**Doc sync (Apr 2026):** **#70** body in **`docs/github-backlog-issues.md`** was updated: **Play** speed is now **configurable** (client speed select + `localStorage`); items **5–9** remain (mobile strip, a11y, tests, pause-on-edit, `graphHistory.js` cleanup). Timestamp replay + **`GraphPlaybackBanner`** are tracked in **#36** / **`docs/graph-time-travel-spike.md`**.
 ```
 
 **Note:** **#62 (client UX follow-on, Apr 2026)** — **Generate** modal: primary button **Apply** (loading **Applying…**); **inline validation** under the title when manual mode has no highlighted anchors at open time or when randomized mode needs at least as many graph nodes as **connections per new node**; on valid **Apply** the modal **closes immediately** and the **`graph-edit-mode-chip`** shows **Generating (AI)** with **`aria-busy`**, an **animated progress bar** (**indeterminate** for manual and before the first randomized cycle; **determinate** by cycle for multi-cycle runs), and **Stop after this cycle** on the chip for randomized mode (no **Cancel** on the chip during generate—intentional for now). **#37** **`dryRun` / Preview budget** is **not** wired in this modal anymore; caps remain enforced server-side. **Failure** paths still use **`window.alert`**. **Follow-ups:** file a new backlog issue using the template in *Suggested GitHub backlog issue (post–#62)* below, and paste the *Suggested issue comments* onto **#62**, **#29**, and **#37** (or ask a maintainer with GitHub CLI/auth).

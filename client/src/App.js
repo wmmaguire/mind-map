@@ -4,6 +4,7 @@ import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
 import GiveFeedbackControl from './components/GiveFeedbackControl';
 import GuestIdentityBanner from './components/GuestIdentityBanner';
+import GraphPlaybackBanner from './components/GraphPlaybackBanner';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
   return (
     <div className="App">
       <GuestIdentityBanner />
+      <GraphPlaybackBanner />
       <GiveFeedbackControl />
       {showUpload && (
         <FileUpload
