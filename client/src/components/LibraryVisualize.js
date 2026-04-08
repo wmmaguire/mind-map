@@ -18,6 +18,7 @@ import {
   materializeGraphSnapshot,
   DEFAULT_GRAPH_HISTORY_MAX,
 } from '../utils/graphHistory';
+import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
 import './LibraryVisualize.css';
 
 const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
@@ -73,6 +74,8 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     () => ({ maxDepth: DEFAULT_GRAPH_HISTORY_MAX }),
     []
   );
+  const { setPayload: setGraphHistoryBannerPayload } = useGraphHistoryUi();
+
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -313,6 +316,30 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       });
     },
     [historyOpts]
+  );
+
+  const graphHistoryBannerPayload = useMemo(() => {
+    if (graphHistory.entries.length < 2 || !graphData) return null;
+    const n = graphHistory.entries.length;
+    const idx = graphHistory.index;
+    return {
+      entryCount: n,
+      index: idx,
+      goEarlier: () => goToHistoryIndex(Math.max(0, idx - 1)),
+      goLater: () => goToHistoryIndex(Math.min(n - 1, idx + 1)),
+      goToIndex: goToHistoryIndex,
+    };
+  }, [graphHistory.entries, graphHistory.index, graphData, goToHistoryIndex]);
+
+  useEffect(() => {
+    setGraphHistoryBannerPayload(graphHistoryBannerPayload);
+  }, [graphHistoryBannerPayload, setGraphHistoryBannerPayload]);
+
+  useEffect(
+    () => () => {
+      setGraphHistoryBannerPayload(null);
+    },
+    [setGraphHistoryBannerPayload]
   );
 
   const handleDeleteSelected = useCallback(async () => {
@@ -717,51 +744,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       )}
 
       <div className="visualization-panel">
-        {graphHistory.entries.length >= 2 && graphData && (
-          <div
-            className="library-graph-history"
-            role="region"
-            aria-label="Graph history replay"
-          >
-            <span className="library-graph-history__label" id="library-graph-history-label">
-              History
-            </span>
-            <button
-              type="button"
-              className="library-graph-history__step"
-              onClick={() => goToHistoryIndex(graphHistory.index - 1)}
-              disabled={graphHistory.index <= 0}
-              aria-label="Show earlier graph state"
-            >
-              Earlier
-            </button>
-            <input
-              type="range"
-              className="library-graph-history__range"
-              min={0}
-              max={graphHistory.entries.length - 1}
-              step={1}
-              value={graphHistory.index}
-              onChange={(e) => goToHistoryIndex(Number(e.target.value))}
-              aria-labelledby="library-graph-history-label"
-              aria-valuetext={`State ${graphHistory.index + 1} of ${graphHistory.entries.length}`}
-            />
-            <span className="library-graph-history__position" aria-hidden>
-              {graphHistory.index + 1} / {graphHistory.entries.length}
-            </span>
-            <button
-              type="button"
-              className="library-graph-history__step"
-              onClick={() => goToHistoryIndex(graphHistory.index + 1)}
-              disabled={
-                graphHistory.index >= graphHistory.entries.length - 1
-              }
-              aria-label="Show later graph state"
-            >
-              Later
-            </button>
-          </div>
-        )}
         <div className="graph-container library-graph-mount">
           <GraphVisualization
             actionsFabPlacement="libraryGraphMount"

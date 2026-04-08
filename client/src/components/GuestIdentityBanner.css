@@ -82,11 +82,22 @@
   transform: none;
 }
 
-.guest-identity-banner__graph-title,
-.guest-identity-banner__center-gap {
+.guest-identity-banner__center-stack {
   grid-column: 2;
   margin: 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.guest-identity-banner__center-stack .guest-identity-banner__graph-title,
+.guest-identity-banner__center-stack .guest-identity-banner__center-gap {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .guest-identity-banner__graph-title {
@@ -98,6 +109,89 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* #36 graph history — banner strip (Library → visualize) */
+.guest-identity-banner__graph-history {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 0.4rem;
+  width: 100%;
+  max-width: min(100%, 28rem);
+  padding: 0.1rem 0;
+}
+
+.guest-identity-banner__graph-history-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-right: 0.15rem;
+}
+
+.guest-identity-banner__graph-history-btn {
+  min-width: 1.75rem;
+  min-height: 1.65rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #475569;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.guest-identity-banner__graph-history-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.guest-identity-banner__graph-history-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.guest-identity-banner__graph-history-range {
+  flex: 1 1 6rem;
+  min-width: 4.5rem;
+  max-width: 12rem;
+  height: 0.35rem;
+  accent-color: #38bdf8;
+}
+
+.guest-identity-banner__graph-history-pos {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.guest-identity-banner__graph-history-play {
+  min-height: 1.65rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f172a;
+  background: #38bdf8;
+  border: 1px solid #0ea5e9;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.guest-identity-banner__graph-history-play:hover {
+  background: #7dd3fc;
+}
+
+.guest-identity-banner__graph-history-play.is-playing {
+  background: #fbbf24;
+  border-color: #f59e0b;
+  color: #422006;
 }
 
 .guest-identity-banner__center-gap {

@@ -6,7 +6,89 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
 import { useLibraryUi } from '../context/LibraryUiContext';
+import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
 import './GuestIdentityBanner.css';
+
+const GRAPH_HISTORY_PLAY_MS = 1800;
+
+function GraphHistoryBannerControls() {
+  const { payload } = useGraphHistoryUi();
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!payload) setPlaying(false);
+  }, [payload]);
+
+  useEffect(() => {
+    if (!playing || !payload || payload.entryCount < 2) return undefined;
+    const id = window.setInterval(() => {
+      if (payload.index >= payload.entryCount - 1) {
+        payload.goToIndex(0);
+      } else {
+        payload.goLater();
+      }
+    }, GRAPH_HISTORY_PLAY_MS);
+    return () => window.clearInterval(id);
+  }, [playing, payload]);
+
+  if (!payload || payload.entryCount < 2) return null;
+
+  const atStart = payload.index <= 0;
+  const atEnd = payload.index >= payload.entryCount - 1;
+
+  return (
+    <div
+      className="guest-identity-banner__graph-history"
+      role="group"
+      aria-label="Graph history replay"
+    >
+      <span className="guest-identity-banner__graph-history-label" id="banner-graph-history-label">
+        History
+      </span>
+      <button
+        type="button"
+        className="guest-identity-banner__graph-history-btn"
+        onClick={payload.goEarlier}
+        disabled={atStart}
+        aria-label="Earlier graph state"
+      >
+        ◀
+      </button>
+      <input
+        type="range"
+        className="guest-identity-banner__graph-history-range"
+        min={0}
+        max={payload.entryCount - 1}
+        step={1}
+        value={payload.index}
+        onChange={(e) => payload.goToIndex(Number(e.target.value))}
+        aria-labelledby="banner-graph-history-label"
+        aria-valuetext={`State ${payload.index + 1} of ${payload.entryCount}`}
+      />
+      <span className="guest-identity-banner__graph-history-pos" aria-hidden>
+        {payload.index + 1}/{payload.entryCount}
+      </span>
+      <button
+        type="button"
+        className="guest-identity-banner__graph-history-btn"
+        onClick={payload.goLater}
+        disabled={atEnd}
+        aria-label="Later graph state"
+      >
+        ▶
+      </button>
+      <button
+        type="button"
+        className={`guest-identity-banner__graph-history-play${playing ? ' is-playing' : ''}`}
+        onClick={() => setPlaying((p) => !p)}
+        aria-pressed={playing}
+        aria-label={playing ? 'Pause history replay' : 'Play history replay'}
+      >
+        {playing ? 'Pause' : 'Play'}
+      </button>
+    </div>
+  );
+}
 
 /** Dev preview uses this stable id (matches button copy). */
 export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
@@ -102,14 +184,17 @@ export default function GuestIdentityBanner() {
             </button>
           )}
         </div>
-        {showTitle ? (
-          <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
-        ) : (
-          <div
-            className="guest-identity-banner__center-gap"
-            aria-hidden
-          />
-        )}
+        <div className="guest-identity-banner__center-stack">
+          {showTitle ? (
+            <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+          ) : (
+            <div
+              className="guest-identity-banner__center-gap"
+              aria-hidden
+            />
+          )}
+          <GraphHistoryBannerControls />
+        </div>
         <div className="guest-identity-banner__trailing">
           {devControls ? (
             <button
@@ -278,11 +363,14 @@ export default function GuestIdentityBanner() {
           </button>
         )}
       </div>
-      {showTitle ? (
-        <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
-      ) : (
-        <div className="guest-identity-banner__center-gap" aria-hidden />
-      )}
+      <div className="guest-identity-banner__center-stack">
+        {showTitle ? (
+          <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+        ) : (
+          <div className="guest-identity-banner__center-gap" aria-hidden />
+        )}
+        <GraphHistoryBannerControls />
+      </div>
       <div
         className="guest-identity-banner__trailing"
         ref={menuWrapRef}

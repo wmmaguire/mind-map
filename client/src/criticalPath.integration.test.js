@@ -10,6 +10,7 @@ import { IdentityProvider } from './context/IdentityContext';
 import { AuthProvider } from './context/AuthContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
 import { LibraryUiProvider } from './context/LibraryUiContext';
+import { GraphHistoryUiProvider } from './context/GraphHistoryUiContext';
 import App from './App';
 
 const sessionId = 'test-session-uuid';
@@ -58,7 +59,9 @@ function renderApp(initialEntries) {
           <IdentityProvider>
             <GraphTitleProvider>
               <LibraryUiProvider>
-                <App />
+                <GraphHistoryUiProvider>
+                  <App />
+                </GraphHistoryUiProvider>
               </LibraryUiProvider>
             </GraphTitleProvider>
           </IdentityProvider>

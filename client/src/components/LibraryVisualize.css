@@ -428,61 +428,6 @@
   flex-direction: column;
 }
 
-/* #36 minimal time travel: in-memory snapshot scrubber above the graph */
-.library-graph-history {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 12px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-  flex-shrink: 0;
-}
-
-.library-graph-history__label {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin-right: 4px;
-}
-
-.library-graph-history__position {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #475569;
-  min-width: 3.25rem;
-  text-align: center;
-}
-
-.library-graph-history__step {
-  min-height: 40px;
-  padding: 6px 14px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #1e40af;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.library-graph-history__step:hover:not(:disabled) {
-  background: #dbeafe;
-}
-
-.library-graph-history__step:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.library-graph-history__range {
-  flex: 1;
-  min-width: 120px;
-  max-width: 320px;
-  accent-color: #2563eb;
-}
-
 .graph-container {
   flex: 1;
   position: relative;
