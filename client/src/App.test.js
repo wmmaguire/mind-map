@@ -7,6 +7,7 @@ import {
   resetSessionBootstrapForTests,
 } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
+import { AuthProvider } from './context/AuthContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
 import { LibraryUiProvider } from './context/LibraryUiContext';
 
@@ -19,13 +20,15 @@ test('renders app title', () => {
   render(
     <BrowserRouter>
       <SessionProvider>
-        <IdentityProvider>
-          <GraphTitleProvider>
-            <LibraryUiProvider>
-              <App />
-            </LibraryUiProvider>
-          </GraphTitleProvider>
-        </IdentityProvider>
+        <AuthProvider>
+          <IdentityProvider>
+            <GraphTitleProvider>
+              <LibraryUiProvider>
+                <App />
+              </LibraryUiProvider>
+            </GraphTitleProvider>
+          </IdentityProvider>
+        </AuthProvider>
       </SessionProvider>
     </BrowserRouter>
   );
@@ -36,13 +39,15 @@ test('shows guest identity banner', () => {
   render(
     <BrowserRouter>
       <SessionProvider>
-        <IdentityProvider>
-          <GraphTitleProvider>
-            <LibraryUiProvider>
-              <App />
-            </LibraryUiProvider>
-          </GraphTitleProvider>
-        </IdentityProvider>
+        <AuthProvider>
+          <IdentityProvider>
+            <GraphTitleProvider>
+              <LibraryUiProvider>
+                <App />
+              </LibraryUiProvider>
+            </GraphTitleProvider>
+          </IdentityProvider>
+        </AuthProvider>
       </SessionProvider>
     </BrowserRouter>
   );

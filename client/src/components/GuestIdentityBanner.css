@@ -111,6 +111,121 @@
   min-width: 0;
 }
 
+/* Auth modal (GitHub #63) */
+.guest-identity-banner__auth-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1300;
+}
+
+.guest-identity-banner__auth-modal {
+  width: min(420px, 92vw);
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 14px 16px;
+  color: #f1f5f9;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.guest-identity-banner__auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.guest-identity-banner__auth-close {
+  border: 1px solid #475569;
+  background: transparent;
+  color: #e2e8f0;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.guest-identity-banner__auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.guest-identity-banner__auth-tab {
+  flex: 1;
+  border: 1px solid #475569;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.guest-identity-banner__auth-tab.is-active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.guest-identity-banner__auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guest-identity-banner__auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.guest-identity-banner__auth-field input {
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.guest-identity-banner__auth-error {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.85rem;
+}
+
+.guest-identity-banner__auth-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.guest-identity-banner__auth-actions button {
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #38bdf8;
+  background: #0ea5e9;
+  color: #082f49;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.guest-identity-banner__auth-actions button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .guest-identity-banner__label {
   font-weight: 700;
   letter-spacing: 0.04em;

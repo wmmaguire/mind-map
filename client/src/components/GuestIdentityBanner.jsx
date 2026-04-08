@@ -3,6 +3,7 @@ import {
   IDENTITY_KIND_GUEST,
   useIdentity,
 } from '../context/IdentityContext';
+import { useAuth } from '../context/AuthContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
 import { useLibraryUi } from '../context/LibraryUiContext';
 import './GuestIdentityBanner.css';
@@ -21,6 +22,7 @@ export default function GuestIdentityBanner() {
     userId,
     setDevRegisteredUserId,
   } = useIdentity();
+  const { status: authStatus, user: authUser, login, register, logout } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
 
@@ -35,6 +37,13 @@ export default function GuestIdentityBanner() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWrapRef = useRef(null);
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // login | register
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -82,7 +91,7 @@ export default function GuestIdentityBanner() {
           />
         )}
         <div className="guest-identity-banner__trailing">
-          {devControls && (
+          {devControls ? (
             <button
               type="button"
               className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
@@ -95,8 +104,118 @@ export default function GuestIdentityBanner() {
                 Preview {DEV_PREVIEW_USER_ID}
               </span>
             </button>
+          ) : (
+            <button
+              type="button"
+              className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
+              onClick={() => {
+                setAuthMode('login');
+                setAuthModalOpen(true);
+              }}
+            >
+              <span className="guest-identity-banner__account-control-primary">
+                {authStatus === 'loading' ? 'Checking…' : 'Sign in'}
+              </span>
+              <span className="guest-identity-banner__account-control-secondary">
+                Create account
+              </span>
+            </button>
           )}
         </div>
+        {authModalOpen ? (
+          <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account">
+            <div className="guest-identity-banner__auth-modal">
+              <div className="guest-identity-banner__auth-header">
+                <strong>{authMode === 'login' ? 'Sign in' : 'Create account'}</strong>
+                <button
+                  type="button"
+                  className="guest-identity-banner__auth-close"
+                  onClick={() => setAuthModalOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="guest-identity-banner__auth-tabs" role="tablist" aria-label="Auth mode">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={authMode === 'login'}
+                  className={`guest-identity-banner__auth-tab ${authMode === 'login' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                  }}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={authMode === 'register'}
+                  className={`guest-identity-banner__auth-tab ${authMode === 'register' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setAuthMode('register');
+                    setAuthError('');
+                  }}
+                >
+                  Create account
+                </button>
+              </div>
+              <form
+                className="guest-identity-banner__auth-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setAuthBusy(true);
+                  setAuthError('');
+                  try {
+                    if (authMode === 'login') {
+                      await login({ email: authEmail, password: authPassword });
+                    } else {
+                      await register({ email: authEmail, password: authPassword });
+                    }
+                    setAuthModalOpen(false);
+                  } catch (err) {
+                    setAuthError(err?.message || 'Auth failed');
+                  } finally {
+                    setAuthBusy(false);
+                  }
+                }}
+              >
+                <label className="guest-identity-banner__auth-field">
+                  Email
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    autoComplete="email"
+                    required
+                  />
+                </label>
+                <label className="guest-identity-banner__auth-field">
+                  Password
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                    required
+                  />
+                </label>
+                {authError ? (
+                  <div className="guest-identity-banner__auth-error" role="alert">
+                    {authError}
+                  </div>
+                ) : null}
+                <div className="guest-identity-banner__auth-actions">
+                  <button type="submit" disabled={authBusy}>
+                    {authBusy ? 'Working…' : authMode === 'login' ? 'Sign in' : 'Create account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </aside>
     );
   }
@@ -176,6 +295,17 @@ export default function GuestIdentityBanner() {
                   }}
                 >
                   End preview (guest)
+                </button>
+                <button
+                  type="button"
+                  className="guest-identity-banner__menu-item"
+                  role="menuitem"
+                  onClick={async () => {
+                    await logout();
+                    setMenuOpen(false);
+                  }}
+                >
+                  Sign out
                 </button>
               </div>
             )}

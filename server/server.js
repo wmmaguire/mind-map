@@ -17,6 +17,7 @@ import filesRouter from './routes/files.js';
 import graphsRouter from './routes/graphs.js';
 import createTranscribeRouter from './routes/transcribe.js';
 import { recordUserActivity } from './lib/recordUserActivity.js';
+import createAuthRouter, { installAuthCookieParsing } from './routes/auth.js';
 import {
   dataDir,
   uploadsDir,
@@ -87,7 +88,7 @@ const corsOptions = {
   // Include DELETE (and PUT/PATCH) so dev clients using REACT_APP_API_URL / config
   // getApiOrigin() → http://localhost:5001 can call file delete and other mutations.
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Mindmap-User-Id'],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -101,12 +102,16 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Parse cookies for auth (GitHub #63).
+installAuthCookieParsing(app);
+
 // Add this middleware to log all incoming requests
 app.use((req, res, next) => {
+  const isAuthRoute = req.path?.startsWith('/api/auth');
   console.log('Incoming request:', {
     method: req.method,
     path: req.path,
-    body: req.body,
+    body: isAuthRoute ? { _redacted: true } : req.body,
     headers: req.headers
   });
   next();
@@ -127,6 +132,7 @@ app.use('/api', filesRouter);
 app.use('/api', graphsRouter);
 app.use('/api', graphOperationsRouter);
 app.use('/api', createTranscribeRouter(openai));
+app.use('/api/auth', createAuthRouter());
 
 app.get('/api/test', (req, res) => {
   try {

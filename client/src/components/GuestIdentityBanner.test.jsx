@@ -3,15 +3,18 @@ import { render, screen } from '@testing-library/react';
 import { IdentityProvider } from '../context/IdentityContext';
 import { GraphTitleProvider } from '../context/GraphTitleContext';
 import { LibraryUiProvider } from '../context/LibraryUiContext';
+import { AuthProvider } from '../context/AuthContext';
 import GuestIdentityBanner, { DEV_PREVIEW_USER_ID } from './GuestIdentityBanner';
 
 function wrap(ui) {
   return (
-    <IdentityProvider>
-      <GraphTitleProvider>
-        <LibraryUiProvider>{ui}</LibraryUiProvider>
-      </GraphTitleProvider>
-    </IdentityProvider>
+    <AuthProvider>
+      <IdentityProvider>
+        <GraphTitleProvider>
+          <LibraryUiProvider>{ui}</LibraryUiProvider>
+        </GraphTitleProvider>
+      </IdentityProvider>
+    </AuthProvider>
   );
 }
 
@@ -24,13 +27,15 @@ describe('GuestIdentityBanner', () => {
 
   it('shows signed-in id when registered', () => {
     render(
-      <IdentityProvider initialRegisteredUserId="acct-test-1">
-        <GraphTitleProvider>
-          <LibraryUiProvider>
-            <GuestIdentityBanner />
-          </LibraryUiProvider>
-        </GraphTitleProvider>
-      </IdentityProvider>
+      <AuthProvider>
+        <IdentityProvider initialRegisteredUserId="acct-test-1">
+          <GraphTitleProvider>
+            <LibraryUiProvider>
+              <GuestIdentityBanner />
+            </LibraryUiProvider>
+          </GraphTitleProvider>
+        </IdentityProvider>
+      </AuthProvider>
     );
     expect(screen.getByText(/Signed in/i)).toBeInTheDocument();
     expect(screen.getByText('acct-test-1')).toBeInTheDocument();

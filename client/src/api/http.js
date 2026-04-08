@@ -67,7 +67,7 @@ export async function apiRequest(path, options = {}) {
 
   let response;
   try {
-    response = await fetch(url, { ...init, headers, body });
+    response = await fetch(url, { ...init, headers, body, credentials: 'include' });
   } catch (e) {
     const msg =
       e?.message === 'Failed to fetch' || e?.name === 'TypeError'
