@@ -5,8 +5,11 @@ import {
 } from '../context/IdentityContext';
 import './GuestIdentityBanner.css';
 
+/** Dev preview uses this stable id (matches button copy). */
+export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
+
 /**
- * Shell strip for active account mode: guest session vs signed-in preview / env user (#31 / #33).
+ * Compact shell strip: guest vs signed-in; dev preview controls on the right (#31 / #33).
  */
 export default function GuestIdentityBanner() {
   const {
@@ -31,21 +34,14 @@ export default function GuestIdentityBanner() {
       >
         <div className="guest-identity-banner__main">
           <span className="guest-identity-banner__label">Guest</span>
-          <span className="guest-identity-banner__active" title="Active mode">
-            Active: <strong>guest session</strong> (no account id)
-          </span>
-          <span className="guest-identity-banner__copy">
-            Files and graphs are scoped to this browser session. Full sign-in is
-            not wired yet.
-          </span>
         </div>
         {devControls && (
           <button
             type="button"
             className="guest-identity-banner__dev-btn"
-            onClick={() => setDevRegisteredUserId('dev-preview-user')}
+            onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
           >
-            Preview signed-in UI
+            Preview as {DEV_PREVIEW_USER_ID}
           </button>
         )}
       </aside>
@@ -53,7 +49,7 @@ export default function GuestIdentityBanner() {
   }
 
   const displayId =
-    userId && userId.length > 36 ? `${userId.slice(0, 34)}…` : userId;
+    userId && userId.length > 28 ? `${userId.slice(0, 26)}…` : userId;
 
   return (
     <aside
@@ -67,13 +63,10 @@ export default function GuestIdentityBanner() {
           Signed in
         </span>
         <span
-          className="guest-identity-banner__active"
+          className="guest-identity-banner__id"
           title={userId || ''}
         >
-          Active: <strong>{displayId || 'account'}</strong>
-        </span>
-        <span className="guest-identity-banner__copy">
-          API calls include your user id for scoped listings when supported.
+          {displayId || '—'}
         </span>
       </div>
       {devControls && (
@@ -82,7 +75,7 @@ export default function GuestIdentityBanner() {
           className="guest-identity-banner__dev-btn"
           onClick={() => setDevRegisteredUserId(null)}
         >
-          End preview (guest)
+          End preview · Guest
         </button>
       )}
     </aside>
