@@ -77,6 +77,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#63** (registration / login / profile + library integration — branch **`issue-63-auth-registration-login`**) — Server: **`User`** model, **`POST/GET/PATCH /api/auth/*`**, httpOnly **`mindmap_auth`** JWT cookie, **`PATCH /api/me`** for display name; **`POST /upload`** + **`graphs/save`** attach **`userId`** from header; listing/read/delete rules above. Client: **`AuthProvider`**, **`AuthIdentityBridge`**, **`GuestIdentityBanner`** (sign-in modal, user settings, sign out), **`LibraryVisualize`** / **`Library.js`** / **`FileUpload`** pass **`auth: { userId }`**; **`LibraryAccountChip`** shows **name** when present. **Removed:** redundant **Guest** label; dev **End preview** menu item (refresh clears preview state). **Docs:** **`server/READEME.md`**, **`client/README.md`**, **`docs/status.md`**, this file. **Follow-ups outside #63:** **#64**, **#65**, **#66**; OAuth — **#33** / future epic.
 
+**Note:** **#67** — Expand **Account settings** with more editable profile/preferences fields (e.g. bio, avatar URL, timezone); **email change** / **password change** as separate verified flows.
+
 | Follow-up (outside #27 implementation scope) | GitHub issue / note |
 |----------------------------------------------|---------------------|
 | Full **z-index** audit: graph menu (**10020**), Actions FAB (**1190**; Library: **container-absolute** + **`libraryGraphMount`** — **#31**), Feedback FAB (**1000** / modal **1001**), library sidebar (**1200**), toasts (**1350**), `Modal` (**1300**) | **#52** (see issue comments post–**#30**, **#31**) |
