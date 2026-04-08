@@ -1672,6 +1672,12 @@ function GraphVisualization({
     setShowGenerateForm(true);
   };
 
+  const onMenuPickGenerateWithAlgorithm = (algorithm) => {
+    setExpansionAlgorithm(algorithm);
+    setGenerateBudgetPreview(null);
+    onMenuPickGenerate();
+  };
+
   const onMenuPickAddNode = () => {
     const snap = graphActionSnapshotRef.current;
     const ids = snap.nodeIds.length ? [...snap.nodeIds] : [];
@@ -1838,40 +1844,20 @@ function GraphVisualization({
                 role="group"
                 aria-label="Generate with AI"
               >
-                <div className="form-group">
-                  <label htmlFor="graph-expansion-algorithm">
-                    Expansion algorithm
-                  </label>
-                  <select
-                    id="graph-expansion-algorithm"
-                    value={expansionAlgorithm}
-                    onChange={e => {
-                      setExpansionAlgorithm(e.target.value);
-                      setGenerateBudgetPreview(null);
-                    }}
-                  >
-                    <option value="manual">
-                      Manual — one model call; new nodes link to every highlighted
-                      node
-                    </option>
-                    <option value="randomizedGrowth">
-                      Multi-cycle randomized — AI adds batches; each new node links
-                      to random existing nodes (uniform)
-                    </option>
-                  </select>
-                </div>
-                <button
-                  type="button"
+                <select
+                  id="graph-expansion-algorithm"
                   className="generate-button graph-action-menu__action"
-                  onClick={onMenuPickGenerate}
+                  aria-label="AI Generation"
+                  value={expansionAlgorithm}
+                  onChange={e => {
+                    const next = e.target.value;
+                    if (!next) return;
+                    onMenuPickGenerateWithAlgorithm(next);
+                  }}
                 >
-                  <span className="graph-action-menu__action-icon" aria-hidden>
-                    ✨
-                  </span>
-                  <span className="graph-action-menu__action-label">
-                    AI Generation
-                  </span>
-                </button>
+                  <option value="manual">manual</option>
+                  <option value="randomizedGrowth">multi-cycle randomized</option>
+                </select>
               </div>
             )}
           </section>

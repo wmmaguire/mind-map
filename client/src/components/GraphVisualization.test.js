@@ -69,21 +69,21 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('button', { name: /Open graph actions menu/i })
     );
     expect(
-      screen.getByRole('button', { name: /^AI Generation$/i })
+      screen.getByRole('combobox', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /^Generate \(AI\)$/i })
     );
     expect(
-      screen.queryByRole('button', { name: /^AI Generation$/i })
+      screen.queryByRole('combobox', { name: /^AI Generation$/i })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /^Generate \(AI\)$/i })
     );
     expect(
-      screen.getByRole('button', { name: /^AI Generation$/i })
+      screen.getByRole('combobox', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /^AI Generation$/i })
+      screen.getByRole('combobox', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /^Add Node$/i })
@@ -162,7 +162,7 @@ describe('GraphVisualization graph action menu', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows expansion algorithm control in the Actions menu Generate section (#62)', () => {
+  it('shows AI Generation algorithm dropdown in the Actions menu (#62)', () => {
     render(
       <GraphVisualization
         data={minimalData}
@@ -176,7 +176,7 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('button', { name: /Open graph actions menu/i })
     );
     expect(
-      screen.getByRole('combobox', { name: /^Expansion algorithm$/i })
+      screen.getByRole('combobox', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
   });
 
