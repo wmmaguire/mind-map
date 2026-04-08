@@ -42,6 +42,8 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
 
 - **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` and `POST /api/generate-node` (default **`gpt-4o`**). Override if your API key only has access to a different model.
 
+- **`OPENAI_TRANSCRIBE_MODEL`**: optional; Whisper model id for `POST /api/transcribe` (default **`whisper-1`**). Same **`OPENAI_API_KEY`** as other OpenAI calls (GitHub **#34**).
+
 **Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
 
 ## High-level architecture
@@ -149,6 +151,27 @@ Relevant code:
 - `server/routes/files.js` (`POST /upload` → `POST /api/upload` when mounted)
 - `server/models/file.js`
 
+### 2b) Audio transcription (Whisper) — GitHub **#34**
+
+**Goal**: turn a short audio clip into plain text for the same analyze pipeline as uploads (client uploads transcript as `.txt` via **`POST /api/upload`**).
+
+1. Client sends `multipart/form-data` to **`POST /api/transcribe`** with:
+   - **`audio`** — one file (`audio/*` MIME; max **25 MB**, Whisper API limit)
+   - **`sessionId`** — UUID; must match an existing Mongo **`Session`**
+2. Server calls OpenAI **`audio.transcriptions.create`** (model **`OPENAI_TRANSCRIBE_MODEL`**, default **`whisper-1`**).
+3. **200** response JSON:
+   - **`success`**: `true`
+   - **`transcript`**: string (may be empty)
+   - **`model`**: model id used
+4. **Errors:** **`400`** — missing `sessionId`, invalid session, missing file, unsupported MIME (**`code`**: `SESSION_REQUIRED`, `INVALID_SESSION`, `NO_AUDIO_FILE`, `UNSUPPORTED_AUDIO_TYPE`). **`413`** — **`FILE_TOO_LARGE`** (`maxBytes`). **`401`** / **`429`** — OpenAI auth / quota (**`OPENAI_AUTH`**, **`OPENAI_QUOTA`**). Failures record **`UserActivity`** **`TRANSCRIBE_COMPLETE`** **`FAILURE`**; successes record **`SUCCESS`**.
+
+No audio bytes are persisted as library **`File`** rows on this route — only audit metadata. The client saves text through the normal upload API.
+
+Relevant code:
+
+- `server/routes/transcribe.js`
+- Unit tests: `server/routes/transcribe.test.mjs` (`npm test` in `server/`)
+
 ### 3) File listing + file content retrieval
 
 **Goal**: allow the UI to list uploaded content and fetch it for analysis.
@@ -193,6 +216,7 @@ Relevant code:
 | `POST /api/sessions` | `Session`, `UserMetadata` | `SESSION_CREATE` |
 | `POST /api/sessions/:sessionId` | `Session` | `SESSION_UPDATE` |
 | `POST /api/upload` | `File` | `FILE_UPLOAD` |
+| `POST /api/transcribe` | *(no `File`; audit only)* | `TRANSCRIBE_COMPLETE` |
 | `POST /api/analyze` | `GraphTransform` | `ANALYZE_COMPLETE` |
 | `POST /api/graphs/save` | `Graph` | `GRAPH_SNAPSHOT_SAVE` |
 | `GET /api/graphs/:filename` | `GraphView` (if DB graph matched) | `GRAPH_VIEW_RECORD` |

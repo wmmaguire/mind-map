@@ -15,6 +15,7 @@ import GraphTransform from './models/graphTransform.js';
 import graphOperationsRouter from './routes/graphOperations.js';
 import filesRouter from './routes/files.js';
 import graphsRouter from './routes/graphs.js';
+import createTranscribeRouter from './routes/transcribe.js';
 import { recordUserActivity } from './lib/recordUserActivity.js';
 import {
   dataDir,
@@ -125,6 +126,7 @@ app.use((req, res, next) => {
 app.use('/api', filesRouter);
 app.use('/api', graphsRouter);
 app.use('/api', graphOperationsRouter);
+app.use('/api', createTranscribeRouter(openai));
 
 app.get('/api/test', (req, res) => {
   try {

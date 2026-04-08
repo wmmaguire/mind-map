@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 (**#33** Library shell: identity banner, graph title, mobile Library control, mindmap auth headers — branch **`issue-33-library-accounts-ui`**, tip **`f430bae`**)
+Last updated: 2026-04-08 (**#34** audio → transcript: `POST /api/transcribe` Whisper, FileUpload **Audio → transcript** tab → `.txt` upload — branch **`issue-34-audio-transcribe-pipeline`**)
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -50,7 +50,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
-    - Sends `multipart/form-data` to `POST /api/upload` with `file`, `customName`, `sessionId`.
+    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34):** `POST /api/transcribe` (`audio`, `sessionId`), then upload generated `.txt` via the same upload path.
   - **Library + analyze**: `LibraryVisualize.js` + **`LibrarySidebar`**, **`LibrarySourcesPanel`**, **`LibraryAccountChip`**
     - Lists files (`GET /api/files`)
     - Reads file content (`GET /api/files/:filename`)
@@ -87,6 +87,8 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 ### Implemented API surface (major endpoints)
 
 #### Files + uploads
+- `POST /api/transcribe` (**#34**)
+  - Multipart `audio` + `sessionId`; OpenAI Whisper; `UserActivity` **`TRANSCRIBE_COMPLETE`**; see **`server/routes/transcribe.js`**
 - `POST /api/upload`
   - Upload a file (multer)
   - Validates session exists (by session UUID)

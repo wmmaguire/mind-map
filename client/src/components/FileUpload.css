@@ -306,4 +306,86 @@
     font-weight: 500;
     display: block;
     margin-bottom: 0.5rem;
-  } 
+  }
+
+  .file-upload-modal {
+    max-width: 520px;
+  }
+
+  .file-upload-mode-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .file-upload-mode-tabs__btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f5f5f5;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+
+  .file-upload-mode-tabs__btn.is-active {
+    background: #4a90e2;
+    color: #fff;
+    border-color: #357abd;
+  }
+
+  .file-upload-audio-hint {
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.4;
+    margin: 0 0 1rem 0;
+  }
+
+  .file-upload-transcript {
+    width: 100%;
+    min-height: 160px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .file-upload-transcript:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+  }
+
+  .file-upload-meta {
+    font-size: 0.8rem;
+    color: #666;
+    margin: 0.35rem 0 0 0;
+  }
+
+  .file-info--inline {
+    margin-top: 0.5rem;
+  }
+
+  .modal-actions--split {
+    justify-content: flex-start;
+    margin-bottom: 0.5rem;
+  }
+
+  .upload-button--secondary {
+    background-color: #6c757d;
+  }
+
+  .upload-button--secondary:hover:not(:disabled) {
+    background-color: #5a6268;
+  }
+
+  .file-upload-audio-file {
+    width: 100%;
+    padding: 8px 0;
+    font-size: 0.95rem;
+    color: #333;
+  }

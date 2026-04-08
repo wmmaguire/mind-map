@@ -58,7 +58,7 @@ Shared JSON (and `multipart/form-data`) API access for GitHub **#22**.
 - `client/src/components/GiveFeedbackControl.jsx`
   - App-shell **Give Feedback** FAB + modal for **`POST /api/feedback`** (GitHub **#23**): single mount in **`App.js`**, **`apiRequest`**, safe-area insets, Escape / basic dialog a11y. Post–#23 follow-ups: **#24** (tests), **#50** (toast), **#52** (z-index vs library UI) — see **`docs/github-backlog-issues.md`**.
 - `client/src/components/FileUpload.js`
-  - Upload modal; posts `multipart/form-data` to **`POST /api/upload`** and associates each upload with the current session. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
+  - Upload modal: **Text file** (`.txt` / `.md`) → **`POST /api/upload`**; **Audio → transcript** tab → **`POST /api/transcribe`** (Whisper), editable transcript, then upload as `.txt` via the same upload path (**GitHub #34**). Tests: **`FileUpload.test.jsx`**. The backend allows **multiple files per session** (see **`server/routes/files.js`** / **`server/models/file.js`**).
 - `client/src/components/LibraryVisualize.js`
   - Library workflow: **`LibrarySidebar`** / **`LibrarySourcesPanel`** / **`LibraryAccountChip`**; selecting files, analyze, save/load graphs, **`GraphVisualization`**. Desktop: **resizable** sidebar (persisted), collapsible **Files** / **Graphs** sections. Narrow viewports: **mobile Library** control is in **`GuestIdentityBanner`** (**`LibraryUiContext`**); overlay when the panel is open. **Files** list: search, sort, select-all/clear, skeleton, empty states; **+ Add new** / **Delete selected** / **Analyze Selected**; delete **toasts**. Helpers: **`libraryFileList.js`**. Current graph **name** is shown in **`GuestIdentityBanner`** via **`GraphTitleContext`** (no separate visualization header strip). **`GraphVisualization`**: explicit **`width` / `height`** (full graph area under the shell), **`actionsFabPlacement="libraryGraphMount"`**. **`apiRequest`** may send **`X-Mindmap-User-Id`** when **`useIdentity().userId`** is set (**#32** / **#33**). The graph wrapper uses **`library-graph-mount`** with scoped **`LibraryVisualize.css`**; legacy global mobile **`.graph-container`** rules in **`GraphVisualization.css`** were **removed** in **#28** (**#55** audit). GitHub **#25**, **#26**, **#28**, **#33**.
 - `client/src/components/GraphVisualization.js`
@@ -96,6 +96,8 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
 
 **Goal**: upload source file(s) and associate each with the current session.
 
+**Text path**
+
 1. User opens the upload modal (`FileUpload`) and selects a `.txt` or `.md` file.
 2. `FileUpload` posts to `POST /api/upload` with form fields:
    - `file`
@@ -103,6 +105,8 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
    - `sessionId` (from `useSession()`)
 3. On success, the server writes the upload to disk, writes metadata JSON, and saves a **`File`** record in Mongo (indexed by **`sessionId`**; optional **`userId`** on the model is **not** set from auth on this path yet — **#33**). A **`UserActivity`** row with action **`FILE_UPLOAD`** is also recorded when persistence succeeds (see **`server/READEME.md`**). Users can repeat steps 1–2 for **additional files in the same session** (multiple `File` documents per `sessionId`).
 4. On failure, the API may return structured JSON (`error`, `details`, `code`). If a **legacy Mongo index** still enforces one file per session, see **`server/READEME.md`** (GitHub **#42**).
+
+**Audio → transcript (same modal):** User switches to **Audio → transcript**, picks an audio file, **`POST /api/transcribe`** with `audio` + `sessionId` returns `{ transcript, model }`. The client can edit the text, then builds a **`File`** and uses **`POST /api/upload`** like a normal text source so Library **Analyze** works unchanged.
 
 ### 3) Library list → analyze → graph render
 
