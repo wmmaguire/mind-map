@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 (**#34** audio → transcript: `POST /api/transcribe` Whisper, FileUpload **Audio → transcript** tab → `.txt` upload — branch **`issue-34-audio-transcribe-pipeline`**)
+Last updated: 2026-04-07 (**#34** audio → transcript: `POST /api/transcribe` OpenAI Whisper, FileUpload **Audio → transcript** tab → `.txt` upload — branch **`issue-34-audio-transcribe-pipeline`**, tip **`5b82d63`**). Plain-text transcript only (no per-segment times); in-browser **recording** not implemented (see **#35**).
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:

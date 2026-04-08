@@ -167,6 +167,8 @@ Relevant code:
 
 No audio bytes are persisted as library **`File`** rows on this route — only audit metadata. The client saves text through the normal upload API.
 
+**Plain text only:** The implementation uses the default transcription response shape (**`text`** string). It does **not** return word- or segment-level timestamps. OpenAI’s API supports richer formats (e.g. **`verbose_json`**) if a future change needs “when things were said” in the UI.
+
 Relevant code:
 
 - `server/routes/transcribe.js`
