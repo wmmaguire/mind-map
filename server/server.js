@@ -22,6 +22,7 @@ import {
   validateGenerateNodeRequest,
   buildGenerateNodeDryRunPreview
 } from './lib/generateNodeBudget.js';
+import { buildRandomExpansionLinks } from './lib/randomExpansionLinks.js';
 import {
   dataDir,
   uploadsDir,
@@ -484,84 +485,106 @@ app.post('/api/generate-node', async (req, res) => {
       });
     }
 
-    // Validate node IDs and convert them to strings for consistent comparison
     const newNodeIds = new Set(newData.nodes.map(node => node.id));
     const selectedNodeIds = new Set(selectedNodes.map(node => String(node.id))); // Convert to string
-    
-    // Validate connections
-    const connectionMap = new Map();
-    newNodeIds.forEach(newId => {
-      connectionMap.set(newId, new Set());
-    });
 
-    // Check each link and count connections
-    console.log('Checking connections...');
-    newData.links.forEach(link => {
-      const source = String(link.source); // Convert to string
-      const target = String(link.target); // Convert to string
-      
-      console.log(`Checking link: source=${source}, target=${target}`);
-      
-      // Validate source and target exist
-      if (!source || !target) {
-        throw new Error(`Invalid link: missing source or target`);
-      }
-
-      // Track connections for new nodes to selected nodes
-      if (newNodeIds.has(source) && selectedNodeIds.has(target)) {
-        console.log(`Adding connection: ${source} -> ${target}`);
-        connectionMap.get(source).add(target);
-      }
-    });
-
-    // Debug log the connection map
-    console.log('Connection map:');
-    connectionMap.forEach((connections, newId) => {
-      console.log(`${newId} is connected to:`, Array.from(connections));
-    });
-
-    // Verify each new node connects to all selected nodes
-    let isValid = true;
-    let missingConnections = [];
-
-    connectionMap.forEach((connections, newId) => {
-      console.log(`Checking ${newId} connections:`, {
-        has: Array.from(connections),
-        needs: Array.from(selectedNodeIds)
-      });
-      
-      if (connections.size !== selectedNodeIds.size) {
-        isValid = false;
-        const missing = Array.from(selectedNodeIds)
-          .filter(id => !connections.has(id));
-        missingConnections.push(
-          `Node ${newId} has ${connections.size} connections but needs ${selectedNodeIds.size}. ` +
-          `Missing connections to: ${missing.map(id => 
-            `${id} (${selectedNodes.find(n => String(n.id) === id)?.label})`
-          ).join(', ')}`
+    if (validated.expansionAlgorithm === 'randomizedGrowth') {
+      const orderedNewIds = newData.nodes.map(node => String(node.id));
+      try {
+        newData.links = buildRandomExpansionLinks(
+          orderedNewIds,
+          validated.existingGraphNodeIds,
+          validated.connectionsPerNewNode,
+          Math.random
         );
+      } catch (attachErr) {
+        console.error('Random expansion attachment failed:', attachErr);
+        return res.status(400).json({
+          success: false,
+          error: attachErr.message || 'Random attachment failed',
+          code: attachErr.code || 'RANDOM_ATTACHMENT_FAILED'
+        });
       }
-    });
-
-    if (!isValid) {
-      console.error('Validation details:', {
-        newNodes: Array.from(newNodeIds),
-        selectedNodes: Array.from(selectedNodeIds),
-        connections: Object.fromEntries(connectionMap),
-        missingConnections
+      console.log('Validation passed (randomizedGrowth):', {
+        newNodes: newData.nodes.length,
+        totalLinks: newData.links.length,
+        connectionsPerNewNode: validated.connectionsPerNewNode
       });
-      return res.json({
-        success: false,
-        error: 'Generated graph does not meet connectivity requirements',
-        details: missingConnections.join('\n')
+    } else {
+      // Manual: each new node must connect to every highlighted (selected) node
+      const connectionMap = new Map();
+      newNodeIds.forEach(newId => {
+        connectionMap.set(newId, new Set());
+      });
+
+      console.log('Checking connections...');
+      newData.links.forEach(link => {
+        const source = String(link.source);
+        const target = String(link.target);
+
+        console.log(`Checking link: source=${source}, target=${target}`);
+
+        if (!source || !target) {
+          throw new Error(`Invalid link: missing source or target`);
+        }
+
+        if (newNodeIds.has(source) && selectedNodeIds.has(target)) {
+          console.log(`Adding connection: ${source} -> ${target}`);
+          connectionMap.get(source).add(target);
+        }
+      });
+
+      console.log('Connection map:');
+      connectionMap.forEach((connections, newId) => {
+        console.log(`${newId} is connected to:`, Array.from(connections));
+      });
+
+      let isValid = true;
+      const missingConnections = [];
+
+      connectionMap.forEach((connections, newId) => {
+        console.log(`Checking ${newId} connections:`, {
+          has: Array.from(connections),
+          needs: Array.from(selectedNodeIds)
+        });
+
+        if (connections.size !== selectedNodeIds.size) {
+          isValid = false;
+          const missing = Array.from(selectedNodeIds).filter(
+            id => !connections.has(id)
+          );
+          missingConnections.push(
+            `Node ${newId} has ${connections.size} connections but needs ${selectedNodeIds.size}. ` +
+              `Missing connections to: ${missing
+                .map(
+                  id =>
+                    `${id} (${selectedNodes.find(n => String(n.id) === id)?.label})`
+                )
+                .join(', ')}`
+          );
+        }
+      });
+
+      if (!isValid) {
+        console.error('Validation details:', {
+          newNodes: Array.from(newNodeIds),
+          selectedNodes: Array.from(selectedNodeIds),
+          connections: Object.fromEntries(connectionMap),
+          missingConnections
+        });
+        return res.json({
+          success: false,
+          error: 'Generated graph does not meet connectivity requirements',
+          details: missingConnections.join('\n')
+        });
+      }
+
+      console.log('Validation passed:', {
+        newNodes: newData.nodes.length,
+        totalLinks: newData.links.length,
+        connectionsPerNode: selectedNodeIds.size
       });
     }
-
-    console.log('Validation passed:', {
-      newNodes: newData.nodes.length,
-      totalLinks: newData.links.length,
-      connectionsPerNode: selectedNodeIds.size
-    });
 
     return res.json({
       success: true,

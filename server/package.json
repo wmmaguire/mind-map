@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test routes/transcribe.test.mjs lib/generateNodeBudget.test.mjs lib/authService.test.mjs",
+    "test": "node --test routes/transcribe.test.mjs lib/generateNodeBudget.test.mjs lib/randomExpansionLinks.test.mjs lib/authService.test.mjs",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "lint": "eslint .",

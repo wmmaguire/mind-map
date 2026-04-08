@@ -162,6 +162,29 @@ describe('GraphVisualization graph action menu', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows expansion algorithm control in Generate (AI) modal (#62)', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open graph actions menu/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Generate Nodes$/i }));
+
+    expect(
+      screen.getByRole('heading', { name: /^Generate \(AI\)$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: /^Expansion algorithm$/i })
+    ).toBeInTheDocument();
+  });
+
   it('still closes add-node modal on Escape', () => {
     render(
       <GraphVisualization

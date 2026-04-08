@@ -148,10 +148,22 @@ In `GraphVisualization` users can:
 - Select nodes/links and inspect relationships
 - Add nodes and relationships
 - Delete nodes/links
-- Use “Generate Nodes” to request AI expansion (**#37** budgets):
-  - Optional **Preview budget** calls `POST /api/generate-node` with **`dryRun: true`** (no OpenAI; shows estimated new links and caps).
-  - **Confirm** runs the full request: `POST /api/generate-node` (same OpenAI model env as analyze: `OPENAI_ANALYZE_MODEL` on the server).
+- Use **Generate Nodes** to request AI expansion (**#37** budgets, **#62** expansion modes):
+  - In the Generate modal, **Expansion algorithm** selects **Manual** (default) or **Multi-cycle randomized**.
+  - **Manual:** one `POST /api/generate-node` call; each new node must link to every highlighted node (existing server validation).
+  - **Multi-cycle randomized:** the client runs **N cycles**; each cycle is one `POST /api/generate-node` with `expansionAlgorithm: "randomizedGrowth"`, `connectionsPerNewNode`, and `existingGraphNodeIds` (all current graph node ids). The server still calls the model once per request, then **replaces** model links with **uniform random** attachment to nodes already present before each new node’s links in that batch (templated relationship text). Use **Stop after this cycle** to stop before the next request; progress shows “Cycle *k* of *N*”.
+  - Optional **Preview budget** calls `POST /api/generate-node` with **`dryRun: true`** (no OpenAI). Manual previews mirror **#37**; randomized previews include totals across cycles and caps (`maxCycles`, `maxConnectionsPerNewNode`).
+  - **Confirm** runs the full flow (same OpenAI model env as analyze: `OPENAI_ANALYZE_MODEL` on the server). Multiple cycles consume multiple API calls (watch quotas).
   - On failure, the UI prefers the API’s `details` field (quota/auth messages, invalid JSON, etc.) when present
+
+#### Manual E2E — Generate expansion modes (**#62**)
+
+1. Start the stack (MongoDB, `server` on port **5001**, `client` on **3000** per this README / root quickstart). Ensure **`OPENAI_API_KEY`** is set on the server.
+2. Open a graph in the library (analyze a file or load a saved graph) so **`GraphVisualization`** is shown.
+3. Highlight at least one node, open **Actions** → **Generate Nodes**.
+4. **Manual path:** leave **Expansion algorithm** on **Manual**, optionally **Preview budget**, then **Confirm**. Inspect new nodes and links (each new node should connect to every highlighted node).
+5. **Randomized path:** choose **Multi-cycle randomized**, set **AI nodes per cycle**, **Connections per new node**, and **Number of cycles** (within min/max shown after preview). **Preview budget** — confirm totals and the attachment rule text. **Confirm** and watch **Cycle *k* of *N*** update; new links should use the templated “Random expansion (uniform attachment)” label where the server applied random edges.
+6. (Optional) During a multi-cycle run, click **Stop after this cycle** and verify the graph stops growing after the current request finishes.
 
 Key operations are logged via:
 

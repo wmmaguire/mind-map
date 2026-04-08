@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
+import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
 import './GraphVisualization.css';
 
 function GraphVisualization({
@@ -24,6 +25,12 @@ function GraphVisualization({
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
   /** Server dry-run (#37): estimated links / caps before OpenAI */
   const [generateBudgetPreview, setGenerateBudgetPreview] = useState(null);
+  /** GitHub #62: manual (single call, link to all highlights) vs multi-cycle randomized */
+  const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
+  const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
+  const [rgNumCycles, setRgNumCycles] = useState(2);
+  const [generateProgress, setGenerateProgress] = useState(null);
+  const randomizedGrowthCancelRef = useRef(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNodeData, setNewNodeData] = useState({
     label: '',
@@ -72,6 +79,8 @@ function GraphVisualization({
     setGraphActionMenu(null);
     generateSourceIdsRef.current = null;
     setGenerateBudgetPreview(null);
+    setGenerateProgress(null);
+    randomizedGrowthCancelRef.current = false;
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -1260,13 +1269,19 @@ function GraphVisualization({
         window.alert('Highlight at least one node on the graph before previewing.');
         return;
       }
+      const json = {
+        selectedNodes: selectedPayload,
+        numNodes: numNodesToAdd,
+        dryRun: true
+      };
+      if (expansionAlgorithm === 'randomizedGrowth') {
+        json.expansionAlgorithm = 'randomizedGrowth';
+        json.connectionsPerNewNode = rgConnectionsPerNewNode;
+        json.numCycles = rgNumCycles;
+      }
       const result = await apiRequest('/api/generate-node', {
         method: 'POST',
-        json: {
-          selectedNodes: selectedPayload,
-          numNodes: numNodesToAdd,
-          dryRun: true
-        }
+        json
       });
       if (!result.success) {
         throw new Error(
@@ -1291,145 +1306,108 @@ function GraphVisualization({
         ? [...generateSourceIdsRef.current]
         : Array.from(selectedNodeIds.current).map(String);
     setIsGenerating(true);
+    setGenerateProgress(null);
+    randomizedGrowthCancelRef.current = false;
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
     let operationError = null;
     let generatedNodes = [];
+    let cyclesCompleted = 0;
 
     try {
-      const selectedNodes = sourceIdSnapshot
+      const selectedNodesPayload = sourceIdSnapshot
         .map(id => data.nodes.find(node => String(node.id) === String(id)))
         .filter(Boolean);
 
-      console.log('Selected nodes for generation:', selectedNodes.map(n => `${n.label} (${n.id})`));
+      console.log(
+        'Selected nodes for generation:',
+        selectedNodesPayload.map(n => `${n.label} (${n.id})`)
+      );
 
-      const result = await apiRequest('/api/generate-node', {
-        method: 'POST',
-        json: {
-          selectedNodes,
-          numNodes: numNodesToAdd,
-        },
-      });
-
-      if (!result.success) {
-        operationStatus = 'FAILURE';
-        operationError =
-          result.details || result.error || 'Request failed';
-        throw new Error(operationError);
-      }
-
-      // Store generated nodes for operation tracking
-      generatedNodes = result.data.nodes;
-
-      // Create a map of all existing nodes with string IDs
-      const nodeMap = new Map();
-      
-      // Add existing nodes to the map with string IDs
-      data.nodes.forEach(node => {
-        // Convert all IDs to strings
-        const stringId = String(node.id);
-        const nodeWithStringId = {
-          ...node,
-          id: stringId
+      const runOneGenerateRequest = async existingGraphNodeIds => {
+        const json = {
+          selectedNodes: selectedNodesPayload,
+          numNodes: numNodesToAdd
         };
-        nodeMap.set(stringId, nodeWithStringId);
-        console.log(`Mapped existing node: ${node.label} (${stringId})`);
-      });
-      
-      // Add new nodes to the map (these already have string IDs)
-      result.data.nodes.forEach(node => {
-        const baseX = data.nodes[0].x || width / 2;
-        const baseY = data.nodes[0].y || height / 2;
-        
-        const processedNode = {
-          ...node,
-          x: baseX + (Math.random() - 0.5) * 200,
-          y: baseY + (Math.random() - 0.5) * 200,
-          vx: 0,
-          vy: 0
-        };
-        nodeMap.set(node.id, processedNode);
-        console.log(`Added new node: ${node.label} (${node.id})`);
-      });
-
-      // Process links with string IDs
-      const processedLinks = data.links.map(link => {
-        // Convert existing link IDs to strings
-        const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
-        const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
-        
-        return {
-          ...link,
-          source: nodeMap.get(sourceId),
-          target: nodeMap.get(targetId)
-        };
-      });
-      
-      // Process new links
-      result.data.links.forEach(link => {
-        const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
-        const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
-        
-        const sourceNode = nodeMap.get(sourceId);
-        const targetNode = nodeMap.get(targetId);
-        
-        console.log('Processing link:', {
-          sourceId,
-          targetId,
-          sourceNode: sourceNode ? `${sourceNode.label} (${sourceNode.id})` : 'not found',
-          targetNode: targetNode ? `${targetNode.label} (${targetNode.id})` : 'not found'
-        });
-
-        if (sourceNode && targetNode) {
-          const newLink = {
-            source: sourceNode,
-            target: targetNode,
-            relationship: link.relationship
-          };
-          processedLinks.push(newLink);
-          console.log('Added link:', {
-            source: `${sourceNode.label} (${sourceNode.id})`,
-            target: `${targetNode.label} (${targetNode.id})`,
-            relationship: link.relationship
-          });
-        } else {
-          console.warn('Failed to create link:', {
-            sourceId,
-            targetId,
-            sourceExists: !!sourceNode,
-            targetExists: !!targetNode,
-            availableNodes: Array.from(nodeMap.entries()).map(([id, node]) => `${node.label} (${id})`)
-          });
+        if (expansionAlgorithm === 'randomizedGrowth') {
+          json.expansionAlgorithm = 'randomizedGrowth';
+          json.connectionsPerNewNode = rgConnectionsPerNewNode;
+          json.existingGraphNodeIds = existingGraphNodeIds;
         }
-      });
-
-      // Create new data object with consistent string IDs
-      const newData = {
-        nodes: Array.from(nodeMap.values()),
-        links: processedLinks
+        return apiRequest('/api/generate-node', {
+          method: 'POST',
+          json
+        });
       };
 
-      // Validate the final data
-      console.log('Final data validation:', {
-        totalNodes: newData.nodes.length,
-        totalLinks: newData.links.length,
-        allNodes: newData.nodes.map(n => `${n.label} (${n.id})`),
-        allLinks: newData.links.map(l => ({
-          source: typeof l.source === 'object' ? `${l.source.label} (${l.source.id})` : l.source,
-          target: typeof l.target === 'object' ? `${l.target.label} (${l.target.id})` : l.target,
-          relationship: l.relationship
-        }))
-      });
+      if (expansionAlgorithm === 'manual') {
+        const result = await runOneGenerateRequest();
 
-      if (onDataUpdate) {
-        onDataUpdate(newData);
+        if (!result.success) {
+          operationStatus = 'FAILURE';
+          operationError =
+            result.details || result.error || 'Request failed';
+          throw new Error(operationError);
+        }
+
+        generatedNodes = result.data.nodes;
+        cyclesCompleted = 1;
+
+        const newData = mergeGenerateNodeResponse(
+          data,
+          result.data,
+          width,
+          height
+        );
+
+        console.log('Final data validation:', {
+          totalNodes: newData.nodes.length,
+          totalLinks: newData.links.length
+        });
+
+        if (onDataUpdate) {
+          onDataUpdate(newData);
+        }
+      } else {
+        let working = data;
+        const totalCycles = rgNumCycles;
+
+        for (let c = 1; c <= totalCycles; c += 1) {
+          if (randomizedGrowthCancelRef.current) {
+            break;
+          }
+          setGenerateProgress({ current: c, total: totalCycles });
+
+          const existingGraphNodeIds = working.nodes.map(n => String(n.id));
+          const result = await runOneGenerateRequest(existingGraphNodeIds);
+
+          if (!result.success) {
+            operationStatus = 'FAILURE';
+            operationError =
+              result.details || result.error || 'Request failed';
+            throw new Error(operationError);
+          }
+
+          generatedNodes = generatedNodes.concat(result.data.nodes);
+          cyclesCompleted += 1;
+
+          working = mergeGenerateNodeResponse(
+            working,
+            result.data,
+            width,
+            height
+          );
+
+          if (onDataUpdate) {
+            onDataUpdate(working);
+          }
+        }
       }
 
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
       setGenerateBudgetPreview(null);
       setShowGenerateForm(false);
-
     } catch (error) {
       console.error('Error generating nodes:', error);
       operationStatus = 'FAILURE';
@@ -1438,22 +1416,35 @@ function GraphVisualization({
     } finally {
       generateSourceIdsRef.current = null;
       setIsGenerating(false);
+      setGenerateProgress(null);
 
-      // Track the operation with its final status
-      await trackOperation('GENERATE', {
-        numNodesRequested: numNodesToAdd,
-        selectedNodes: sourceIdSnapshot.map(id => {
-          const node = data.nodes.find(n => String(n.id) === String(id));
-          return {
-            id: node?.id || id,
-            label: node?.label || 'Unknown Node'
-          };
-        }),
-        generatedNodes: generatedNodes.map(node => ({
-          id: node.id,
-          label: node.label
-        }))
-      }, startTime, operationStatus === 'FAILURE' ? new Error(operationError) : null);
+      await trackOperation(
+        'GENERATE',
+        {
+          expansionAlgorithm,
+          numNodesRequested: numNodesToAdd,
+          numCyclesRequested:
+            expansionAlgorithm === 'randomizedGrowth' ? rgNumCycles : 1,
+          numCyclesCompleted: cyclesCompleted,
+          connectionsPerNewNode:
+            expansionAlgorithm === 'randomizedGrowth'
+              ? rgConnectionsPerNewNode
+              : undefined,
+          selectedNodes: sourceIdSnapshot.map(id => {
+            const node = data.nodes.find(n => String(n.id) === String(id));
+            return {
+              id: node?.id || id,
+              label: node?.label || 'Unknown Node'
+            };
+          }),
+          generatedNodes: generatedNodes.map(node => ({
+            id: node.id,
+            label: node.label
+          }))
+        },
+        startTime,
+        operationStatus === 'FAILURE' ? new Error(operationError) : null
+      );
     }
   };
 
@@ -1661,6 +1652,8 @@ function GraphVisualization({
     setShowAddForm(false);
     setRelationshipForm({ show: false, relationship: '' });
     setGenerateBudgetPreview(null);
+    randomizedGrowthCancelRef.current = false;
+    setGenerateProgress(null);
     setShowGenerateForm(true);
   };
 
@@ -1737,7 +1730,9 @@ function GraphVisualization({
     activeGraphEditBanner = {
       title: 'Generate (AI)',
       hint:
-        'Optional Preview budget estimates size without calling the model; Confirm runs generation.',
+        expansionAlgorithm === 'manual'
+          ? 'Optional Preview budget estimates size without calling the model; Confirm runs one generation.'
+          : 'Multi-cycle mode runs one API batch per cycle (rate limits apply). Preview shows totals; you can stop between cycles.',
     };
   } else if (showAddForm) {
     activeGraphEditBanner = {
@@ -2058,41 +2053,138 @@ function GraphVisualization({
       {showGenerateForm && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <form onSubmit={handleGenerate}>
+            <h2 id="graph-generate-modal-title">Generate (AI)</h2>
+            <form
+              onSubmit={handleGenerate}
+              aria-labelledby="graph-generate-modal-title"
+            >
+              <div className="form-group">
+                <label htmlFor="graph-expansion-algorithm">
+                  Expansion algorithm
+                </label>
+                <select
+                  id="graph-expansion-algorithm"
+                  value={expansionAlgorithm}
+                  onChange={e => {
+                    setExpansionAlgorithm(e.target.value);
+                    setGenerateBudgetPreview(null);
+                  }}
+                >
+                  <option value="manual">
+                    Manual — one model call; new nodes link to every highlighted
+                    node
+                  </option>
+                  <option value="randomizedGrowth">
+                    Multi-cycle randomized — AI adds batches; each new node links
+                    to random existing nodes (uniform)
+                  </option>
+                </select>
+              </div>
               <label>
-                Number of nodes to generate:
+                {expansionAlgorithm === 'manual'
+                  ? 'Number of nodes to generate'
+                  : 'AI nodes per cycle'}
+                :
                 <input
                   type="number"
                   min="1"
                   max="5"
                   value={numNodesToAdd}
-                  onChange={(e) => {
+                  onChange={e => {
                     setNumNodesToAdd(parseInt(e.target.value, 10) || 1);
                     setGenerateBudgetPreview(null);
                   }}
                 />
               </label>
-              {generateBudgetPreview ? (
-                <div
-                  className="graph-generate-budget-preview"
-                  role="status"
-                >
-                  <p>
+              {expansionAlgorithm === 'randomizedGrowth' && (
+                <>
+                  <label>
+                    Connections per new node:
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={rgConnectionsPerNewNode}
+                      onChange={e => {
+                        setRgConnectionsPerNewNode(
+                          parseInt(e.target.value, 10) || 1
+                        );
+                        setGenerateBudgetPreview(null);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Number of cycles:
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={rgNumCycles}
+                      onChange={e => {
+                        setRgNumCycles(parseInt(e.target.value, 10) || 1);
+                        setGenerateBudgetPreview(null);
+                      }}
+                    />
+                  </label>
+                </>
+              )}
+              {generateBudgetPreview?.expansionAlgorithm ===
+              'randomizedGrowth' ? (
+                  <div
+                    className="graph-generate-budget-preview"
+                    role="status"
+                  >
+                    <p>
+                    About <strong>
+                        {generateBudgetPreview.estimatedTotalNewNodes}
+                      </strong>{' '}
+                    new nodes over{' '}
+                      <strong>{generateBudgetPreview.numCycles}</strong> cycle
+                      {generateBudgetPreview.numCycles === 1 ? '' : 's'} (
+                      <strong>{generateBudgetPreview.numNodesPerCycle}</strong> per
+                    cycle), ~{' '}
+                      <strong>{generateBudgetPreview.estimatedNewLinks}</strong>{' '}
+                    random links (
+                      <strong>
+                        {generateBudgetPreview.connectionsPerNewNode}
+                      </strong>{' '}
+                    per new node). Caps: max{' '}
+                      {generateBudgetPreview.caps.maxNewNodes} nodes per API call, max{' '}
+                      {generateBudgetPreview.caps.maxCycles} cycles (client), max{' '}
+                      {generateBudgetPreview.caps.maxConnectionsPerNewNode}{' '}
+                    connections per node.
+                    </p>
+                    <p className="graph-generate-budget-preview__rule">
+                      {generateBudgetPreview.attachmentRule}
+                    </p>
+                  </div>
+                ) : generateBudgetPreview ? (
+                  <div
+                    className="graph-generate-budget-preview"
+                    role="status"
+                  >
+                    <p>
                     Add <strong>{generateBudgetPreview.numNodes}</strong> new node
-                    {generateBudgetPreview.numNodes === 1 ? '' : 's'}, each linked to
-                    all{' '}
-                    <strong>{generateBudgetPreview.selectedCount}</strong> highlighted
-                    node
-                    {generateBudgetPreview.selectedCount === 1 ? '' : 's'} (~
-                    <strong>{generateBudgetPreview.estimatedNewLinks}</strong> new links).
-                    Caps: max {generateBudgetPreview.caps.maxNewNodes} nodes per run, max{' '}
-                    {generateBudgetPreview.caps.maxSelected} highlights.
+                      {generateBudgetPreview.numNodes === 1 ? '' : 's'}, each linked
+                    to all{' '}
+                      <strong>{generateBudgetPreview.selectedCount}</strong>{' '}
+                    highlighted node
+                      {generateBudgetPreview.selectedCount === 1 ? '' : 's'} (~
+                      <strong>{generateBudgetPreview.estimatedNewLinks}</strong> new
+                    links). Caps: max {generateBudgetPreview.caps.maxNewNodes} nodes
+                    per run, max {generateBudgetPreview.caps.maxSelected}{' '}
+                    highlights.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="graph-generate-budget-hint">
+                  Optional: <strong>Preview budget</strong> estimates size without
+                  calling OpenAI.
                   </p>
-                </div>
-              ) : (
-                <p className="graph-generate-budget-hint">
-                  Optional: <strong>Preview budget</strong> estimates size without calling
-                  OpenAI.
+                )}
+              {generateProgress && expansionAlgorithm === 'randomizedGrowth' && (
+                <p className="graph-generate-progress" role="status">
+                  Cycle {generateProgress.current} of {generateProgress.total}…
                 </p>
               )}
               <div className="form-buttons">
@@ -2103,6 +2195,17 @@ function GraphVisualization({
                 >
                   {isGenerating ? '…' : 'Preview budget'}
                 </button>
+                {isGenerating &&
+                  expansionAlgorithm === 'randomizedGrowth' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      randomizedGrowthCancelRef.current = true;
+                    }}
+                  >
+                      Stop after this cycle
+                  </button>
+                )}
               </div>
               <div className="form-buttons">
                 <button type="submit" disabled={isGenerating}>
