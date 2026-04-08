@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-04 (**#31** guest identity foundation; **#32** scoped library listing APIs — docs pass for implementation vs follow-ups)
+Last updated: 2026-04-08 (**#33** Library shell: identity banner, graph title, mobile Library control, mindmap auth headers — branch **`issue-33-library-accounts-ui`**, tip **`f430bae`**)
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -41,13 +41,17 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - telemetry (`POST /api/operations`)
     - graph saving metadata
 
-- **Identity (guest — GitHub #31 foundation)**
-  - `client/src/context/IdentityContext.jsx` (`IdentityProvider`, `useIdentity()`) currently exposes guest-only mode; `GuestIdentityBanner` shows a shell notice until registered accounts exist (**#33**). **#32** covers scoped **listing** APIs only; upload/save **writes** are still session-only until auth lands.
+- **Identity + Library shell (GitHub #31 foundation, #33 UI)**
+  - `IdentityContext.jsx`: optional `userId` / `isRegistered` / `identityKind`; optional `REACT_APP_MINDMAP_USER_ID`; in **development**, `setDevRegisteredUserId` for signed-in preview.
+  - `GraphTitleContext.jsx`: `LibraryVisualize` sets the current graph title for the shell banner; cleared when leaving **`/visualize`**.
+  - `LibraryUiContext.jsx`: mobile “open library” — `LibraryVisualize` registers visibility + opener; control renders in **`GuestIdentityBanner`** (leading), not a fixed left rail.
+  - **`GuestIdentityBanner`**: consolidated account control (guest preview / signed-in menu), centered graph title, compact mobile Library button.
+  - **#32** covers scoped **listing** APIs; client sends **`X-Mindmap-User-Id`** when `userId` is set. **Server upload** still does not attach **`File.userId`** from auth until a later auth milestone (**#33** follow-up).
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
     - Sends `multipart/form-data` to `POST /api/upload` with `file`, `customName`, `sessionId`.
-  - **Library + analyze**: `client/src/components/LibraryVisualize.js`
+  - **Library + analyze**: `LibraryVisualize.js` + **`LibrarySidebar`**, **`LibrarySourcesPanel`**, **`LibraryAccountChip`**
     - Lists files (`GET /api/files`)
     - Reads file content (`GET /api/files/:filename`)
     - Calls analysis (`POST /api/analyze`)
