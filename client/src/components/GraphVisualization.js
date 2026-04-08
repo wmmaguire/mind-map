@@ -1844,19 +1844,15 @@ function GraphVisualization({
                 role="group"
                 aria-label="AI Generation"
               >
-                <div className="generate-button graph-action-menu__action graph-action-select-wrap">
-                  <button
-                    type="button"
-                    className="graph-action-select-run"
-                    aria-label="Run AI Generation"
-                    onClick={() =>
-                      onMenuPickGenerateWithAlgorithm(expansionAlgorithm)
-                    }
-                  >
-                    <span className="graph-action-menu__action-icon" aria-hidden>
-                      ✨
-                    </span>
-                  </button>
+                <button
+                  type="button"
+                  className="generate-button graph-action-menu__action graph-action-select-wrap"
+                  aria-label="Open AI Generation form"
+                  onClick={() => onMenuPickGenerateWithAlgorithm(expansionAlgorithm)}
+                >
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    ✨
+                  </span>
                   <select
                     id="graph-expansion-algorithm"
                     className="graph-action-select"
@@ -1865,7 +1861,12 @@ function GraphVisualization({
                     onChange={e => {
                       const next = e.target.value;
                       if (!next) return;
-                      onMenuPickGenerateWithAlgorithm(next);
+                      setExpansionAlgorithm(next);
+                      setGenerateBudgetPreview(null);
+                    }}
+                    onClick={e => {
+                      // Allow changing algorithm without opening the form.
+                      e.stopPropagation();
                     }}
                   >
                     <option value="manual">manual</option>
@@ -1874,7 +1875,7 @@ function GraphVisualization({
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
                   </span>
-                </div>
+                </button>
               </div>
             )}
           </section>
