@@ -33,15 +33,28 @@ export function isNetworkError(err) {
 }
 
 /**
+ * Optional MindMap auth for user-scoped listing and writes (GitHub #32 / #33).
+ * Never log or persist tokens in client code — pass stable user ids only.
+ *
+ * @param {Headers} headers
+ * @param {{ userId?: string | null }} [auth]
+ */
+export function applyMindmapAuthHeaders(headers, auth) {
+  if (!auth?.userId) return;
+  headers.set('X-Mindmap-User-Id', auth.userId);
+}
+
+/**
  * Shared JSON API client using {@link apiUrl} and consistent error bodies (`error`, `details`, `code`).
  *
  * @param {string} path - e.g. `/api/files` (prepends API origin) or absolute URL
- * @param {RequestInit & { json?: object }} [options] - pass `json` to set body and `Content-Type` (omit for FormData)
+ * @param {RequestInit & { json?: object, auth?: { userId?: string | null } }} [options] - pass `json` to set body and `Content-Type` (omit for FormData); `auth` adds `X-Mindmap-User-Id` when `userId` is set
  * @returns {Promise<object>} Parsed JSON body (empty object if no JSON)
  */
 export async function apiRequest(path, options = {}) {
-  const { json, ...init } = options;
+  const { json, auth, ...init } = options;
   const headers = new Headers(init.headers || {});
+  applyMindmapAuthHeaders(headers, auth);
   let body = init.body;
   if (json !== undefined) {
     body = JSON.stringify(json);

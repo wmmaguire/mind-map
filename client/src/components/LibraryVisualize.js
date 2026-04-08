@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
+import { useIdentity } from '../context/IdentityContext';
+import LibrarySidebar from './LibrarySidebar';
 import {
   apiRequest,
   getApiErrorMessage,
@@ -11,11 +12,7 @@ import {
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import {
   getFilteredSortedFiles,
-  getFileDisplayName,
   FILE_SORT_NAME_ASC,
-  FILE_SORT_NAME_DESC,
-  FILE_SORT_DATE_ASC,
-  FILE_SORT_DATE_DESC,
 } from '../utils/libraryFileList';
 import './LibraryVisualize.css';
 
@@ -57,6 +54,7 @@ function readStoredSections() {
 
 function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const { sessionId } = useSession();
+  const { userId } = useIdentity();
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [deletingFiles, setDeletingFiles] = useState(false);
@@ -112,12 +110,18 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const listingAuth = useMemo(
+    () => (userId ? { auth: { userId } } : {}),
+    [userId]
+  );
+
   const fetchFiles = useCallback(async () => {
     if (!sessionId) return;
     setFilesLoading(true);
     try {
       const data = await apiRequest(
-        `/api/files?sessionId=${encodeURIComponent(sessionId)}`
+        `/api/files?sessionId=${encodeURIComponent(sessionId)}`,
+        listingAuth
       );
       if (data && data.files) {
         setFiles(data.files);
@@ -131,13 +135,14 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setFilesLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, listingAuth]);
 
   const fetchSavedGraphs = useCallback(async () => {
     if (!sessionId) return;
     try {
       const data = await apiRequest(
-        `/api/graphs?sessionId=${encodeURIComponent(sessionId)}`
+        `/api/graphs?sessionId=${encodeURIComponent(sessionId)}`,
+        listingAuth
       );
       if (data && data.graphs) {
         setSavedGraphs(data.graphs);
@@ -146,7 +151,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       console.warn('Error fetching saved graphs:', error);
       setSavedGraphs([]);
     }
-  }, [sessionId]);
+  }, [sessionId, listingAuth]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -271,7 +276,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       const n = list.length;
       for (const file of list) {
         const path = `/api/files/${encodeURIComponent(file.filename)}?sessionId=${encodeURIComponent(sessionId)}`;
-        await apiRequest(path, { method: 'DELETE' });
+        await apiRequest(path, { method: 'DELETE', ...listingAuth });
       }
       setSelectedFiles(new Set());
       setGraphData(null);
@@ -294,7 +299,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setDeletingFiles(false);
     }
-  }, [selectedFiles, sessionId, fetchFiles]);
+  }, [selectedFiles, sessionId, fetchFiles, listingAuth]);
 
   const handleFileListKeyDown = useCallback((e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -344,7 +349,8 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         sourceFiles: Array.from(selectedFiles).map(f => f.originalName),
         generatedAt: new Date().toISOString(),
         nodeCount: graphData.nodes.length,
-        edgeCount: graphData.links.length
+        edgeCount: graphData.links.length,
+        ...(userId ? { userId } : {}),
       };
 
       const data = await apiRequest('/api/graphs/save', {
@@ -353,6 +359,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           graph: graphToSave,
           metadata,
         },
+        ...listingAuth,
       });
 
       if (data.success) {
@@ -373,10 +380,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
   const handleLoadGraph = async (filename) => {
     try {
-      const data = await apiRequest(`/api/graphs/${filename}`);
+      const data = await apiRequest(`/api/graphs/${filename}`, listingAuth);
 
       if (data.success) {
-        console.log('Graph data:', data.data);
         const graphData = data.data.graph;
         const nodeMap = new Map();
         graphData.nodes.forEach(node => {
@@ -389,8 +395,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           target: nodeMap.get(typeof link.target === 'object' ? link.target.id : link.target)
         }));
 
-        console.log('Reconstructed nodes:', graphData.nodes);
-        console.log('Reconstructed links:', reconstructedLinks);
         setGraphData({
           nodes: graphData.nodes,
           links: reconstructedLinks
@@ -405,10 +409,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         // If there's a dbId in the metadata, fetch view stats
         if (data.data.metadata.dbId) {
           try {
-            const viewStats = await apiRequest(
-              `/api/graphs/${data.data.metadata.dbId}/views`
+            await apiRequest(
+              `/api/graphs/${data.data.metadata.dbId}/views`,
+              listingAuth
             );
-            console.log('Graph view stats:', viewStats);
           } catch (statsError) {
             console.warn('Failed to fetch view stats:', statsError);
           }
@@ -443,7 +447,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       
       const fileResults = await Promise.all(
         Array.from(selectedFiles).map(async (file) => {
-          const fileData = await apiRequest(`/api/files/${file.filename}`);
+          const fileData = await apiRequest(
+            `/api/files/${encodeURIComponent(file.filename)}`,
+            listingAuth
+          );
           if (!fileData.success || !fileData.content) {
             throw new Error(`Failed to read file: ${file.originalName}`);
           }
@@ -456,6 +463,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
               sessionId,
               sourceFiles: [file._id || file.filename],
             },
+            ...listingAuth,
           });
 
           if (!analysisData.success || !analysisData.data) {
@@ -502,8 +510,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   };
 
   const handleGraphDataUpdate = (newData) => {
-    console.log('Updating graph data in LibraryVisualize:', newData);
-    
     // Create a map of all nodes for reference
     const nodeMap = new Map();
     newData.nodes.forEach(node => {
@@ -537,7 +543,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       links: processedLinks
     };
 
-    console.log('Processed graph data:', processedData);
     setGraphData(processedData);
     
     // Update metadata
@@ -593,313 +598,43 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         </button>
       )}
 
-      <aside
-        className={`sidebar ${isMobile ? 'mobile' : 'desktop'} ${showSidebar ? 'visible' : 'hidden'}`}
-        style={
-          !isMobile
-            ? { width: sidebarWidth, flexShrink: 0 }
-            : undefined
-        }
-        aria-hidden={isMobile ? !showSidebar : undefined}
-      >
-        <div className="sidebar-header">
-          <div className="sidebar-header__titles">
-            <h2 className="sidebar-title">Library</h2>
-            <p className="sidebar-subtitle">Sources and saved graphs</p>
-          </div>
-          {isMobile && (
-            <button
-              type="button"
-              className="sidebar-close"
-              onClick={() => setShowSidebar(false)}
-              aria-label="Close library panel"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        {error && (
-          <div className="error sidebar-error" role="alert">
-            <span className="error-text">{error}</span>
-            <button
-              type="button"
-              className="retry-button"
-              onClick={handleErrorBannerAction}
-            >
-              {error.startsWith('Failed to fetch files') ? 'Retry' : 'Dismiss'}
-            </button>
-          </div>
-        )}
-
-        <div className="sidebar-content">
-          <section
-            className="library-section"
-            aria-labelledby="library-section-files"
-          >
-            <h3 id="library-section-files" className="library-section__title">
-              <button
-                type="button"
-                className="library-section__toggle"
-                onClick={() => setFilesSectionOpen((o) => !o)}
-                aria-expanded={filesSectionOpen}
-              >
-                <span className="library-section__chevron" aria-hidden>
-                  {filesSectionOpen ? '▼' : '▶'}
-                </span>
-                Files
-                {!filesLoading && files.length > 0
-                  ? ` (${files.length})`
-                  : ''}
-              </button>
-            </h3>
-            {filesSectionOpen && (
-              <div
-                className="library-section__body file-list"
-                aria-busy={filesLoading}
-              >
-                {filesLoading ? (
-                  <div
-                    className="file-list-skeleton"
-                    aria-hidden
-                  >
-                    <div className="file-list-skeleton__row" />
-                    <div className="file-list-skeleton__row" />
-                    <div className="file-list-skeleton__row" />
-                    <div className="file-list-skeleton__row" />
-                  </div>
-                ) : error && error.startsWith('Failed to fetch files') ? (
-                  <p className="no-files no-files--muted">
-                    File list could not be loaded. Use Retry above.
-                  </p>
-                ) : files.length === 0 ? (
-                  <div className="file-list-empty">
-                    <p className="file-list-empty__title">No uploaded files yet</p>
-                    <p className="file-list-empty__hint">
-                      Upload text or Markdown from the home page to analyze them
-                      here.
-                    </p>
-                    <Link className="file-list-empty__cta" to="/">
-                      Go to home
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    <div className="library-file-toolbar">
-                      <div className="library-file-toolbar__search">
-                        <label className="sr-only" htmlFor="library-file-search">
-                          Search files
-                        </label>
-                        <input
-                          id="library-file-search"
-                          type="search"
-                          className="library-file-search-input"
-                          placeholder="Search files…"
-                          value={fileSearchQuery}
-                          onChange={(e) => setFileSearchQuery(e.target.value)}
-                          autoComplete="off"
-                          aria-label="Search files"
-                        />
-                      </div>
-                      <div className="library-file-toolbar__sort">
-                        <label className="sr-only" htmlFor="library-file-sort">
-                          Sort files
-                        </label>
-                        <select
-                          id="library-file-sort"
-                          className="library-file-sort-select"
-                          value={fileSort}
-                          onChange={(e) => setFileSort(e.target.value)}
-                          aria-label="Sort files"
-                        >
-                          <option value={FILE_SORT_NAME_ASC}>Name (A–Z)</option>
-                          <option value={FILE_SORT_NAME_DESC}>Name (Z–A)</option>
-                          <option value={FILE_SORT_DATE_DESC}>
-                            Newest upload first
-                          </option>
-                          <option value={FILE_SORT_DATE_ASC}>
-                            Oldest upload first
-                          </option>
-                        </select>
-                      </div>
-                    </div>
-                    {fileSearchQuery.trim() && (
-                      <p className="file-list-filter-hint" role="status">
-                        Showing {displayFiles.length} of {files.length} files
-                      </p>
-                    )}
-                    <div className="file-list-actions">
-                      <button
-                        type="button"
-                        className="file-list-action-btn"
-                        onClick={handleSelectAllFiltered}
-                        disabled={displayFiles.length === 0}
-                      >
-                        Select all
-                      </button>
-                      <button
-                        type="button"
-                        className="file-list-action-btn"
-                        onClick={handleClearFileSelection}
-                        disabled={selectedFiles.size === 0}
-                      >
-                        Clear selection
-                      </button>
-                    </div>
-                    {displayFiles.length === 0 ? (
-                      <div className="file-list-empty file-list-empty--compact">
-                        <p>No files match your search.</p>
-                        <button
-                          type="button"
-                          className="file-list-empty__cta file-list-empty__cta--btn"
-                          onClick={() => setFileSearchQuery('')}
-                        >
-                          Clear search
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="file-list-header">
-                          <span className="file-list-header__count">
-                            Selected: {selectedFiles.size} file
-                            {selectedFiles.size === 1 ? '' : 's'}
-                          </span>
-                          <div className="file-list-header__actions">
-                            <button
-                              type="button"
-                              className="library-toolbar-btn library-toolbar-btn--add"
-                              onClick={onOpenUpload}
-                            >
-                              <span className="library-toolbar-btn__icon" aria-hidden>
-                                +
-                              </span>
-                              Add new
-                            </button>
-                            <button
-                              type="button"
-                              className="library-toolbar-btn library-toolbar-btn--danger"
-                              onClick={handleDeleteSelected}
-                              disabled={
-                                selectedFiles.size === 0 || deletingFiles
-                              }
-                            >
-                              {deletingFiles ? 'Deleting…' : 'Delete selected'}
-                            </button>
-                            <button
-                              className="library-toolbar-btn library-toolbar-btn--primary"
-                              type="button"
-                              onClick={handleAnalyzeClick}
-                              disabled={analyzing || selectedFiles.size === 0}
-                            >
-                              {analyzing ? 'Analyzing…' : 'Analyze Selected'}
-                            </button>
-                          </div>
-                        </div>
-                        <ul
-                          className="file-list-items"
-                          onKeyDown={handleFileListKeyDown}
-                        >
-                          {displayFiles.map((file, index) => (
-                            <li
-                              key={file.filename || file.id || index}
-                              className={`file-item ${
-                                selectedFiles.has(file) ? 'selected' : ''
-                              }`}
-                            >
-                              <label className="file-label">
-                                <input
-                                  type="checkbox"
-                                  className="file-item-checkbox"
-                                  checked={selectedFiles.has(file)}
-                                  onChange={() => handleFileSelect(file)}
-                                />
-                                <span className="file-name">
-                                  {getFileDisplayName(file)}
-                                </span>
-                                {file.uploadDate && (
-                                  <span className="file-meta">
-                                    {new Date(
-                                      file.uploadDate
-                                    ).toLocaleDateString(undefined, {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      year: 'numeric',
-                                    })}
-                                  </span>
-                                )}
-                              </label>
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section
-            className="library-section library-section--graphs"
-            aria-labelledby="library-section-graphs"
-          >
-            <h3 id="library-section-graphs" className="library-section__title">
-              <button
-                type="button"
-                className="library-section__toggle"
-                onClick={() => setGraphsSectionOpen((o) => !o)}
-                aria-expanded={graphsSectionOpen}
-              >
-                <span className="library-section__chevron" aria-hidden>
-                  {graphsSectionOpen ? '▼' : '▶'}
-                </span>
-                Graphs
-                {savedGraphs.length > 0 ? ` (${savedGraphs.length})` : ''}
-              </button>
-            </h3>
-            {graphsSectionOpen && (
-              <div className="library-section__body saved-graphs-section">
-                {graphData && (
-                  <button
-                    onClick={handleSaveClick}
-                    disabled={saving}
-                    className="save-current-button"
-                  >
-                    {saving ? 'Saving...' : 'Save Current Graph'}
-                  </button>
-                )}
-                <div className="saved-graphs">
-                  {savedGraphs.length === 0 ? (
-                    <p className="no-saved-graphs">No saved graphs yet.</p>
-                  ) : (
-                    savedGraphs.map((graph, index) => (
-                      <div key={index} className="saved-graph-item">
-                        <div className="graph-info">
-                          <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
-                          <small>
-                            Nodes: {graph.metadata.nodeCount} |
-                            Edges: {graph.metadata.edgeCount}
-                          </small>
-                          <small>
-                            Saved:{' '}
-                            {new Date(graph.metadata.generatedAt).toLocaleDateString()}
-                          </small>
-                        </div>
-                        <button
-                          onClick={() => handleLoadGraph(graph.filename)}
-                          className="load-button"
-                        >
-                          Load
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-      </aside>
+      <LibrarySidebar
+        isMobile={isMobile}
+        showSidebar={showSidebar}
+        setShowSidebar={setShowSidebar}
+        sidebarWidth={sidebarWidth}
+        error={error}
+        onErrorBannerAction={handleErrorBannerAction}
+        sourcesPanelProps={{
+          filesSectionOpen,
+          setFilesSectionOpen,
+          graphsSectionOpen,
+          setGraphsSectionOpen,
+          files,
+          filesLoading,
+          error,
+          displayFiles,
+          fileSearchQuery,
+          setFileSearchQuery,
+          fileSort,
+          setFileSort,
+          selectedFiles,
+          analyzing,
+          deletingFiles,
+          savedGraphs,
+          graphData,
+          saving,
+          onOpenUpload,
+          onSelectAllFiltered: handleSelectAllFiltered,
+          onClearFileSelection: handleClearFileSelection,
+          onDeleteSelected: handleDeleteSelected,
+          onFileSelect: handleFileSelect,
+          onFileListKeyDown: handleFileListKeyDown,
+          onAnalyzeClick: handleAnalyzeClick,
+          onSaveClick: handleSaveClick,
+          onLoadGraph: handleLoadGraph,
+        }}
+      />
 
       {!isMobile && (
         <div

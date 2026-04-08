@@ -19,6 +19,22 @@ describe('apiRequest', () => {
     expect(data.files).toEqual([]);
   });
 
+  it('sends X-Mindmap-User-Id when auth.userId is set', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({ files: [] }),
+    });
+
+    await apiRequest('/api/files?sessionId=x', {
+      auth: { userId: 'user-abc' },
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    const [, init] = global.fetch.mock.calls[0];
+    expect(init.headers.get('X-Mindmap-User-Id')).toBe('user-abc');
+  });
+
   it('throws ApiError with server message on 4xx JSON body', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,

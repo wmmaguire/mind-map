@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
+import { useIdentity } from '../context/IdentityContext';
 import './Modal.css';
 import './Library.css';
 
 function Library({ onClose }) {
   const { sessionId } = useSession();
+  const { userId } = useIdentity();
+  const listingAuth = useMemo(
+    () => (userId ? { auth: { userId } } : {}),
+    [userId]
+  );
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,7 +24,8 @@ function Library({ onClose }) {
     if (!sessionId) return;
     try {
       const data = await apiRequest(
-        `/api/files?sessionId=${encodeURIComponent(sessionId)}`
+        `/api/files?sessionId=${encodeURIComponent(sessionId)}`,
+        listingAuth
       );
       setFiles(data.files);
     } catch (error) {
@@ -26,7 +33,7 @@ function Library({ onClose }) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, listingAuth]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -42,8 +49,6 @@ function Library({ onClose }) {
       setAnalyzing(true);
       setError(null);
 
-      console.log('Fetching file:', file);
-      
       const filename = file.filename || file.originalName;
       const data = await apiRequest(
         `/api/files/${encodeURIComponent(filename)}`,
@@ -51,6 +56,7 @@ function Library({ onClose }) {
           headers: {
             Accept: 'application/json',
           },
+          ...listingAuth,
         }
       );
 
@@ -58,7 +64,6 @@ function Library({ onClose }) {
         throw new Error(data.error || 'Failed to fetch file');
       }
 
-      console.log('File content received, length:', data.content.length);
       await analyzeContent(data.content, file);
     } catch (error) {
       console.error('File fetch error:', error);
@@ -69,8 +74,6 @@ function Library({ onClose }) {
 
   const analyzeContent = async (content, file) => {
     try {
-      console.log('Sending content for analysis, length:', content.length);
-      
       const data = await apiRequest('/api/analyze', {
         method: 'POST',
         json: {
@@ -78,6 +81,7 @@ function Library({ onClose }) {
           sessionId,
           sourceFiles: [file._id || file.filename],
         },
+        ...listingAuth,
       });
 
       if (!data.success) {

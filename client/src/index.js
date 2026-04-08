@@ -12,7 +12,9 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <SessionProvider>
-        <IdentityProvider>
+        <IdentityProvider
+          initialRegisteredUserId={process.env.REACT_APP_MINDMAP_USER_ID}
+        >
           <App />
         </IdentityProvider>
       </SessionProvider>
