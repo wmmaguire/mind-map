@@ -29,7 +29,7 @@ function renderModal() {
   );
 }
 
-test('audio tab shows transcription hint and file input', async () => {
+test('audio tab shows privacy hint and upload sub-tab', async () => {
   const user = userEvent.setup();
   renderModal();
 
@@ -38,7 +38,22 @@ test('audio tab shows transcription hint and file input', async () => {
   expect(
     screen.getByText(/sent to the server for transcription/i)
   ).toBeInTheDocument();
+  expect(screen.getByText(/25 MB/i)).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /^Upload file$/i })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
   expect(screen.getByLabelText(/Audio file/i)).toBeInTheDocument();
+});
+
+test('audio tab Record sub-tab shows Start recording', async () => {
+  const user = userEvent.setup();
+  renderModal();
+
+  await user.click(screen.getByRole('tab', { name: /Audio → transcript/i }));
+  await user.click(screen.getByRole('tab', { name: /^Record$/i }));
+
+  expect(screen.getByRole('button', { name: /Start recording/i })).toBeInTheDocument();
 });
 
 test('transcribe requests /api/transcribe and shows transcript', async () => {

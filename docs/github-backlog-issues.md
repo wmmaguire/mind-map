@@ -39,6 +39,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#58** — optional **segment / word timestamps** for **`POST /api/transcribe`** (`verbose_json` or equivalent); plain text shipped in **#34** (`214abed` docs commit references).
 
+**Note:** Client **#35** — **`FileUpload`** audio pipeline: **Upload file** | **Record** (`getUserMedia` + **`MediaRecorder`**, preview **`audio`**, discard / record again), **`utils/audioRecording.js`** (25 MB client validation); branch **`issue-35-fileupload-audio-recorder`**. Depends on **#34** transcribe API. Follow-ups: Safari-specific MIME quirks, optional waveform, **#24** E2E with mic permission mocked.
+
 **Note:** Client **#21** — namespaced **union** of per-file analyze graphs (`client/src/utils/mergeGraphs.js`); merged view is disjoint subgraphs by default.
 
 **Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics.

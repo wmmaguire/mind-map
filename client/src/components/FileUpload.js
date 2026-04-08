@@ -1,7 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
+import {
+  validateAudioFileSizeForTranscribe,
+  pickMediaRecorderMimeType
+} from '../utils/audioRecording';
 import './Modal.css';
 import './FileUpload.css';
 
@@ -13,17 +17,64 @@ function FileUpload({ onClose, onUploadSuccess }) {
   const [uploadStatus, setUploadStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
+  const [audioSubTab, setAudioSubTab] = useState('upload');
   const [audioFile, setAudioFile] = useState(null);
   const [transcript, setTranscript] = useState('');
   const [transcribeModel, setTranscribeModel] = useState('');
   const [transcribeAttempted, setTranscribeAttempted] = useState(false);
 
+  const [recState, setRecState] = useState('idle');
+  const [recordPreviewUrl, setRecordPreviewUrl] = useState(null);
+
+  const streamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const skipRecorderOnStopRef = useRef(false);
+
+  const revokeRecordPreview = useCallback(() => {
+    setRecordPreviewUrl((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return null;
+    });
+  }, []);
+
+  const abortActiveRecording = useCallback(() => {
+    skipRecorderOnStopRef.current = true;
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+    } catch {
+      /* ignore */
+    }
+    mediaRecorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    chunksRef.current = [];
+    skipRecorderOnStopRef.current = false;
+    setRecState('idle');
+  }, []);
+
   const resetAudioState = useCallback(() => {
+    abortActiveRecording();
+    revokeRecordPreview();
+    setAudioSubTab('upload');
     setAudioFile(null);
     setTranscript('');
     setTranscribeModel('');
     setTranscribeAttempted(false);
-  }, []);
+  }, [abortActiveRecording, revokeRecordPreview]);
+
+  useEffect(() => {
+    return () => {
+      abortActiveRecording();
+      revokeRecordPreview();
+    };
+  }, [abortActiveRecording, revokeRecordPreview]);
 
   const uploadFileToServer = async (uploadFile, name) => {
     if (!sessionId) {
@@ -71,7 +122,12 @@ function FileUpload({ onClose, onUploadSuccess }) {
 
   const handleTranscribe = async () => {
     if (!audioFile) {
-      setUploadStatus('Select an audio file first.');
+      setUploadStatus('Select or record an audio clip first.');
+      return;
+    }
+    const sizeCheck = validateAudioFileSizeForTranscribe(audioFile.size);
+    if (!sizeCheck.ok) {
+      setUploadStatus(sizeCheck.message);
       return;
     }
     if (!sessionId) {
@@ -165,13 +221,132 @@ function FileUpload({ onClose, onUploadSuccess }) {
 
   const handleAudioFileChange = (event) => {
     const selected = event.target.files[0];
-    if (selected) {
-      setAudioFile(selected);
-      setTranscript('');
-      setTranscribeModel('');
-      setTranscribeAttempted(false);
-      setUploadStatus('');
+    if (!selected) return;
+    const check = validateAudioFileSizeForTranscribe(selected.size);
+    if (!check.ok) {
+      setUploadStatus(check.message);
+      return;
     }
+    setAudioFile(selected);
+    setTranscript('');
+    setTranscribeModel('');
+    setTranscribeAttempted(false);
+    setUploadStatus('');
+  };
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setUploadStatus(
+        'Recording is not supported in this browser. Use Upload file or try Chrome / Firefox / Edge.'
+      );
+      return;
+    }
+    setUploadStatus('');
+    revokeRecordPreview();
+    setAudioFile(null);
+    setTranscript('');
+    setTranscribeModel('');
+    setTranscribeAttempted(false);
+    chunksRef.current = [];
+    skipRecorderOnStopRef.current = false;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = pickMediaRecorderMimeType();
+      const mr = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined
+      );
+      mediaRecorderRef.current = mr;
+
+      mr.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          chunksRef.current.push(ev.data);
+        }
+      };
+
+      mr.onstop = () => {
+        if (skipRecorderOnStopRef.current) {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
+          }
+          return;
+        }
+        const blob = new Blob(chunksRef.current, {
+          type: mr.mimeType || 'audio/webm'
+        });
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
+        mediaRecorderRef.current = null;
+        chunksRef.current = [];
+
+        const sizeCheck = validateAudioFileSizeForTranscribe(blob.size);
+        if (!sizeCheck.ok) {
+          setUploadStatus(sizeCheck.message);
+          setRecState('idle');
+          return;
+        }
+
+        const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+        const fname = `recording-${Date.now()}.${ext}`;
+        const fileFromBlob = new File([blob], fname, { type: blob.type || 'audio/webm' });
+        setAudioFile(fileFromBlob);
+        setRecordPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+        setRecState('stopped');
+        setUploadStatus('Recording ready — preview below, then Transcribe.');
+      };
+
+      mr.start(250);
+      setRecState('recording');
+    } catch (err) {
+      console.error('getUserMedia error:', err);
+      setUploadStatus(
+        `Microphone access failed: ${err?.message || 'Permission denied or no microphone.'}`
+      );
+      streamRef.current = null;
+      mediaRecorderRef.current = null;
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recState === 'recording') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const discardRecording = () => {
+    revokeRecordPreview();
+    setAudioFile(null);
+    setRecState('idle');
+    setUploadStatus('');
+  };
+
+  const setAudioSubTabSafe = (tab) => {
+    if (tab === audioSubTab) return;
+    if (recState === 'recording') {
+      setUploadStatus('Stop recording before switching source.');
+      return;
+    }
+    abortActiveRecording();
+    revokeRecordPreview();
+    setAudioSubTab(tab);
+    setAudioFile(null);
+    setTranscript('');
+    setTranscribeModel('');
+    setTranscribeAttempted(false);
+    setRecState('idle');
+    setUploadStatus('');
   };
 
   return (
@@ -277,42 +452,129 @@ function FileUpload({ onClose, onUploadSuccess }) {
         ) : (
           <div key="upload-audio-mode">
             <p className="file-upload-audio-hint">
-              Audio is sent to the server for transcription (OpenAI Whisper). Do not upload
-              sensitive recordings you cannot share with the API provider.
+              Audio is sent to the server for transcription (OpenAI Whisper). Do not record or
+              upload sensitive audio you cannot share with the API provider. Max size per clip:{' '}
+              <strong>25 MB</strong>.
             </p>
-            <div className="form-group">
-              <label htmlFor="audio-file-input">Audio file</label>
-              <input
-                id="audio-file-input"
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioFileChange}
-                className="file-upload-audio-file"
-              />
-              {audioFile && (
-                <div className="file-info file-info--inline">
-                  <span className="file-name">{audioFile.name}</span>
+
+            <div
+              className="file-upload-audio-subtabs"
+              role="tablist"
+              aria-label="Audio source"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={audioSubTab === 'upload'}
+                className={`file-upload-audio-subtabs__btn ${
+                  audioSubTab === 'upload' ? 'is-active' : ''
+                }`}
+                onClick={() => setAudioSubTabSafe('upload')}
+                disabled={recState === 'recording'}
+              >
+                Upload file
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={audioSubTab === 'record'}
+                className={`file-upload-audio-subtabs__btn ${
+                  audioSubTab === 'record' ? 'is-active' : ''
+                }`}
+                onClick={() => setAudioSubTabSafe('record')}
+                disabled={recState === 'recording'}
+              >
+                Record
+              </button>
+            </div>
+
+            {audioSubTab === 'upload' ? (
+              <div className="form-group">
+                <label htmlFor="audio-file-input">Audio file</label>
+                <input
+                  id="audio-file-input"
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleAudioFileChange}
+                  className="file-upload-audio-file"
+                />
+                {audioFile && (
+                  <div className="file-info file-info--inline">
+                    <span className="file-name">{audioFile.name}</span>
+                    <button
+                      type="button"
+                      className="remove-file"
+                      onClick={() => {
+                        setAudioFile(null);
+                        setTranscript('');
+                        setTranscribeModel('');
+                        setTranscribeAttempted(false);
+                        setUploadStatus('');
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="file-upload-record-panel">
+                {recState === 'recording' ? (
+                  <div className="file-upload-record-active">
+                    <p className="file-upload-record-indicator" role="status">
+                      Recording… speak now.
+                    </p>
+                    <button
+                      type="button"
+                      className="upload-button upload-button--danger"
+                      onClick={stopRecording}
+                    >
+                      Stop
+                    </button>
+                  </div>
+                ) : recState === 'stopped' && recordPreviewUrl ? (
+                  <div className="file-upload-record-preview">
+                    <audio
+                      className="file-upload-record-audio"
+                      controls
+                      src={recordPreviewUrl}
+                      aria-label="Recording preview"
+                    />
+                    <div className="file-upload-record-actions">
+                      <button
+                        type="button"
+                        className="upload-button upload-button--secondary"
+                        onClick={discardRecording}
+                      >
+                        Discard
+                      </button>
+                      <button
+                        type="button"
+                        className="upload-button"
+                        onClick={startRecording}
+                      >
+                        Record again
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    className="remove-file"
-                    onClick={() => {
-                      setAudioFile(null);
-                      setTranscript('');
-                      setTranscribeModel('');
-                      setTranscribeAttempted(false);
-                    }}
+                    className="upload-button"
+                    onClick={startRecording}
                   >
-                    ×
+                    Start recording
                   </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
+
             <div className="modal-actions modal-actions--split">
               <button
                 type="button"
                 className="upload-button upload-button--secondary"
                 onClick={handleTranscribe}
-                disabled={!audioFile}
+                disabled={!audioFile || recState === 'recording'}
               >
                 Transcribe
               </button>

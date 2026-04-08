@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-07 (**#34** audio → transcript: `POST /api/transcribe` OpenAI Whisper, FileUpload **Audio → transcript** tab → `.txt` upload — branch **`issue-34-audio-transcribe-pipeline`**, tip **`5b82d63`**). Plain-text transcript only (no per-segment times); in-browser **recording** not implemented (see **#35**).
+Last updated: 2026-04-07 (**#35** FileUpload audio: **Upload file** | **Record** `MediaRecorder`, 25 MB client check, **`utils/audioRecording.js`** — branch **`issue-35-fileupload-audio-recorder`**). **#34** server **`POST /api/transcribe`** unchanged. Plain text only (**#58** for timestamps).
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
@@ -50,7 +50,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
-    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34):** `POST /api/transcribe` (`audio`, `sessionId`), then upload generated `.txt` via the same upload path.
+    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34 / #35):** sub-tabs **Upload file** or **Record** → `POST /api/transcribe` (`audio`, `sessionId`), then `.txt` via **`POST /api/upload`**.
   - **Library + analyze**: `LibraryVisualize.js` + **`LibrarySidebar`**, **`LibrarySourcesPanel`**, **`LibraryAccountChip`**
     - Lists files (`GET /api/files`)
     - Reads file content (`GET /api/files/:filename`)
