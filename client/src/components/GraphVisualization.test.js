@@ -69,21 +69,21 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('button', { name: /Open graph actions menu/i })
     );
     expect(
-      screen.getByRole('button', { name: /^Generate Nodes$/i })
+      screen.getByRole('button', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /^Generate \(AI\)$/i })
     );
     expect(
-      screen.queryByRole('button', { name: /^Generate Nodes$/i })
+      screen.queryByRole('button', { name: /^AI Generation$/i })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /^Generate \(AI\)$/i })
     );
     expect(
-      screen.getByRole('button', { name: /^Generate Nodes$/i })
+      screen.getByRole('button', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe('GraphVisualization graph action menu', () => {
       screen.getByRole('group', { name: /Graph actions/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /^Generate Nodes$/i })
+      screen.getByRole('button', { name: /^AI Generation$/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /^Add Node$/i })
@@ -162,7 +162,7 @@ describe('GraphVisualization graph action menu', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows expansion algorithm control in Generate (AI) modal (#62)', () => {
+  it('shows expansion algorithm control in the Actions menu Generate section (#62)', () => {
     render(
       <GraphVisualization
         data={minimalData}
@@ -175,11 +175,6 @@ describe('GraphVisualization graph action menu', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /Open graph actions menu/i })
     );
-    fireEvent.click(screen.getByRole('button', { name: /^Generate Nodes$/i }));
-
-    expect(
-      screen.getByRole('heading', { name: /^Generate \(AI\)$/i })
-    ).toBeInTheDocument();
     expect(
       screen.getByRole('combobox', { name: /^Expansion algorithm$/i })
     ).toBeInTheDocument();

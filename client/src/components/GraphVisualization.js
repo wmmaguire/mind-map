@@ -31,6 +31,18 @@ function GraphVisualization({
   const [rgNumCycles, setRgNumCycles] = useState(2);
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
+  const expansionAlgorithmMeta =
+    expansionAlgorithm === 'randomizedGrowth'
+      ? {
+        title: 'Randomized AI growth',
+        description:
+          'Runs multiple cycles. Each cycle adds a batch of AI nodes, then attaches each new node to a fixed number of randomly selected existing nodes (uniform).'
+      }
+      : {
+        title: 'Manual AI generate',
+        description:
+          'One-shot generation. The model returns nodes and links, and each new node must connect to every highlighted node.'
+      };
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNodeData, setNewNodeData] = useState({
     label: '',
@@ -1826,6 +1838,28 @@ function GraphVisualization({
                 role="group"
                 aria-label="Generate with AI"
               >
+                <div className="form-group">
+                  <label htmlFor="graph-expansion-algorithm">
+                    Expansion algorithm
+                  </label>
+                  <select
+                    id="graph-expansion-algorithm"
+                    value={expansionAlgorithm}
+                    onChange={e => {
+                      setExpansionAlgorithm(e.target.value);
+                      setGenerateBudgetPreview(null);
+                    }}
+                  >
+                    <option value="manual">
+                      Manual — one model call; new nodes link to every highlighted
+                      node
+                    </option>
+                    <option value="randomizedGrowth">
+                      Multi-cycle randomized — AI adds batches; each new node links
+                      to random existing nodes (uniform)
+                    </option>
+                  </select>
+                </div>
                 <button
                   type="button"
                   className="generate-button graph-action-menu__action"
@@ -1835,7 +1869,7 @@ function GraphVisualization({
                     ✨
                   </span>
                   <span className="graph-action-menu__action-label">
-                    Generate Nodes
+                    AI Generation
                   </span>
                 </button>
               </div>
@@ -2056,33 +2090,16 @@ function GraphVisualization({
       {showGenerateForm && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 id="graph-generate-modal-title">Generate (AI)</h2>
+            <h2 id="graph-generate-modal-title">
+              {expansionAlgorithmMeta.title}
+            </h2>
+            <p className="graph-generate-algorithm-description">
+              {expansionAlgorithmMeta.description}
+            </p>
             <form
               onSubmit={handleGenerate}
               aria-labelledby="graph-generate-modal-title"
             >
-              <div className="form-group">
-                <label htmlFor="graph-expansion-algorithm">
-                  Expansion algorithm
-                </label>
-                <select
-                  id="graph-expansion-algorithm"
-                  value={expansionAlgorithm}
-                  onChange={e => {
-                    setExpansionAlgorithm(e.target.value);
-                    setGenerateBudgetPreview(null);
-                  }}
-                >
-                  <option value="manual">
-                    Manual — one model call; new nodes link to every highlighted
-                    node
-                  </option>
-                  <option value="randomizedGrowth">
-                    Multi-cycle randomized — AI adds batches; each new node links
-                    to random existing nodes (uniform)
-                  </option>
-                </select>
-              </div>
               <label>
                 {expansionAlgorithm === 'manual'
                   ? 'Number of nodes to generate'
