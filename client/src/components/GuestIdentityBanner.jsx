@@ -3,13 +3,14 @@ import {
   IDENTITY_KIND_GUEST,
   useIdentity,
 } from '../context/IdentityContext';
+import { useGraphTitle } from '../context/GraphTitleContext';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
 export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
 
 /**
- * Compact shell strip: guest vs signed-in; dev preview controls on the right (#31 / #33).
+ * Compact shell strip: account mode, optional graph title (from Library), dev preview (#31 / #33).
  */
 export default function GuestIdentityBanner() {
   const {
@@ -18,16 +19,18 @@ export default function GuestIdentityBanner() {
     userId,
     setDevRegisteredUserId,
   } = useIdentity();
+  const { graphTitle } = useGraphTitle();
 
   const devControls =
     process.env.NODE_ENV === 'development' && setDevRegisteredUserId;
 
   const isGuest = !isRegistered || identityKind === IDENTITY_KIND_GUEST;
+  const showTitle = graphTitle != null && graphTitle !== '';
 
   if (isGuest) {
     return (
       <aside
-        className="guest-identity-banner guest-identity-banner--guest"
+        className={`guest-identity-banner guest-identity-banner--guest${showTitle ? ' guest-identity-banner--with-title' : ''}`}
         role="status"
         aria-live="polite"
         aria-label="Account mode"
@@ -35,13 +38,16 @@ export default function GuestIdentityBanner() {
         <div className="guest-identity-banner__main">
           <span className="guest-identity-banner__label">Guest</span>
         </div>
+        {showTitle && (
+          <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+        )}
         {devControls && (
           <button
             type="button"
-            className="guest-identity-banner__dev-btn"
+            className="guest-identity-banner__label guest-identity-banner__label--action"
             onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
           >
-            Preview as {DEV_PREVIEW_USER_ID}
+            Preview {DEV_PREVIEW_USER_ID}
           </button>
         )}
       </aside>
@@ -53,7 +59,7 @@ export default function GuestIdentityBanner() {
 
   return (
     <aside
-      className="guest-identity-banner guest-identity-banner--registered"
+      className={`guest-identity-banner guest-identity-banner--registered${showTitle ? ' guest-identity-banner--with-title' : ''}`}
       role="status"
       aria-live="polite"
       aria-label="Account mode"
@@ -69,13 +75,16 @@ export default function GuestIdentityBanner() {
           {displayId || '—'}
         </span>
       </div>
+      {showTitle && (
+        <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+      )}
       {devControls && (
         <button
           type="button"
-          className="guest-identity-banner__dev-btn"
+          className="guest-identity-banner__label guest-identity-banner__label--action guest-identity-banner__label--action-end"
           onClick={() => setDevRegisteredUserId(null)}
         >
-          End preview · Guest
+          End preview
         </button>
       )}
     </aside>

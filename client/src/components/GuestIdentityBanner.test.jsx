@@ -1,15 +1,20 @@
 import '../setupPolyfills';
 import { render, screen } from '@testing-library/react';
 import { IdentityProvider } from '../context/IdentityContext';
+import { GraphTitleProvider } from '../context/GraphTitleContext';
 import GuestIdentityBanner, { DEV_PREVIEW_USER_ID } from './GuestIdentityBanner';
+
+function wrap(ui) {
+  return (
+    <IdentityProvider>
+      <GraphTitleProvider>{ui}</GraphTitleProvider>
+    </IdentityProvider>
+  );
+}
 
 describe('GuestIdentityBanner', () => {
   it('shows compact guest label by default', () => {
-    render(
-      <IdentityProvider>
-        <GuestIdentityBanner />
-      </IdentityProvider>
-    );
+    render(wrap(<GuestIdentityBanner />));
     expect(screen.getByRole('status', { name: /account mode/i })).toBeInTheDocument();
     expect(screen.getByText('Guest', { exact: true })).toBeInTheDocument();
   });
@@ -17,7 +22,9 @@ describe('GuestIdentityBanner', () => {
   it('shows signed-in id when registered', () => {
     render(
       <IdentityProvider initialRegisteredUserId="acct-test-1">
-        <GuestIdentityBanner />
+        <GraphTitleProvider>
+          <GuestIdentityBanner />
+        </GraphTitleProvider>
       </IdentityProvider>
     );
     expect(screen.getByText(/Signed in/i)).toBeInTheDocument();

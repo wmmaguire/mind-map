@@ -6,6 +6,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { SessionProvider } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
+import { GraphTitleProvider } from './context/GraphTitleContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -15,7 +16,9 @@ root.render(
         <IdentityProvider
           initialRegisteredUserId={process.env.REACT_APP_MINDMAP_USER_ID}
         >
-          <App />
+          <GraphTitleProvider>
+            <App />
+          </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>
     </BrowserRouter>

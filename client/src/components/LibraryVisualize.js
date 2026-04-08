@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import GraphVisualization from './GraphVisualization';
 import { useSession } from '../context/SessionContext';
 import { useIdentity } from '../context/IdentityContext';
+import { useGraphTitle } from '../context/GraphTitleContext';
 import LibrarySidebar from './LibrarySidebar';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
@@ -18,9 +19,6 @@ const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 480;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
-/** Space reserved for the graph title row (border, padding, bold title). */
-const VISUALIZATION_HEADER_PX = 40;
-
 function readStoredSidebarWidth() {
   try {
     const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -51,6 +49,7 @@ function readStoredSections() {
 function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const { sessionId } = useSession();
   const { userId } = useIdentity();
+  const { setGraphTitle } = useGraphTitle();
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [deletingFiles, setDeletingFiles] = useState(false);
@@ -189,6 +188,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       /* ignore */
     }
   }, [filesSectionOpen, graphsSectionOpen]);
+
+  useEffect(() => {
+    setGraphTitle(currentSource?.name || 'Unnamed Graph');
+    return () => setGraphTitle(null);
+  }, [currentSource?.name, setGraphTitle]);
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -561,10 +565,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     );
   }
 
-  const graphViewportHeight = Math.max(
-    200,
-    dimensions.height - VISUALIZATION_HEADER_PX
-  );
+  const graphViewportHeight = Math.max(200, dimensions.height);
 
   return (
     <div
@@ -643,9 +644,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       )}
 
       <div className="visualization-panel">
-        <div className="visualization-header">
-          <h3>{currentSource?.name || 'Unnamed Graph'}</h3>
-        </div>
         <div className="graph-container library-graph-mount">
           <GraphVisualization
             actionsFabPlacement="libraryGraphMount"

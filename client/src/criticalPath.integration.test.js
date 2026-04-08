@@ -7,6 +7,7 @@ import {
   resetSessionBootstrapForTests,
 } from './context/SessionContext';
 import { IdentityProvider } from './context/IdentityContext';
+import { GraphTitleProvider } from './context/GraphTitleContext';
 import App from './App';
 
 const sessionId = 'test-session-uuid';
@@ -52,7 +53,9 @@ function renderApp(initialEntries) {
     <MemoryRouter initialEntries={initialEntries}>
       <SessionProvider>
         <IdentityProvider>
-          <App />
+          <GraphTitleProvider>
+            <App />
+          </GraphTitleProvider>
         </IdentityProvider>
       </SessionProvider>
     </MemoryRouter>
