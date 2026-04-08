@@ -11,6 +11,20 @@ test('validateGenerateNodeRequest rejects empty selectedNodes', () => {
   assert.equal(r.code, 'MISSING_SELECTED_NODES');
 });
 
+test('validateGenerateNodeRequest randomizedGrowth allows empty selectedNodes', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [],
+    numNodes: 2,
+    expansionAlgorithm: 'randomizedGrowth',
+    connectionsPerNewNode: 2,
+    numCycles: 1,
+    existingGraphNodeIds: ['x', 'y', 'z']
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.expansionAlgorithm, 'randomizedGrowth');
+  assert.equal(r.selectedNodes.length, 0);
+});
+
 test('validateGenerateNodeRequest defaults numNodes to 3', () => {
   const r = validateGenerateNodeRequest({
     selectedNodes: [{ id: 'a', label: 'A' }]

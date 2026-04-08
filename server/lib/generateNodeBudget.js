@@ -64,34 +64,49 @@ export function validateGenerateNodeRequest(body) {
     body.dryRun === '1' ||
     body.dryRun === 'true';
 
-  const { selectedNodes } = body;
-  if (!Array.isArray(selectedNodes) || selectedNodes.length === 0) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'MISSING_SELECTED_NODES',
-      error: 'selectedNodes must be a non-empty array'
-    };
-  }
-  if (selectedNodes.length > caps.maxSelected) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'TOO_MANY_SELECTED',
-      error: `At most ${caps.maxSelected} highlighted nodes allowed for generation`,
-      details: { max: caps.maxSelected }
-    };
-  }
+  const expansionAlgorithm =
+    body.expansionAlgorithm === 'randomizedGrowth'
+      ? 'randomizedGrowth'
+      : 'manual';
 
-  for (let i = 0; i < selectedNodes.length; i += 1) {
-    const n = selectedNodes[i];
-    if (!n || typeof n !== 'object' || n.id === undefined || n.id === null) {
+  // Manual mode expands from highlighted anchors (required).
+  // Randomized growth mode can run without highlights (optional).
+  const selectedNodesRaw = body.selectedNodes;
+  const selectedNodes =
+    Array.isArray(selectedNodesRaw) ? selectedNodesRaw : [];
+
+  if (expansionAlgorithm === 'manual') {
+    if (!Array.isArray(selectedNodesRaw) || selectedNodes.length === 0) {
       return {
         ok: false,
         status: 400,
-        code: 'INVALID_SELECTED_NODE',
-        error: 'Each selected node must be an object with an id'
+        code: 'MISSING_SELECTED_NODES',
+        error: 'selectedNodes must be a non-empty array'
       };
+    }
+  }
+
+  if (selectedNodes.length > 0) {
+    if (selectedNodes.length > caps.maxSelected) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'TOO_MANY_SELECTED',
+        error: `At most ${caps.maxSelected} highlighted nodes allowed for generation`,
+        details: { max: caps.maxSelected }
+      };
+    }
+
+    for (let i = 0; i < selectedNodes.length; i += 1) {
+      const n = selectedNodes[i];
+      if (!n || typeof n !== 'object' || n.id === undefined || n.id === null) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_SELECTED_NODE',
+          error: 'Each selected node must be an object with an id'
+        };
+      }
     }
   }
 
@@ -117,11 +132,6 @@ export function validateGenerateNodeRequest(body) {
       details: { max: caps.maxNewNodes }
     };
   }
-
-  const expansionAlgorithm =
-    body.expansionAlgorithm === 'randomizedGrowth'
-      ? 'randomizedGrowth'
-      : 'manual';
 
   const expCaps = getRandomizedExpansionCaps();
 

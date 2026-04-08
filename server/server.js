@@ -399,12 +399,50 @@ app.post('/api/generate-node', async (req, res) => {
     const timestamp = Date.now(); // Get current timestamp
 
     console.log('Number nodes to add:', numNodesToGenerate);
-    console.log('Selected nodes for extension:', selectedNodes.map(n => `${n.label} (${n.id})`));
+    console.log(
+      'Selected nodes for extension:',
+      (selectedNodes || []).map(n => `${n.label} (${n.id})`)
+    );
     console.log('Using timestamp prefix:', timestamp);
 
-    const prompt = `
+    const prompt =
+      validated.expansionAlgorithm === 'randomizedGrowth'
+        ? `
+      Generate ${numNodesToGenerate} new, meaningful concepts to expand a knowledge graph.
+
+      Each new concept should:
+      1. Be a real, well-defined concept or topic
+      2. Include a relevant Wikipedia URL
+      3. Have a concise but informative description
+
+      Response must be a valid JSON object with this structure:
+      {
+        "nodes": [
+          {
+            "id": "${timestamp}_1",
+            "label": "<meaningful concept name>",
+            "description": "<clear, informative description>",
+            "wikiUrl": "<actual Wikipedia URL>"
+          }
+          // Additional nodes use ${timestamp}_2, ${timestamp}_3, etc.
+        ],
+        "links": []
+      }
+
+      IMPORTANT:
+      - Generate real, meaningful concepts (not placeholders)
+      - Ensure all Wikipedia URLs are valid and relevant
+      - Use "${timestamp}_1", "${timestamp}_2", etc. for node IDs
+
+      Return ONLY the JSON object.
+    `
+        : `
       Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to these existing nodes:
-      ${selectedNodes.map(node => `- ${node.label}: ${node.description || 'No description available'}`).join('\n')}
+      ${selectedNodes
+        .map(
+          node => `- ${node.label}: ${node.description || 'No description available'}`
+        )
+        .join('\n')}
 
       Each new concept should:
       1. Be a real, well-defined concept or topic
