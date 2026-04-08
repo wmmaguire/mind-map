@@ -512,6 +512,28 @@ svg {
   cursor: not-allowed;
 }
 
+.graph-generate-budget-hint {
+  font-size: 0.88rem;
+  color: #555;
+  margin: 12px 0 8px;
+  line-height: 1.35;
+}
+
+.graph-generate-budget-preview {
+  font-size: 0.9rem;
+  color: #333;
+  margin: 12px 0 8px;
+  padding: 10px 12px;
+  background: #f0f7ff;
+  border: 1px solid #c5d9f0;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.graph-generate-budget-preview p {
+  margin: 0;
+}
+
 /* Mobile-specific styles — ≥44px tap targets (#30) */
 @media (max-width: 768px) {
   .add-node-button,

@@ -142,8 +142,9 @@ In `GraphVisualization` users can:
 - Select nodes/links and inspect relationships
 - Add nodes and relationships
 - Delete nodes/links
-- Use “Generate Nodes” to request AI expansion:
-  - `POST /api/generate-node` (same OpenAI model env as analyze: `OPENAI_ANALYZE_MODEL` on the server)
+- Use “Generate Nodes” to request AI expansion (**#37** budgets):
+  - Optional **Preview budget** calls `POST /api/generate-node` with **`dryRun: true`** (no OpenAI; shows estimated new links and caps).
+  - **Confirm** runs the full request: `POST /api/generate-node` (same OpenAI model env as analyze: `OPENAI_ANALYZE_MODEL` on the server).
   - On failure, the UI prefers the API’s `details` field (quota/auth messages, invalid JSON, etc.) when present
 
 Key operations are logged via:

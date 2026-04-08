@@ -22,6 +22,8 @@ function GraphVisualization({
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
+  /** Server dry-run (#37): estimated links / caps before OpenAI */
+  const [generateBudgetPreview, setGenerateBudgetPreview] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNodeData, setNewNodeData] = useState({
     label: '',
@@ -69,6 +71,7 @@ function GraphVisualization({
     selectedNodeId.current = null;
     setGraphActionMenu(null);
     generateSourceIdsRef.current = null;
+    setGenerateBudgetPreview(null);
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -1241,6 +1244,46 @@ function GraphVisualization({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
   }, [data, selectedNodes, width, height]);
 
+  const handlePreviewGenerateBudget = async (event) => {
+    event.preventDefault();
+    const sourceIdSnapshot =
+      generateSourceIdsRef.current != null
+        ? [...generateSourceIdsRef.current]
+        : Array.from(selectedNodeIds.current).map(String);
+    setIsGenerating(true);
+    setGenerateBudgetPreview(null);
+    try {
+      const selectedPayload = sourceIdSnapshot
+        .map((id) => data.nodes.find((node) => String(node.id) === String(id)))
+        .filter(Boolean);
+      if (selectedPayload.length === 0) {
+        window.alert('Highlight at least one node on the graph before previewing.');
+        return;
+      }
+      const result = await apiRequest('/api/generate-node', {
+        method: 'POST',
+        json: {
+          selectedNodes: selectedPayload,
+          numNodes: numNodesToAdd,
+          dryRun: true
+        }
+      });
+      if (!result.success) {
+        throw new Error(
+          result.details || result.error || 'Preview failed'
+        );
+      }
+      if (result.preview) {
+        setGenerateBudgetPreview(result.preview);
+      }
+    } catch (error) {
+      console.error('Preview budget error:', error);
+      window.alert('Preview failed: ' + getApiErrorMessage(error));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerate = async (event) => {
     event.preventDefault();
     const sourceIdSnapshot =
@@ -1384,6 +1427,7 @@ function GraphVisualization({
 
       selectedNodeIds.current.clear();
       selectedNodeId.current = null;
+      setGenerateBudgetPreview(null);
       setShowGenerateForm(false);
 
     } catch (error) {
@@ -1616,6 +1660,7 @@ function GraphVisualization({
     setGraphActionMenu(null);
     setShowAddForm(false);
     setRelationshipForm({ show: false, relationship: '' });
+    setGenerateBudgetPreview(null);
     setShowGenerateForm(true);
   };
 
@@ -1692,7 +1737,7 @@ function GraphVisualization({
     activeGraphEditBanner = {
       title: 'Generate (AI)',
       hint:
-        'Choose how many related nodes to create from your current highlights.',
+        'Optional Preview budget estimates size without calling the model; Confirm runs generation.',
     };
   } else if (showAddForm) {
     activeGraphEditBanner = {
@@ -2021,9 +2066,44 @@ function GraphVisualization({
                   min="1"
                   max="5"
                   value={numNodesToAdd}
-                  onChange={(e) => setNumNodesToAdd(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    setNumNodesToAdd(parseInt(e.target.value, 10) || 1);
+                    setGenerateBudgetPreview(null);
+                  }}
                 />
               </label>
+              {generateBudgetPreview ? (
+                <div
+                  className="graph-generate-budget-preview"
+                  role="status"
+                >
+                  <p>
+                    Add <strong>{generateBudgetPreview.numNodes}</strong> new node
+                    {generateBudgetPreview.numNodes === 1 ? '' : 's'}, each linked to
+                    all{' '}
+                    <strong>{generateBudgetPreview.selectedCount}</strong> highlighted
+                    node
+                    {generateBudgetPreview.selectedCount === 1 ? '' : 's'} (~
+                    <strong>{generateBudgetPreview.estimatedNewLinks}</strong> new links).
+                    Caps: max {generateBudgetPreview.caps.maxNewNodes} nodes per run, max{' '}
+                    {generateBudgetPreview.caps.maxSelected} highlights.
+                  </p>
+                </div>
+              ) : (
+                <p className="graph-generate-budget-hint">
+                  Optional: <strong>Preview budget</strong> estimates size without calling
+                  OpenAI.
+                </p>
+              )}
+              <div className="form-buttons">
+                <button
+                  type="button"
+                  onClick={handlePreviewGenerateBudget}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? '…' : 'Preview budget'}
+                </button>
+              </div>
               <div className="form-buttons">
                 <button type="submit" disabled={isGenerating}>
                   {isGenerating ? 'Generating...' : 'Confirm'}

@@ -42,6 +42,8 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
 
 - **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` and `POST /api/generate-node` (default **`gpt-4o`**). Override if your API key only has access to a different model.
 
+- **`GENERATE_NODE_MAX_NEW_NODES`** / **`GENERATE_NODE_MAX_SELECTED`**: optional caps for **`POST /api/generate-node`** (defaults **5** / **12**; GitHub **#37**).
+
 - **`OPENAI_TRANSCRIBE_MODEL`**: optional; Whisper model id for `POST /api/transcribe` (default **`whisper-1`**). Same **`OPENAI_API_KEY`** as other OpenAI calls (GitHub **#34**).
 
 **Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
@@ -234,16 +236,18 @@ Relevant code:
 
 **Goal**: expand an existing graph by adding new nodes + links connected to selected nodes.
 
-1. Client sends `POST /api/generate-node` with `selectedNodes` and optional `numNodes`.
-2. Server prompts OpenAI (same **`OPENAI_ANALYZE_MODEL`** / default **`gpt-4o`** as analyze) to return JSON with `nodes` and `links`.
-3. Server parses the assistant message with **`parseGraphJsonFromCompletion`** (markdown code fences, stray prose, and `{ ... }` extraction—same as **`/api/analyze`**). If parsing or shape checks fail, responds with **502** and `code: INVALID_MODEL_JSON`.
-4. Server validates graph semantics (connectivity of new nodes to all selected nodes). On validation failure, responds with **200** and `{ success: false, error, details }` (legacy shape for this endpoint).
-5. On OpenAI HTTP errors, responds with **429** / **401** and `code` **`OPENAI_QUOTA`** / **`OPENAI_AUTH`** (same semantics as analyze).
-6. On other failures, **500** with `code: GENERATE_NODE_FAILED` when appropriate.
+1. Client sends `POST /api/generate-node` with **`selectedNodes`** (non-empty array, each with **`id`**) and optional **`numNodes`** (default **3**). **Growth budgets (GitHub #37):** **`GENERATE_NODE_MAX_NEW_NODES`** (default **5**) and **`GENERATE_NODE_MAX_SELECTED`** (default **12**) cap request size. Invalid requests return **400** with **`code`** such as **`MISSING_SELECTED_NODES`**, **`TOO_MANY_SELECTED`**, **`NUM_NODES_OVER_CAP`**, etc.
+2. **Dry run:** JSON body **`dryRun: true`** skips OpenAI and returns **`{ success: true, dryRun: true, preview: { numNodes, selectedCount, estimatedNewLinks, caps } }`** so the UI can show a **preview/apply** round without spending tokens.
+3. Otherwise server prompts OpenAI (same **`OPENAI_ANALYZE_MODEL`** / default **`gpt-4o`** as analyze) to return JSON with `nodes` and `links`.
+4. Server parses the assistant message with **`parseGraphJsonFromCompletion`** (markdown code fences, stray prose, and `{ ... }` extraction—same as **`/api/analyze`**). If parsing or shape checks fail, responds with **502** and `code: INVALID_MODEL_JSON`.
+5. Server validates graph semantics (connectivity of new nodes to all selected nodes). On validation failure, responds with **200** and `{ success: false, error, details }` (legacy shape for this endpoint).
+6. On OpenAI HTTP errors, responds with **429** / **401** and `code` **`OPENAI_QUOTA`** / **`OPENAI_AUTH`** (same semantics as analyze).
+7. On other failures, **500** with `code: GENERATE_NODE_FAILED` when appropriate.
 
 Relevant code:
 
 - `server/server.js` (`/api/generate-node`)
+- `server/lib/generateNodeBudget.js` (validation + dry-run preview; tests: **`lib/generateNodeBudget.test.mjs`**)
 
 ### 6) Save/load graphs (filesystem + MongoDB)
 
