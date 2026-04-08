@@ -22,7 +22,7 @@ export default function GuestIdentityBanner() {
     userId,
     setDevRegisteredUserId,
   } = useIdentity();
-  const { status: authStatus, user: authUser, login, register, logout } = useAuth();
+  const { status: authStatus, login, register, logout } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
 
