@@ -18,6 +18,10 @@ import graphsRouter from './routes/graphs.js';
 import createTranscribeRouter from './routes/transcribe.js';
 import { recordUserActivity } from './lib/recordUserActivity.js';
 import {
+  validateGenerateNodeRequest,
+  buildGenerateNodeDryRunPreview
+} from './lib/generateNodeBudget.js';
+import {
   dataDir,
   uploadsDir,
   metadataDir,
@@ -364,9 +368,27 @@ app.post('/api/analyze', async (req, res) => {
 
 // Add after other API endpoints
 app.post('/api/generate-node', async (req, res) => {
+  const validated = validateGenerateNodeRequest(req.body);
+  if (!validated.ok) {
+    return res.status(validated.status).json({
+      success: false,
+      error: validated.error,
+      code: validated.code,
+      ...(validated.details ? { details: validated.details } : {})
+    });
+  }
+
+  if (validated.dryRun) {
+    return res.json({
+      success: true,
+      dryRun: true,
+      preview: buildGenerateNodeDryRunPreview(validated)
+    });
+  }
+
   try {
-    const { selectedNodes } = req.body;
-    const numNodesToGenerate = req.body.numNodes || 3;
+    const { selectedNodes } = validated;
+    const numNodesToGenerate = validated.numNodes;
     const timestamp = Date.now(); // Get current timestamp
 
     console.log('Number nodes to add:', numNodesToGenerate);

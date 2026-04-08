@@ -1,6 +1,6 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-08 — **#58** documented; follow-ups **#24** (E2E), **#59** (diarization), **#60** (transcribe HTTP tests), **#61** (optional persist/export); see **`docs/github-backlog-issues.md`** and **`server/READEME.md`** §2b.
+Last updated: 2026-04-08 — **#37** slice: **`POST /api/generate-node`** budgets + **`dryRun`** preview; **GraphVisualization** “Preview budget” before Confirm. See **`server/READEME.md`** §5.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:

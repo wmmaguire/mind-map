@@ -41,6 +41,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#59** — optional **speaker diarization** (**`gpt-4o-transcribe-diarize`**, **`diarized_json`**); **`whisper-1`** does not identify multiple speakers — see **`server/READEME.md`** §2b. When implemented, coordinate with **#58** segment fields so clients can show **time + speaker** without conflicting contracts.
 
+**Note:** **#37** (epic — **NF—Graph intelligence**) — first slice: **growth budgets** + **`dryRun`** on **`POST /api/generate-node`** (no OpenAI); client **Preview budget** in Generate modal. **`GENERATE_NODE_MAX_NEW_NODES`** / **`GENERATE_NODE_MAX_SELECTED`**. Tests: **`server/lib/generateNodeBudget.test.mjs`**. Full presets/autopilot still backlog.
+
 **Note:** **#60** — HTTP integration tests for **`POST /api/transcribe`** (Express + multer + mocked **`openai.audio.transcriptions.create`**), default vs **`verbose`** branches. See **`server/READEME.md`** §2b follow-ups.
 
 **Note:** **#61** — optional product/API: persist **segment JSON** with uploads, **word-level** timing, or **SRT/VTT** export (**#58** UI is ephemeral until upload). LOW priority.
