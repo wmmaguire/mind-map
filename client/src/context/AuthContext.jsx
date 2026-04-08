@@ -27,10 +27,10 @@ export function AuthProvider({ children }) {
     refreshMe();
   }, [refreshMe]);
 
-  const register = useCallback(async ({ email, password }) => {
+  const register = useCallback(async ({ email, password, name }) => {
     const data = await apiRequest('/api/auth/register', {
       method: 'POST',
-      json: { email, password },
+      json: { email, password, name },
     });
     if (data?.success && data.user) {
       setAuthState({ status: 'authenticated', user: data.user });

@@ -34,22 +34,26 @@ export default function createAuthRouter() {
     async findUserByEmail(emailLower) {
       return User.findOne({ emailLower });
     },
-    async createUser({ emailLower, passwordHash }) {
-      const u = new User({ emailLower, passwordHash });
+    async createUser({ emailLower, passwordHash, name }) {
+      const u = new User({ emailLower, passwordHash, name: name || '' });
       await u.save();
       return u;
     },
   };
 
   router.post('/register', async (req, res) => {
-    const { email, password } = req.body || {};
+    const { email, password, name } = req.body || {};
     const r = await registerWithStore(store, { email, password });
     if (!r.ok) {
       return res.status(r.status).json({ success: false, error: r.error, code: r.code });
     }
+    if (typeof name === 'string' && name.trim() !== '') {
+      r.user.name = name.trim();
+      await r.user.save();
+    }
     const token = signAuthToken({ sub: String(r.user._id) });
     res.cookie(COOKIE_NAME, token, cookieOptions());
-    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower } });
+    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower, name: r.user.name || '' } });
   });
 
   router.post('/login', async (req, res) => {
@@ -60,7 +64,7 @@ export default function createAuthRouter() {
     }
     const token = signAuthToken({ sub: String(r.user._id) });
     res.cookie(COOKIE_NAME, token, cookieOptions());
-    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower } });
+    return res.json({ success: true, user: { id: String(r.user._id), email: r.user.emailLower, name: r.user.name || '' } });
   });
 
   router.post('/logout', async (_req, res) => {
@@ -83,7 +87,7 @@ export default function createAuthRouter() {
       if (!user) {
         return res.status(401).json({ success: false, error: 'Unknown user', code: 'UNKNOWN_USER' });
       }
-      return res.json({ success: true, user: { id: String(user._id), email: user.emailLower } });
+      return res.json({ success: true, user: { id: String(user._id), email: user.emailLower, name: user.name || '' } });
     } catch (e) {
       return res.status(401).json({ success: false, error: 'Invalid token', code: 'INVALID_TOKEN' });
     }

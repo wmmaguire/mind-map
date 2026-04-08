@@ -44,6 +44,7 @@ export default function GuestIdentityBanner() {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // login | register
+  const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -176,7 +177,11 @@ export default function GuestIdentityBanner() {
                     if (authMode === 'login') {
                       await login({ email: authEmail, password: authPassword });
                     } else {
-                      await register({ email: authEmail, password: authPassword });
+                      await register({
+                        name: authName,
+                        email: authEmail,
+                        password: authPassword
+                      });
                     }
                     setAuthModalOpen(false);
                   } catch (err) {
@@ -186,6 +191,18 @@ export default function GuestIdentityBanner() {
                   }
                 }}
               >
+                {authMode === 'register' ? (
+                  <label className="guest-identity-banner__auth-field">
+                    Name
+                    <input
+                      type="text"
+                      value={authName}
+                      onChange={(e) => setAuthName(e.target.value)}
+                      autoComplete="name"
+                      placeholder="e.g. Max"
+                    />
+                  </label>
+                ) : null}
                 <label className="guest-identity-banner__auth-field">
                   Email
                   <input
@@ -253,80 +270,67 @@ export default function GuestIdentityBanner() {
       )}
       <div
         className="guest-identity-banner__trailing"
-        ref={devControls ? menuWrapRef : undefined}
+        ref={menuWrapRef}
       >
-        {devControls ? (
-          <>
-            <button
-              type="button"
-              className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <span className="guest-identity-banner__account-control-primary">
-                Signed in
-              </span>
-              <span
-                className="guest-identity-banner__account-control-id"
-                title={userId || ''}
-              >
-                {displayId || '—'}
-              </span>
-              <span className="guest-identity-banner__account-control-chevron" aria-hidden>
-                {menuOpen ? '▴' : '▾'}
-              </span>
-            </button>
-            {menuOpen && (
-              <div className="guest-identity-banner__menu" role="menu">
-                <div className="guest-identity-banner__menu-meta" role="none">
-                  Active account
-                </div>
-                <div
-                  className="guest-identity-banner__menu-id"
-                  role="none"
-                  title={userId || ''}
-                >
-                  {userId || '—'}
-                </div>
-                <button
-                  type="button"
-                  className="guest-identity-banner__menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setDevRegisteredUserId(null);
-                    setMenuOpen(false);
-                  }}
-                >
-                  End preview (guest)
-                </button>
-                <button
-                  type="button"
-                  className="guest-identity-banner__menu-item"
-                  role="menuitem"
-                  onClick={async () => {
-                    await logout();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Sign out
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <span
-            className="guest-identity-banner__account-static"
-            title={userId || ''}
+        <>
+          <button
+            type="button"
+            className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((o) => !o)}
           >
-            <span className="guest-identity-banner__account-static-prefix">
+            <span className="guest-identity-banner__account-control-primary">
               Signed in
             </span>
-            <span className="guest-identity-banner__account-static-id">
+            <span
+              className="guest-identity-banner__account-control-id"
+              title={userId || ''}
+            >
               {displayId || '—'}
             </span>
-          </span>
-        )}
+            <span className="guest-identity-banner__account-control-chevron" aria-hidden>
+              {menuOpen ? '▴' : '▾'}
+            </span>
+          </button>
+          {menuOpen && (
+            <div className="guest-identity-banner__menu" role="menu">
+              <div className="guest-identity-banner__menu-meta" role="none">
+                Active account
+              </div>
+              <div
+                className="guest-identity-banner__menu-id"
+                role="none"
+                title={userId || ''}
+              >
+                {userId || '—'}
+              </div>
+              <button
+                type="button"
+                className="guest-identity-banner__menu-item"
+                role="menuitem"
+                onClick={() => {
+                  if (devControls) setDevRegisteredUserId(null);
+                  setMenuOpen(false);
+                }}
+                disabled={!devControls}
+              >
+                End preview (guest)
+              </button>
+              <button
+                type="button"
+                className="guest-identity-banner__menu-item"
+                role="menuitem"
+                onClick={async () => {
+                  await logout();
+                  setMenuOpen(false);
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </>
       </div>
     </aside>
   );
