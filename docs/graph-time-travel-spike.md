@@ -49,4 +49,4 @@ Users only see the latest graph state in the Library visualization. There is no 
 ## References
 
 - GitHub **#36** (epic)
-- Follow-ups: **`docs/github-backlog-issues.md`** (*#36 phase 1 follow-ons* and backlog issue template)
+- Follow-ups: **`docs/github-backlog-issues.md`**, GitHub **#70** (phase 2+ backlog)
