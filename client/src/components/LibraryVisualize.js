@@ -104,6 +104,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [shareViewerMode, setShareViewerMode] = useState(false);
   const [shareLinkToast, setShareLinkToast] = useState(null);
 
+  /** Stable noop so GraphVisualization is not handed a new callback every render in share mode. */
+  const noopGraphDataUpdate = useCallback(() => {}, []);
+
   const goToHistoryIndex = useCallback(
     (nextIndex) => {
       setGraphHistory((prev) => {
@@ -292,6 +295,15 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       cancelled = true;
     };
   }, [sessionId, shareGraph, shareToken, applyLoadedGraphFromApi]);
+
+  /** Leave share mode when query params are gone (e.g. “Open your library” / edited URL). */
+  useEffect(() => {
+    const g = shareGraph?.trim();
+    const t = shareToken?.trim();
+    if (!g || !t) {
+      setShareViewerMode(false);
+    }
+  }, [shareGraph, shareToken]);
 
   useEffect(() => {
     try {
@@ -714,53 +726,60 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     setShowContextModal(true);
   };
 
-  const handleGraphDataUpdate = (newData) => {
-    // Create a map of all nodes for reference
-    const nodeMap = new Map();
-    newData.nodes.forEach(node => {
-      nodeMap.set(node.id, node);
-    });
+  const handleGraphDataUpdate = useCallback(
+    (newData) => {
+      const nodeMap = new Map();
+      newData.nodes.forEach((node) => {
+        nodeMap.set(node.id, node);
+      });
 
-    // Process links to ensure they reference actual node objects
-    const processedLinks = newData.links.map(link => {
-      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      
-      const sourceNode = nodeMap.get(sourceId);
-      const targetNode = nodeMap.get(targetId);
-      
-      if (!sourceNode || !targetNode) {
-        console.error('Missing node reference:', { sourceId, targetId, link });
-        return null;
-      }
+      const processedLinks = newData.links
+        .map((link) => {
+          const sourceId =
+            typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === 'object' ? link.target.id : link.target;
 
-      return {
-        ...link,
-        source: sourceNode,
-        target: targetNode,
-        relationship: link.relationship
+          const sourceNode = nodeMap.get(sourceId);
+          const targetNode = nodeMap.get(targetId);
+
+          if (!sourceNode || !targetNode) {
+            console.error('Missing node reference:', { sourceId, targetId, link });
+            return null;
+          }
+
+          return {
+            ...link,
+            source: sourceNode,
+            target: targetNode,
+            relationship: link.relationship,
+          };
+        })
+        .filter((link) => link !== null);
+
+      const processedData = {
+        nodes: newData.nodes,
+        links: processedLinks,
       };
-    }).filter(link => link !== null);
 
-    // Update graph data with processed links
-    const processedData = {
-      nodes: newData.nodes,
-      links: processedLinks
-    };
+      setGraphData(processedData);
+      setGraphHistory((prev) =>
+        graphHistoryReducer(
+          prev,
+          { type: 'COMMIT', graph: processedData },
+          historyOpts
+        )
+      );
 
-    setGraphData(processedData);
-    setGraphHistory((prev) =>
-      graphHistoryReducer(prev, { type: 'COMMIT', graph: processedData }, historyOpts)
-    );
-
-    // Update metadata
-    setCurrentSource(prev => ({
-      ...prev,
-      nodeCount: processedData.nodes.length,
-      edgeCount: processedData.links.length,
-      lastModified: new Date().toISOString()
-    }));
-  };
+      setCurrentSource((prev) => ({
+        ...prev,
+        nodeCount: processedData.nodes.length,
+        edgeCount: processedData.links.length,
+        lastModified: new Date().toISOString(),
+      }));
+    },
+    [historyOpts]
+  );
 
   const isMobile = dimensions.width <= 768;
   let graphViewportWidth;
@@ -869,7 +888,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
             actionsFabPlacement="libraryGraphMount"
             data={graphData || { nodes: [], links: [] }}
             onDataUpdate={
-              shareViewerMode ? () => {} : handleGraphDataUpdate
+              shareViewerMode ? noopGraphDataUpdate : handleGraphDataUpdate
             }
             readOnly={shareViewerMode}
             width={graphViewportWidth}

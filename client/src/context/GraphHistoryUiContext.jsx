@@ -1,6 +1,7 @@
 import React, {
   createContext,
   useContext,
+  useMemo,
   useState,
 } from 'react';
 import PropTypes from 'prop-types';
@@ -26,8 +27,12 @@ const GraphHistoryUiContext = createContext({
 
 export function GraphHistoryUiProvider({ children }) {
   const [payload, setPayload] = useState(null);
+  const value = useMemo(
+    () => ({ payload, setPayload }),
+    [payload, setPayload]
+  );
   return (
-    <GraphHistoryUiContext.Provider value={{ payload, setPayload }}>
+    <GraphHistoryUiContext.Provider value={value}>
       {children}
     </GraphHistoryUiContext.Provider>
   );
