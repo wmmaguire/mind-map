@@ -37,5 +37,5 @@ test('shows guest identity banner', () => {
     </BrowserRouter>
   );
   expect(screen.getByRole('status', { name: /account mode/i })).toBeInTheDocument();
-  expect(screen.getByText(/Guest/i)).toBeInTheDocument();
+  expect(screen.getByText('Guest', { exact: true })).toBeInTheDocument();
 });

@@ -6,15 +6,11 @@ import {
 import './LibraryAccountChip.css';
 
 /**
- * Library-local account affordance: guest chip vs signed-in menu (#33).
+ * Library-local account affordance: mirrors shell identity (guest vs signed-in) (#33).
+ * Dev preview controls live on {@link GuestIdentityBanner}.
  */
 export default function LibraryAccountChip() {
-  const {
-    identityKind,
-    isRegistered,
-    userId,
-    setDevRegisteredUserId,
-  } = useIdentity();
+  const { identityKind, isRegistered, userId } = useIdentity();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -29,9 +25,6 @@ export default function LibraryAccountChip() {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
-  const devControls =
-    process.env.NODE_ENV === 'development' && setDevRegisteredUserId;
-
   if (!isRegistered || identityKind === IDENTITY_KIND_GUEST) {
     return (
       <div className="library-account-chip library-account-chip--guest">
@@ -39,19 +32,9 @@ export default function LibraryAccountChip() {
           Guest session
         </span>
         <span className="library-account-chip__hint">
-          Files and graphs follow this browser session.
+          Files and graphs follow this browser session. See the banner for
+          active mode.
         </span>
-        {devControls && (
-          <div className="library-account-chip__dev">
-            <button
-              type="button"
-              className="library-account-chip__dev-btn"
-              onClick={() => setDevRegisteredUserId('dev-preview-user')}
-            >
-              Preview signed-in UI
-            </button>
-          </div>
-        )}
       </div>
     );
   }
@@ -83,21 +66,8 @@ export default function LibraryAccountChip() {
         <div className="library-account-chip__menu" role="menu">
           <div className="library-account-chip__menu-note" role="none">
             Account features (sign out, profile) will connect here in a later
-            milestone.
+            milestone. Active account is shown in the top banner.
           </div>
-          {devControls && (
-            <button
-              type="button"
-              className="library-account-chip__menu-item"
-              role="menuitem"
-              onClick={() => {
-                setDevRegisteredUserId(null);
-                setMenuOpen(false);
-              }}
-            >
-              End preview (guest)
-            </button>
-          )}
         </div>
       )}
     </div>

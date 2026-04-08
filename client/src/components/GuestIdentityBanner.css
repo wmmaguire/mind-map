@@ -9,9 +9,26 @@
   font-size: 0.85rem;
   line-height: 1.35;
   color: #f8fafc;
-  background: #1e293b;
   border-bottom: 1px solid #334155;
   z-index: 100;
+}
+
+.guest-identity-banner--guest {
+  background: #1e293b;
+}
+
+.guest-identity-banner--registered {
+  background: #0f172a;
+  border-bottom-color: #14532d;
+}
+
+.guest-identity-banner__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  max-width: 100%;
 }
 
 .guest-identity-banner__label {
@@ -22,7 +39,42 @@
   color: #94a3b8;
 }
 
+.guest-identity-banner__label--registered {
+  color: #86efac;
+}
+
+.guest-identity-banner__active {
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+.guest-identity-banner__active strong {
+  font-weight: 600;
+  color: #fff;
+}
+
 .guest-identity-banner__copy {
   max-width: 52rem;
   text-align: center;
+  color: #cbd5e1;
+}
+
+.guest-identity-banner__dev-btn {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px dashed #64748b;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.guest-identity-banner__dev-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.guest-identity-banner--registered .guest-identity-banner__dev-btn {
+  border-color: #4ade80;
+  color: #bbf7d0;
 }
