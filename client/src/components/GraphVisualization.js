@@ -1867,6 +1867,9 @@ function GraphVisualization({
                       multi-cycle randomized
                     </option>
                   </select>
+                  <span className="graph-action-select-caret" aria-hidden>
+                    ▼
+                  </span>
                 </div>
               </div>
             )}

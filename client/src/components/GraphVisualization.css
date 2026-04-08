@@ -268,6 +268,16 @@ svg {
   -webkit-appearance: none;
 }
 
+.graph-action-select-wrap .graph-action-select-caret {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.95rem;
+  line-height: 1;
+  width: 1.25rem;
+  text-align: right;
+  opacity: 0.95;
+}
+
 .graph-action-select-wrap .graph-action-select:focus {
   outline: none;
 }
