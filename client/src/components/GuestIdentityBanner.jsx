@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IDENTITY_KIND_GUEST,
   useIdentity,
@@ -10,13 +10,8 @@ import './GuestIdentityBanner.css';
 export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
 
 /**
- * Compact shell strip: account mode, optional graph title (from Library), dev preview (#31 / #33).
- *
- * **Future (post-demo):** consolidate identity UI so “who is signed in” and related actions
- * live in one place—similar to the guest branch’s label-styled **`Preview …`** control
- * (`guest-identity-banner__label--action`)—instead of spreading **Signed in**, user id, **End preview**,
- * and the graph title across separate nodes. Likely a single trigger (button or menu) with
- * account summary + sign-out / preview toggles inside.
+ * Shell strip: centered graph title; **account identity and actions** consolidated in the
+ * trailing control (guest preview button or signed-in menu) — #31 / #33.
  */
 export default function GuestIdentityBanner() {
   const {
@@ -33,6 +28,23 @@ export default function GuestIdentityBanner() {
   const isGuest = !isRegistered || identityKind === IDENTITY_KIND_GUEST;
   const showTitle = graphTitle != null && graphTitle !== '';
 
+  const displayId =
+    userId && userId.length > 28 ? `${userId.slice(0, 26)}…` : userId;
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e) => {
+      if (menuWrapRef.current && !menuWrapRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
+
   if (isGuest) {
     return (
       <aside
@@ -41,27 +53,38 @@ export default function GuestIdentityBanner() {
         aria-live="polite"
         aria-label="Account mode"
       >
-        <div className="guest-identity-banner__main">
-          <span className="guest-identity-banner__label">Guest</span>
+        <div className="guest-identity-banner__leading">
+          {!(devControls) && (
+            <span className="guest-identity-banner__label">Guest</span>
+          )}
         </div>
-        {showTitle && (
+        {showTitle ? (
           <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+        ) : (
+          <div
+            className="guest-identity-banner__center-gap"
+            aria-hidden
+          />
         )}
-        {devControls && (
-          <button
-            type="button"
-            className="guest-identity-banner__label guest-identity-banner__label--action"
-            onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
-          >
-            Preview {DEV_PREVIEW_USER_ID}
-          </button>
-        )}
+        <div className="guest-identity-banner__trailing">
+          {devControls && (
+            <button
+              type="button"
+              className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
+              onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
+            >
+              <span className="guest-identity-banner__account-control-primary">
+                Guest
+              </span>
+              <span className="guest-identity-banner__account-control-secondary">
+                Preview {DEV_PREVIEW_USER_ID}
+              </span>
+            </button>
+          )}
+        </div>
       </aside>
     );
   }
-
-  const displayId =
-    userId && userId.length > 28 ? `${userId.slice(0, 26)}…` : userId;
 
   return (
     <aside
@@ -70,31 +93,78 @@ export default function GuestIdentityBanner() {
       aria-live="polite"
       aria-label="Account mode"
     >
-      <div className="guest-identity-banner__main">
-        <span
-          className="guest-identity-banner__label guest-identity-banner__label--registered guest-identity-banner__account-label"
-          title={userId || ''}
-        >
-          <span className="guest-identity-banner__account-label-prefix">
-            Signed in
-          </span>
-          <span className="guest-identity-banner__account-label-id">
-            {displayId || '—'}
-          </span>
-        </span>
-      </div>
-      {showTitle && (
+      <div className="guest-identity-banner__leading" aria-hidden />
+      {showTitle ? (
         <h2 className="guest-identity-banner__graph-title">{graphTitle}</h2>
+      ) : (
+        <div className="guest-identity-banner__center-gap" aria-hidden />
       )}
-      {devControls && (
-        <button
-          type="button"
-          className="guest-identity-banner__label guest-identity-banner__label--action"
-          onClick={() => setDevRegisteredUserId(null)}
-        >
-          End preview
-        </button>
-      )}
+      <div
+        className="guest-identity-banner__trailing"
+        ref={devControls ? menuWrapRef : undefined}
+      >
+        {devControls ? (
+          <>
+            <button
+              type="button"
+              className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <span className="guest-identity-banner__account-control-primary">
+                Signed in
+              </span>
+              <span
+                className="guest-identity-banner__account-control-id"
+                title={userId || ''}
+              >
+                {displayId || '—'}
+              </span>
+              <span className="guest-identity-banner__account-control-chevron" aria-hidden>
+                {menuOpen ? '▴' : '▾'}
+              </span>
+            </button>
+            {menuOpen && (
+              <div className="guest-identity-banner__menu" role="menu">
+                <div className="guest-identity-banner__menu-meta" role="none">
+                  Active account
+                </div>
+                <div
+                  className="guest-identity-banner__menu-id"
+                  role="none"
+                  title={userId || ''}
+                >
+                  {userId || '—'}
+                </div>
+                <button
+                  type="button"
+                  className="guest-identity-banner__menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setDevRegisteredUserId(null);
+                    setMenuOpen(false);
+                  }}
+                >
+                  End preview (guest)
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <span
+            className="guest-identity-banner__account-static"
+            title={userId || ''}
+          >
+            <span className="guest-identity-banner__account-static-prefix">
+              Signed in
+            </span>
+            <span className="guest-identity-banner__account-static-id">
+              {displayId || '—'}
+            </span>
+          </span>
+        )}
+      </div>
     </aside>
   );
 }
