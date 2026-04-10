@@ -933,6 +933,21 @@ svg {
   background: #eef5fc;
 }
 
+.graph-discovery-bar__reset-view {
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #95a5a6;
+  background: #fff;
+  color: #34495e;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.graph-discovery-bar__reset-view:hover {
+  background: #ecf0f1;
+}
+
 .graph-canvas-wrap {
   position: relative;
   flex: 1;
@@ -972,24 +987,24 @@ svg {
    mobile full-screen sidebar (1200) so sidebar-header / close stay tappable. */
 .graph-actions-fab {
   position: fixed;
-  right: max(12px, env(safe-area-inset-right, 0px));
-  top: max(12px, env(safe-area-inset-top, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
+  top: max(8px, env(safe-area-inset-top, 0px));
   z-index: 1190;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  min-height: 48px;
+  gap: 5px;
+  padding: 6px 10px;
+  min-height: 34px;
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: #fff;
   background: linear-gradient(145deg, #4a90e2 0%, #357abd 100%);
   box-shadow:
-    0 4px 14px rgba(74, 144, 226, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.12);
+    0 3px 10px rgba(74, 144, 226, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.1);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1005,7 +1020,7 @@ svg {
 }
 
 .graph-actions-fab-icon {
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1;
   opacity: 0.95;
 }
@@ -1016,7 +1031,7 @@ svg {
 
 @media (max-width: 380px) {
   .graph-actions-fab {
-    padding: 12px 14px;
-    font-size: 14px;
+    padding: 6px 9px;
+    font-size: 12px;
   }
 }

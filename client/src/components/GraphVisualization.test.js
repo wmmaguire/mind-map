@@ -203,6 +203,7 @@ describe('GraphVisualization graph action menu', () => {
     expect(screen.getByTestId('graph-discovery-count')).toHaveTextContent(/0 match/);
     expect(screen.getByTestId('graph-minimap')).toBeInTheDocument();
     expect(screen.getByTestId('graph-discovery-focus')).toBeInTheDocument();
+    expect(screen.getByTestId('graph-discovery-show-all')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('graph-discovery-search'), {
       target: { value: 'one' },

@@ -96,6 +96,9 @@ function GraphVisualization({
   const graphTransformRef = useRef(null);
   const minimapRafRef = useRef(null);
   const minimapSvgRef = useRef(null);
+  /** Skip merge/split while applying programmatic fit (zoom-out would otherwise re-cluster). */
+  const skipZoomClusteringRef = useRef(false);
+  const resetCanvasViewRef = useRef(null);
 
   const { sessionId } = useSession();
   const sessionIdRef = useRef(sessionId);
@@ -510,27 +513,27 @@ function GraphVisualization({
           currentCommunities: communitiesRef.current?.size || 0
         });
 
-        // Check if we should merge or split
-        if (currentZoom < mergeThresholdRef.current) {
-          console.log('Attempting merge with', communitiesRef.current.size, 'communities');
-          const newCommunities = mergeCommunities(communitiesRef.current);
-          if (newCommunities !== communitiesRef.current) {
-            communitiesRef.current = newCommunities;
-            updateVisualization();
-            // Update merge threshold based on current zoom
+        // Check if we should merge or split (skipped during programmatic "Show all" fit)
+        if (!skipZoomClusteringRef.current) {
+          if (currentZoom < mergeThresholdRef.current) {
+            console.log('Attempting merge with', communitiesRef.current.size, 'communities');
+            const newCommunities = mergeCommunities(communitiesRef.current);
+            if (newCommunities !== communitiesRef.current) {
+              communitiesRef.current = newCommunities;
+              updateVisualization();
+            }
+            mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
+            splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
+          } else if (currentZoom > splitThresholdRef.current) {
+            console.log('Attempting split with', communitiesRef.current.size, 'communities');
+            const newCommunities = splitCommunities(communitiesRef.current);
+            if (newCommunities !== communitiesRef.current) {
+              communitiesRef.current = newCommunities;
+              updateVisualization();
+            }
+            mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
+            splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
           }
-          mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
-          splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
-        } else if (currentZoom > splitThresholdRef.current) {
-          console.log('Attempting split with', communitiesRef.current.size, 'communities');
-          const newCommunities = splitCommunities(communitiesRef.current);
-          if (newCommunities !== communitiesRef.current) {
-            communitiesRef.current = newCommunities;
-            updateVisualization();
-            // Update split threshold based on current zoom
-          }
-          mergeThresholdRef.current = Math.min(currentZoom * MERGE_THRESHOLD, 0.8);
-          splitThresholdRef.current = currentZoom / MERGE_THRESHOLD;
         }
 
         // Update positions and visuals based on current communities
@@ -1462,6 +1465,85 @@ function GraphVisualization({
       simulation.alpha(0.3).restart();
     };
 
+    function resetCanvasToFullView() {
+      if (!svgRef.current || !data?.nodes?.length) return;
+      communitiesRef.current = initializeCommunities();
+      mergeThresholdRef.current = 0.8;
+      splitThresholdRef.current = 1.2;
+      previousZoomRef.current = 1;
+      updateVisualization();
+      updateHighlighting();
+
+      const syncThresholdsAfterFit = () => {
+        const k = graphTransformRef.current?.k ?? 1;
+        mergeThresholdRef.current = Math.min(k * MERGE_THRESHOLD, 0.8);
+        splitThresholdRef.current = k / MERGE_THRESHOLD;
+        previousZoomRef.current = k;
+      };
+
+      const pad = 40;
+      const w = width;
+      const h = height;
+
+      const runFit = () => {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        const communities = communitiesRef.current;
+        if (communities?.size) {
+          communities.forEach(c => {
+            if (c.x == null || c.y == null) return;
+            minX = Math.min(minX, c.x);
+            minY = Math.min(minY, c.y);
+            maxX = Math.max(maxX, c.x);
+            maxY = Math.max(maxY, c.y);
+          });
+        }
+        if (!Number.isFinite(minX)) {
+          data.nodes.forEach(n => {
+            if (n.x == null || n.y == null) return;
+            minX = Math.min(minX, n.x);
+            minY = Math.min(minY, n.y);
+            maxX = Math.max(maxX, n.x);
+            maxY = Math.max(maxY, n.y);
+          });
+        }
+
+        const applyTransform = (t) => {
+          skipZoomClusteringRef.current = true;
+          d3.select(svgRef.current)
+            .transition()
+            .duration(450)
+            .call(zoom.transform, t)
+            .on('end', () => {
+              skipZoomClusteringRef.current = false;
+              syncThresholdsAfterFit();
+            });
+          graphTransformRef.current = t;
+          updateMinimapRef.current?.();
+        };
+
+        if (!Number.isFinite(minX)) {
+          applyTransform(d3.zoomIdentity);
+          return;
+        }
+        const gw = Math.max(maxX - minX, 1);
+        const gh = Math.max(maxY - minY, 1);
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const k = Math.min((w - 2 * pad) / gw, (h - 2 * pad) / gh, 4);
+        const kClamped = Math.max(0.1, Math.min(4, k));
+        const tx = w / 2 - kClamped * cx;
+        const ty = h / 2 - kClamped * cy;
+        applyTransform(d3.zoomIdentity.translate(tx, ty).scale(kClamped));
+      };
+
+      window.setTimeout(runFit, 120);
+    }
+
+    resetCanvasViewRef.current = resetCanvasToFullView;
+
     // Cleanup
     return () => {
       if (minimapRafRef.current) {
@@ -1473,6 +1555,7 @@ function GraphVisualization({
       zoomBehaviorRef.current = null;
       updateHighlightingRef.current = null;
       updateMinimapRef.current = null;
+      resetCanvasViewRef.current = null;
     };
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
@@ -2067,6 +2150,16 @@ function GraphVisualization({
           onClick={() => focusNextDiscoveryMatch()}
         >
           Focus next
+        </button>
+        <button
+          type="button"
+          className="graph-discovery-bar__reset-view"
+          data-testid="graph-discovery-show-all"
+          onClick={() => resetCanvasViewRef.current?.()}
+          title="Zoom to fit all nodes and show each concept (no clusters)"
+          aria-label="Show all nodes: zoom to fit and ungroup clusters"
+        >
+          Show all
         </button>
       </div>
 
