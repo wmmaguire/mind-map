@@ -169,11 +169,11 @@ Refs: #62 #37 #24 #50 #57 #56
 
 **Note:** Client **#35** (branch **`issue-35-fileupload-audio-recorder`**, tip **`0d6d47d`**) — **`FileUpload`** **Audio → transcript**: sub-tabs **Upload file** | **Record** (`getUserMedia`, **`MediaRecorder`**, preview, discard / record again), **`utils/audioRecording.js`** (25 MB preflight). Depends on **#34**. **#58** adds optional segment timings UI (checkbox + **details**). **Out of scope:** **#24** (Playwright/Cypress with mic + verbose path), Safari **`webm`** interop hardening, optional waveform UI, integration test mocking **`MediaRecorder`**, a11y polish for segment list (**#57**-related).
 
-**Note:** Client **#21** — namespaced **union** of per-file analyze graphs (`client/src/utils/mergeGraphs.js`); merged view is disjoint subgraphs by default.
+**Note:** Client **#21** — namespaced **union** of per-file analyze graphs (`client/src/utils/mergeGraphs.js`); merged view is disjoint subgraphs by default. **`mergeAnalyzedGraphs`** assigns **one shared `createdAt` / `timestamp`** per **Apply** for all merged nodes and links (playback **#36**). Per-entity chronology from source text is **#72**.
 
-**Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics.
+**Note:** **#47** — optional **fusion** into one fully connected graph and **splitting** large graphs (topics, communities, size, etc.); builds on **#21** union semantics. **#72** may inform how time-ordered or fused graphs set **`createdAt`**.
 
-**Note:** **#48** — **batch analyze** resilience (partial failures, per-file status, retry vs **#22** general error handling).
+**Note:** **#48** — **batch analyze** resilience (partial failures, per-file status, retry vs **#22** general error handling). **Update:** Library analyze still uses **`Promise.all`** — one failed file fails the whole batch; partial success remains backlog here.
 
 **Note:** Client **#22** (merged on branch `issue-22-unify-loading-errors`) adds **`client/src/api/http.js`** — `apiRequest()`, `ApiError`, `getApiErrorMessage()`, `isNetworkError()` — so all prior `fetch('/api/...')` call sites share **`apiUrl()`** from `config.js` and consistent JSON error bodies. Jest tests: **`client/src/api/http.test.js`**. This addresses **transport-level** loading/error consistency; UI-level work is tracked separately.
 
@@ -255,5 +255,61 @@ These are tracked as **separate GitHub issues**:
 | **#64** | **JWT-verified owner for library APIs** — derive **`userId`** from **`mindmap_auth`** (or verify **`X-Mindmap-User-Id`** against **`jwt.sub`**) instead of trusting the header alone. |
 | **#65** | **Gate legacy unscoped `GET /api/files`** — unscoped handler still enumerates **`metadata/`**; disable or require admin in production. |
 | **#66** | **Authorize `POST /api/analyze`** — ensure **`sourceFiles`** / content cannot be analyzed from another user’s uploads without ownership. |
+| **#72** | **Analyze — text-derived chronology for playback** — distinct **`createdAt` / `timestamp`** per node/link from extracted text order or dates; complements batch timestamp today. See *Suggested backlog issue #72* below. |
 
 *Issue numbers are from the batch created in-repo (March 2026); adjust if yours differ.*
+
+### Suggested backlog issue #72 (create on GitHub if not filed)
+
+**Title:** `Backlog: Analyze — text-derived chronology for playback (per-entity createdAt)`
+
+**Body:**
+
+```markdown
+## Context
+Library **Apply** assigns one **batch** `createdAt`/`timestamp` to every node/link from `mergeAnalyzedGraphs` so **#36** treats the whole text-import as one playback step.
+
+## Scope (future)
+- Extract dates or narrative order from source text (or model-returned fields) and map to **distinct** playback times per node/link.
+- Coordinate with **#70** / **#71** if server-persisted revisions validate timestamps.
+
+## Related follow-ups (outside analyze quality slice)
+- **Performance:** parallelize or cache Wikipedia **repairAnalyzeGraphWikiUrls** HTTP work (sequential per node today).
+- **Parity:** optional second-pass **relationship synthesis** for **`POST /api/analyze`** (like generate-node) — product decision.
+
+Refs: #21 #36 #47 #48 #66 #70 #71
+```
+
+### Suggested GitHub issue comments (analyze / guidance / playback, Apr 2026)
+
+Paste into GitHub as needed:
+
+**On #21 — comment body:**
+
+```markdown
+**Update (Apr 2026):** `mergeAnalyzedGraphs` still namespaces ids per file; it now sets **one shared `createdAt`/`timestamp`** per **Apply** for all merged entities. Optional **#47** fusion remains separate. **#72** tracks **per-entity** times from text later.
+```
+
+**On #36 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Text-from-library analyze uses a **single playback time** for the whole batch (one scrubber step per Apply). **#72** covers **ordering inside** a batch from text-derived chronology.
+```
+
+**On #48 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Analyze still uses `Promise.all` — one failed file fails the whole batch; partial success / per-file status remains in scope for this issue.
+```
+
+**On #66 — comment body:**
+
+```markdown
+**Update (Apr 2026):** `POST /api/analyze` still relies on session + file resolution; verify **mindmap_auth** / ownership vs **X-Mindmap-User-Id** for production hardening remains open (**#64** related).
+```
+
+**On #47 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Disjoint union + shared batch timestamp unchanged; **#72** may inform fused or time-ordered graphs and `createdAt` assignment.
+```

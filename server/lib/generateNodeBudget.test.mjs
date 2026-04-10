@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validateGenerateNodeRequest,
-  buildGenerateNodeDryRunPreview
+  buildGenerateNodeDryRunPreview,
+  MAX_GENERATION_CONTEXT_CHARS
 } from './generateNodeBudget.js';
 
 test('validateGenerateNodeRequest rejects empty selectedNodes', () => {
@@ -31,6 +32,55 @@ test('validateGenerateNodeRequest defaults numNodes to 3', () => {
   });
   assert.equal(r.ok, true);
   assert.equal(r.numNodes, 3);
+  assert.ok(Array.isArray(r.existingGraphNodes));
+  assert.equal(r.existingGraphNodes.length, 0);
+});
+
+test('validateGenerateNodeRequest rejects invalid existingGraphNodes', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    existingGraphNodes: 'bad'
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'INVALID_EXISTING_GRAPH_NODES');
+});
+
+test('validateGenerateNodeRequest accepts existingGraphNodes', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    existingGraphNodes: [
+      { id: '1', label: 'One', description: 'd', wikiUrl: 'https://en.wikipedia.org/wiki/X' }
+    ]
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.existingGraphNodes.length, 1);
+});
+
+test('validateGenerateNodeRequest accepts generationContext', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    generationContext: ' Prefer short labels. '
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.generationContext, 'Prefer short labels.');
+});
+
+test('validateGenerateNodeRequest rejects generationContext too long', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    generationContext: 'x'.repeat(MAX_GENERATION_CONTEXT_CHARS + 1)
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'GENERATION_CONTEXT_TOO_LONG');
+});
+
+test('validateGenerateNodeRequest rejects non-string generationContext', () => {
+  const r = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    generationContext: 123
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'INVALID_GENERATION_CONTEXT');
 });
 
 test('validateGenerateNodeRequest enforces max new nodes', () => {

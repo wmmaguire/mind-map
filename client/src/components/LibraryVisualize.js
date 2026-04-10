@@ -27,6 +27,8 @@ import {
   mergePlaybackTimesFromEdit,
 } from '../utils/graphPlayback';
 import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
+import { resolveGenerationContext } from '../utils/generationGuidance';
+import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './LibraryVisualize.css';
 
 const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
@@ -101,7 +103,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [graphName, setGraphName] = useState('');
   const [graphDescription, setGraphDescription] = useState('');
   const [showContextModal, setShowContextModal] = useState(false);
-  const [additionalContext, setAdditionalContext] = useState('');
+  const [analysisGuidancePreset, setAnalysisGuidancePreset] = useState('none');
+  const [analysisGuidanceCustomText, setAnalysisGuidanceCustomText] =
+    useState('');
   const [showSidebar, setShowSidebar] = useState(false);
 
   const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
@@ -738,13 +742,23 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     } finally {
       setAnalyzing(false);
       setShowContextModal(false);
-      setAdditionalContext('');
+      setAnalysisGuidancePreset('none');
+      setAnalysisGuidanceCustomText('');
     }
   };
 
   const handleAnalyzeClick = () => {
     if (selectedFiles.size === 0) return;
     setShowContextModal(true);
+  };
+
+  const handleAnalyzeWithGuidance = () => {
+    handleAnalyzeMultiple(
+      resolveGenerationContext(
+        analysisGuidancePreset,
+        analysisGuidanceCustomText
+      )
+    );
   };
 
   const handleGraphDataUpdate = useCallback(
@@ -870,8 +884,14 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           onDeleteSelected: handleDeleteSelected,
           onFileSelect: handleFileSelect,
           onFileListKeyDown: handleFileListKeyDown,
-          onAnalyzeClick: handleAnalyzeClick,
-          onLoadGraph: handleLoadGraph,
+          onAnalyzeClick: () => {
+            if (isMobile) setShowSidebar(false);
+            handleAnalyzeClick();
+          },
+          onLoadGraph: filename => {
+            if (isMobile) setShowSidebar(false);
+            void handleLoadGraph(filename);
+          },
           shareViewerMode,
         }}
       />
@@ -1010,7 +1030,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         <div className="modal-overlay" onClick={() => !analyzing && setShowContextModal(false)}>
           <div className="save-dialog" onClick={e => e.stopPropagation()}>
             <div className="save-dialog-header">
-              <h3>Add Analysis Context</h3>
+              <h3>Generate Graph</h3>
               {!analyzing && (
                 <button 
                   className="close-button" 
@@ -1023,17 +1043,20 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
             </div>
 
             <div className="save-dialog-content">
-              <div className="form-group">
-                <label htmlFor="analysisContext">Additional Context (Optional)</label>
-                <textarea
-                  id="analysisContext"
-                  value={additionalContext}
-                  onChange={(e) => setAdditionalContext(e.target.value)}
-                  placeholder="Enter any additional context to guide the analysis..."
-                  rows="4"
-                  disabled={analyzing}
-                />
-              </div>
+              <GenerationGuidanceFields
+                idPrefix="analysis-guidance"
+                preset={analysisGuidancePreset}
+                onPresetChange={setAnalysisGuidancePreset}
+                customText={analysisGuidanceCustomText}
+                onCustomTextChange={setAnalysisGuidanceCustomText}
+                disabled={analyzing}
+                helpText={
+                  <>
+                    Applies when analyzing your files into a graph. Presets send fixed
+                    instructions; Custom uses your text. Max 2000 characters for custom.
+                  </>
+                }
+              />
 
               <div className="graph-metadata">
                 <h4>Analysis Details</h4>
@@ -1048,15 +1071,8 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
             <div className="save-dialog-footer">
               <div className="dialog-buttons">
-                <button 
-                  onClick={() => handleAnalyzeMultiple()}
-                  className="cancel-button"
-                  disabled={analyzing}
-                >
-                  Skip Context
-                </button>
                 <button
-                  onClick={() => handleAnalyzeMultiple(additionalContext)}
+                  onClick={handleAnalyzeWithGuidance}
                   className={`save-button ${analyzing ? 'loading' : ''}`}
                   disabled={analyzing}
                 >
@@ -1065,7 +1081,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
                       <span className="spinner"></span>
                       Analyzing...
                     </>
-                  ) : 'Analyze with Context'}
+                  ) : (
+                    'Apply'
+                  )}
                 </button>
               </div>
             </div>

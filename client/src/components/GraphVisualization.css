@@ -652,6 +652,8 @@ svg {
   cursor: not-allowed;
 }
 
+/* Guidance preset UI: client/src/components/GenerationGuidanceFields.css */
+
 .graph-generate-form-error {
   font-size: 0.88rem;
   color: #b91c1c;
@@ -766,6 +768,7 @@ svg {
 }
 
 .form-group input,
+.form-group select,
 .form-group textarea {
   width: 100%;
   padding: 10px;
@@ -776,6 +779,7 @@ svg {
 }
 
 .form-group input:focus,
+.form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #4a90e2;

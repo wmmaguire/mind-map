@@ -5,6 +5,9 @@
 const DEFAULT_MAX_EXPANSION_CYCLES = 10;
 const DEFAULT_MAX_CONNECTIONS_PER_NEW_NODE = 12;
 
+/** Optional user guidance string on POST /api/generate-node (step 1 + step 2 prompts). */
+export const MAX_GENERATION_CONTEXT_CHARS = 2000;
+
 export function getRandomizedExpansionCaps() {
   const maxCycles = clampInt(
     process.env.GENERATE_NODE_MAX_EXPANSION_CYCLES,
@@ -63,6 +66,78 @@ export function validateGenerateNodeRequest(body) {
     body.dryRun === 1 ||
     body.dryRun === '1' ||
     body.dryRun === 'true';
+
+  let existingGraphNodes = [];
+  if (body.existingGraphNodes !== undefined && body.existingGraphNodes !== null) {
+    if (!Array.isArray(body.existingGraphNodes)) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'INVALID_EXISTING_GRAPH_NODES',
+        error: 'existingGraphNodes must be an array'
+      };
+    }
+    if (body.existingGraphNodes.length > 2000) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'EXISTING_GRAPH_NODES_TOO_LARGE',
+        error: 'existingGraphNodes cannot exceed 2000 entries',
+        details: { max: 2000 }
+      };
+    }
+    for (let i = 0; i < body.existingGraphNodes.length; i += 1) {
+      const n = body.existingGraphNodes[i];
+      if (!n || typeof n !== 'object') {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_EXISTING_GRAPH_NODE',
+          error: `existingGraphNodes[${i}] must be an object`
+        };
+      }
+      if (n.id === undefined || n.id === null) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_EXISTING_GRAPH_NODE',
+          error: `existingGraphNodes[${i}] must have an id`
+        };
+      }
+      if (typeof n.label !== 'string') {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_EXISTING_GRAPH_NODE',
+          error: `existingGraphNodes[${i}] must have a string label`
+        };
+      }
+    }
+    existingGraphNodes = body.existingGraphNodes;
+  }
+
+  let generationContext = '';
+  if (body.generationContext !== undefined && body.generationContext !== null) {
+    if (typeof body.generationContext !== 'string') {
+      return {
+        ok: false,
+        status: 400,
+        code: 'INVALID_GENERATION_CONTEXT',
+        error: 'generationContext must be a string'
+      };
+    }
+    const trimmed = body.generationContext.trim();
+    if (trimmed.length > MAX_GENERATION_CONTEXT_CHARS) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'GENERATION_CONTEXT_TOO_LONG',
+        error: `generationContext cannot exceed ${MAX_GENERATION_CONTEXT_CHARS} characters`,
+        details: { max: MAX_GENERATION_CONTEXT_CHARS }
+      };
+    }
+    generationContext = trimmed;
+  }
 
   const expansionAlgorithm =
     body.expansionAlgorithm === 'randomizedGrowth'
@@ -223,6 +298,8 @@ export function validateGenerateNodeRequest(body) {
     selectedNodes,
     caps,
     expansionAlgorithm,
+    existingGraphNodes,
+    generationContext,
     ...(expansionAlgorithm === 'randomizedGrowth'
       ? {
           connectionsPerNewNode,
@@ -242,6 +319,8 @@ export function buildGenerateNodeDryRunPreview(v) {
     const cpn = v.connectionsPerNewNode;
     const expCaps = getRandomizedExpansionCaps();
     return {
+      generationContextIncluded: Boolean(v.generationContext),
+      generationContextMaxChars: MAX_GENERATION_CONTEXT_CHARS,
       expansionAlgorithm: 'randomizedGrowth',
       numNodesPerCycle: numNodes,
       numCycles: nc,
@@ -261,6 +340,8 @@ export function buildGenerateNodeDryRunPreview(v) {
   }
 
   return {
+    generationContextIncluded: Boolean(v.generationContext),
+    generationContextMaxChars: MAX_GENERATION_CONTEXT_CHARS,
     expansionAlgorithm: 'manual',
     numNodes,
     selectedCount,

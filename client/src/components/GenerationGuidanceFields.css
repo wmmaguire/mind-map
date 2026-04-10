@@ -1,0 +1,21 @@
+/* Shared with AI Generate modal and Library analyze context modal */
+.graph-generate-guidance {
+  margin-top: 12px;
+}
+
+.graph-generate-guidance__hint {
+  font-weight: normal;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.graph-generate-guidance__meta {
+  font-size: 0.82rem;
+  color: #555;
+  margin: 6px 0 0;
+  line-height: 1.35;
+}
+
+.graph-generate-guidance__custom {
+  margin-top: 10px;
+}

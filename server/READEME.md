@@ -44,6 +44,10 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
 
 - **`GENERATE_NODE_MAX_NEW_NODES`** / **`GENERATE_NODE_MAX_SELECTED`**: optional caps for **`POST /api/generate-node`** (defaults **5** / **12**; GitHub **#37**).
 
+- **`GENERATE_NODE_RELATIONSHIP_SYNTHESIS`**: optional; set **`0`** / **`false`** / **`off`** to **skip** the second OpenAI pass that rewrites link labels (cheaper; keeps first-pass relationship text). Default: on.
+
+- **`OPENAI_RELATIONSHIP_SYNTHESIS_MODEL`**: optional; model id for that second pass only (default **`gpt-4o-mini`**). The first generate pass still uses **`OPENAI_ANALYZE_MODEL`**.
+
 - **`OPENAI_TRANSCRIBE_MODEL`**: optional; Whisper model id for `POST /api/transcribe` (default **`whisper-1`**). Same **`OPENAI_API_KEY`** as other OpenAI calls (GitHub **#34**).
 
 **Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
@@ -218,15 +222,18 @@ Relevant code:
 5. Server calls OpenAI Chat Completions (model from **`OPENAI_ANALYZE_MODEL`**, default **`gpt-4o`**) and **expects JSON** with:
    - `nodes[]` (concept nodes: id, label, description, wikiUrl, etc.)
    - `links[]` (relationships: source, target, relationship)
+   - Prompting is **aligned with generate-node** where practical: structured system rules; optional **`context`** is framed as **USER GUIDANCE** (tone/voice for descriptions and relationship strings when present); **connectivity** is softened (prefer a coherent cluster; avoid weak edges that only exist to connect unrelated concepts); **`temperature`** is **`0.35`** without guidance and **`0.48`** with guidance; **`max_tokens`** is **`4096`**. (Generate-node retains its own topology rules and optional relationship-synthesis pass.)
 6. Server parses the reply with the same helper used for generate-node: strips common markdown code fences, extracts a `{ ... }` object, then validates `nodes` and `links` arrays.
-7. On success, server updates `GraphTransform` with `result`, marks it `completed`, writes `UserActivity` **`ANALYZE_COMPLETE`** **`SUCCESS`**, then returns the graph JSON. On failure (OpenAI **429** / **401**, parse errors, etc.), returns a non-2xx JSON body with `details` and `code` (e.g. `OPENAI_QUOTA`, `ANALYSIS_FAILED`), marks the transform `failed`, and writes **`ANALYZE_COMPLETE`** **`FAILURE`** when a transform record exists.
+7. **Wikipedia URL repair:** After parse, **`repairAnalyzeGraphWikiUrls`** (`server/lib/repairAnalyzeGraphWikiUrls.js`) normalizes English Wikipedia URLs, validates via the REST **page/summary** API, and on failure tries **opensearch** from the node **label** (tests: **`lib/repairAnalyzeGraphWikiUrls.test.mjs`**). Errors during repair are logged; the response still returns the graph. Repair performs **sequential** HTTP work per node (see backlog in **`docs/github-backlog-issues.md`**).
+8. On success, server updates `GraphTransform` with `result`, marks it `completed`, writes `UserActivity` **`ANALYZE_COMPLETE`** **`SUCCESS`**, then returns the graph JSON. On failure (OpenAI **429** / **401**, parse errors, etc.), returns a non-2xx JSON body with `details` and `code` (e.g. `OPENAI_QUOTA`, `ANALYSIS_FAILED`), marks the transform `failed`, and writes **`ANALYZE_COMPLETE`** **`FAILURE`** when a transform record exists.
 
 Relevant code:
 
 - `server/server.js` (`/api/analyze`)
 - `server/models/graphTransform.js`
+- `server/lib/repairAnalyzeGraphWikiUrls.js` (normalize + validate/repair **`wikiUrl`**)
 
-**Multi-select uploads (library UI):** The client may call **`POST /api/analyze` once per selected file** (one `GraphTransform` per request). For visualization it merges responses in the browser with **namespaced node ids** so OpenAI-local ids do not collide across files — see **`client/src/utils/mergeGraphs.js`** and **`client/README.md`** (GitHub **#21**). The merged graph is a **disjoint union** of per-file subgraphs unless/until optional **fusion** or **split** features land (**#47**).
+**Multi-select uploads (library UI):** The client may call **`POST /api/analyze` once per selected file** (one `GraphTransform` per request). For visualization it merges responses in the browser with **namespaced node ids** so OpenAI-local ids do not collide across files — see **`client/src/utils/mergeGraphs.js`** and **`client/README.md`** (GitHub **#21**). The merged graph is a **disjoint union** of per-file subgraphs unless/until optional **fusion** or **split** features land (**#47**). After merge, the client assigns **one shared playback timestamp** (`createdAt` / `timestamp`) to **every** node and link produced in that **Apply** run so **#36** replay treats the batch as a single step; future **text-derived ordering** within a batch is backlog **#72** (`docs/github-backlog-issues.md`).
 
 **Persistence matrix (audit vs domain):**
 
@@ -246,18 +253,20 @@ Relevant code:
 
 **Goal**: expand an existing graph by adding new nodes + links connected to selected nodes.
 
-1. Client sends `POST /api/generate-node` with **`selectedNodes`** (non-empty array, each with **`id`**) and optional **`numNodes`** (default **3**). **Growth budgets (GitHub #37):** **`GENERATE_NODE_MAX_NEW_NODES`** (default **5**) and **`GENERATE_NODE_MAX_SELECTED`** (default **12**) cap request size. Invalid requests return **400** with **`code`** such as **`MISSING_SELECTED_NODES`**, **`TOO_MANY_SELECTED`**, **`NUM_NODES_OVER_CAP`**, etc.
-2. **Dry run:** JSON body **`dryRun: true`** skips OpenAI and returns **`{ success: true, dryRun: true, preview: { numNodes, selectedCount, estimatedNewLinks, caps } }`** so the UI can show a **preview/apply** round without spending tokens.
-3. Otherwise server prompts OpenAI (same **`OPENAI_ANALYZE_MODEL`** / default **`gpt-4o`** as analyze) to return JSON with `nodes` and `links`.
+1. Client sends `POST /api/generate-node` with **`selectedNodes`** (non-empty array, each with **`id`**) and optional **`numNodes`** (default **3**). Optional **`generationContext`** (string, max **2000** characters after trim) is injected into the **first** and **second** OpenAI prompts as user guidance (must not override required IDs or connectivity). **Growth budgets (GitHub #37):** **`GENERATE_NODE_MAX_NEW_NODES`** (default **5**) and **`GENERATE_NODE_MAX_SELECTED`** (default **12**) cap request size. Invalid requests return **400** with **`code`** such as **`MISSING_SELECTED_NODES`**, **`TOO_MANY_SELECTED`**, **`NUM_NODES_OVER_CAP`**, **`GENERATION_CONTEXT_TOO_LONG`**, etc.
+2. **Dry run:** JSON body **`dryRun: true`** skips OpenAI and returns **`{ success: true, dryRun: true, preview: { …, generationContextIncluded, generationContextMaxChars, … } }`** so the UI can show a **preview/apply** round without spending tokens.
+3. Otherwise the server runs the **first** OpenAI completion (**`OPENAI_ANALYZE_MODEL`**, default **`gpt-4o`**) and expects JSON with `nodes` and `links`.
 4. Server parses the assistant message with **`parseGraphJsonFromCompletion`** (markdown code fences, stray prose, and `{ ... }` extraction—same as **`/api/analyze`**). If parsing or shape checks fail, responds with **502** and `code: INVALID_MODEL_JSON`.
-5. Server validates graph semantics (connectivity of new nodes to all selected nodes). On validation failure, responds with **200** and `{ success: false, error, details }` (legacy shape for this endpoint).
-6. On OpenAI HTTP errors, responds with **429** / **401** and `code` **`OPENAI_QUOTA`** / **`OPENAI_AUTH`** (same semantics as analyze).
-7. On other failures, **500** with `code: GENERATE_NODE_FAILED` when appropriate.
+5. Server validates new node labels vs **`existingGraphNodes`**, assigns timestamps, then validates topology. **Manual:** **`normalizeManualExpansionLinks`** keeps only edges between a new node and a **highlighted** anchor (drops extra model edges to other nodes), accepts **new→anchor** or **anchor→new**, then checks full connectivity. **Randomized:** **`buildRandomExpansionLinks`**. On validation failure, responds with **200** and `{ success: false, error, details }` where applicable.
+6. **Optional second pass** — relationship label rewrite (env **`GENERATE_NODE_RELATIONSHIP_SYNTHESIS`**, **`OPENAI_RELATIONSHIP_SYNTHESIS_MODEL`**): Wikipedia extracts are fetched **in parallel**, then a **smaller default model** (**`gpt-4o-mini`**) rewrites link `relationship` strings. Set **`GENERATE_NODE_RELATIONSHIP_SYNTHESIS=off`** to skip (cheaper; keeps step 3 link text).
+7. On OpenAI HTTP errors, responds with **429** / **401** and `code` **`OPENAI_QUOTA`** / **`OPENAI_AUTH`** (same semantics as analyze).
+8. On other failures, **500** with `code: GENERATE_NODE_FAILED` when appropriate.
 
 Relevant code:
 
 - `server/server.js` (`/api/generate-node`)
 - `server/lib/generateNodeBudget.js` (validation + dry-run preview; tests: **`lib/generateNodeBudget.test.mjs`**)
+- `server/lib/relationshipSynthesisConfig.js`, **`synthesizeLinkRelationships.js`**, **`wikipediaExtract.js`**, **`manualExpansionLinks.js`**
 
 ### 6) Save/load graphs (filesystem + MongoDB)
 

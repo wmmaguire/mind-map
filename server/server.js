@@ -23,6 +23,17 @@ import {
   buildGenerateNodeDryRunPreview
 } from './lib/generateNodeBudget.js';
 import { buildRandomExpansionLinks } from './lib/randomExpansionLinks.js';
+import { fetchWikipediaExtract, normalizeConceptLabel } from './lib/wikipediaExtract.js';
+import {
+  synthesizeLinkRelationships,
+  buildNodeLookupMap
+} from './lib/synthesizeLinkRelationships.js';
+import {
+  isRelationshipSynthesisEnabled,
+  getRelationshipSynthesisModel
+} from './lib/relationshipSynthesisConfig.js';
+import { normalizeManualExpansionLinks } from './lib/manualExpansionLinks.js';
+import { repairAnalyzeGraphWikiUrls } from './lib/repairAnalyzeGraphWikiUrls.js';
 import {
   dataDir,
   uploadsDir,
@@ -256,55 +267,85 @@ app.post('/api/analyze', async (req, res) => {
       console.log('Additional context provided:', context);
     }
 
+    const hasAnalyzeGuidance =
+      typeof context === 'string' && context.trim().length > 0;
+
+    const analyzeGuidanceBlock = hasAnalyzeGuidance
+      ? `
+      USER GUIDANCE — TONE AND VOICE (apply to every node's description and every relationship string; keep claims grounded in the source text—do not invent facts):
+      ${context.trim()}
+
+      Reflect this guidance in how you write: descriptions and relationship labels should match the requested tone when applicable. Avoid generic neutral wording when a different voice is requested.
+      `
+      : '';
+
+    const analyzeGuidanceBullet = hasAnalyzeGuidance
+      ? `- USER GUIDANCE is active: make tone visible in every "description" and every "relationship" field where it fits (still factual; do not invent information).\n      `
+      : '';
+
     const prompt = `
       Analyze the following content and return a JSON object containing:
       1. nodes: An array of objects, each representing a key concept with properties:
-         - id: unique identifier
+         - id: unique string identifier (stable within this response)
          - label: name of the concept
-         - description: brief explanation
-         - wikiUrl: URL of the Wikipedia page for the concept
+         - description: brief explanation grounded in the source text
+         - wikiUrl: English Wikipedia article URL (https://en.wikipedia.org/wiki/...)
       2. links: An array of objects representing relationships between nodes with properties:
          - source: id of the source node
          - target: id of the target node
-         - relationship: description of how these concepts are related
-      
+         - relationship: specific description of how these concepts are related (not generic filler)
+
+      ${analyzeGuidanceBlock}
       Rules for generating the graph:
-      1. Every node MUST have a wikiUrl
-      2. All wikiUrl values must be valid Wikipedia URLs
-      3. The wikiUrl should be as relevant as possible to the concept
-      4. The graph should be fully connected
-      5. The graph should be as accurate as possible, based on the content provided
-      6. All Additional Context MUST be applied to the content during analysis
-
-
-      Please ensure the response is valid JSON and includes at least 5-10 key concepts and their relationships.
+      1. Every node MUST have a wikiUrl pointing to a relevant English Wikipedia article when one exists; use the closest sensible article for the concept.
+      2. All wikiUrl values MUST use the form https://en.wikipedia.org/wiki/... with an accurate article title for the label.
+      3. The graph should be as accurate as possible and justified by the content provided.
+      4. Connectivity: prefer one main connected cluster that reflects how the ideas in the text relate; do NOT force weak, redundant, or tangential edges only to link unrelated topics. It is acceptable to omit edges that would be guesses.
+      5. Relationship strings must be substantive (not bare "is related to").
+      ${analyzeGuidanceBullet}
+      Please ensure the response is valid JSON with at least 5–10 key concepts when the content supports that many.
 
       Content to analyze:
       ${content}
-
-      ${context ? `Additional Context:\n${context}\n` : ''}
     `;
 
     const analyzeModel = process.env.OPENAI_ANALYZE_MODEL || 'gpt-4o';
+
+    const analyzeSystemMessage = `You are a knowledgeable assistant that builds a knowledge graph from text. Return only valid JSON: a single object with "nodes" and "links" arrays. No markdown code fences, no commentary before or after the JSON.
+
+Rules:
+1. Use exact property names: nodes[].id, nodes[].label, nodes[].description, nodes[].wikiUrl, links[].source, links[].target, links[].relationship.
+2. Ground concepts and edges in the provided content; do not invent facts not supported by the text.
+3. Prefer meaningful English Wikipedia URLs (https://en.wikipedia.org/wiki/...) that match each node's label.${
+      hasAnalyzeGuidance
+        ? `
+4. If the user message includes USER GUIDANCE, apply it to the tone and phrasing of every node description and every relationship string while staying factual.`
+        : ''
+    }`;
 
     const completion = await openai.chat.completions.create({
       model: analyzeModel,
       messages: [
         {
-          role: "system",
-          content: "You are a helpful assistant that analyzes text and identifies key concepts and their relationships. Return only valid JSON without any additional text."
+          role: 'system',
+          content: analyzeSystemMessage
         },
         {
-          role: "user",
+          role: 'user',
           content: prompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: hasAnalyzeGuidance ? 0.48 : 0.35,
+      max_tokens: 4096
     });
 
     const rawMessage = completion.choices[0]?.message?.content;
-    const graphData = parseGraphJsonFromCompletion(rawMessage);
+    let graphData = parseGraphJsonFromCompletion(rawMessage);
+    try {
+      graphData = await repairAnalyzeGraphWikiUrls(graphData, globalThis.fetch);
+    } catch (repairErr) {
+      console.error('repairAnalyzeGraphWikiUrls failed:', repairErr);
+    }
     console.log('Analysis completed successfully');
 
     graphTransform.result = graphData;
@@ -373,6 +414,79 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+async function wikiAnchorLinesForNodes(nodes) {
+  const list = Array.isArray(nodes) ? nodes.slice(0, 16) : [];
+  const parts = await Promise.all(
+    list.map(async n => {
+      const label = n.label || String(n.id);
+      const url = n.wikiUrl || n.wikipediaUrl;
+      const desc = (n.description || '').slice(0, 280);
+      if (!url || typeof url !== 'string') {
+        return `${label}: (no Wikipedia URL on this node) ${desc}`;
+      }
+      const { extract, error } = await fetchWikipediaExtract(url);
+      const excerpt =
+        extract && extract.length > 720
+          ? `${extract.slice(0, 720)}…`
+          : extract || `(no summary; ${error || 'fetch failed'})`;
+      return `${label} — ${url}\n  Wikipedia summary: ${excerpt}\n  Local description: ${desc || '(none)'}`;
+    })
+  );
+  return parts.join('\n\n');
+}
+
+function validateNewNodesAgainstExisting(newData, forbidden) {
+  const seenNew = new Set();
+  for (const node of newData.nodes || []) {
+    const k = normalizeConceptLabel(node.label || '');
+    if (!k) continue;
+    if (forbidden.has(k)) {
+      return {
+        ok: false,
+        error: `Generated concept duplicates an existing graph node: "${node.label}"`,
+        code: 'DUPLICATE_WITH_EXISTING'
+      };
+    }
+    if (seenNew.has(k)) {
+      return {
+        ok: false,
+        error: `Generated batch contains duplicate concepts: "${node.label}"`,
+        code: 'DUPLICATE_WITHIN_BATCH'
+      };
+    }
+    seenNew.add(k);
+  }
+  return { ok: true };
+}
+
+/**
+ * Second OpenAI pass: relationship labels grounded in Wikipedia extracts (shared by
+ * manual and randomized expansion after topology is known).
+ */
+async function applySynthesizedRelationships(
+  newData,
+  existingGraphNodes,
+  openai,
+  generationContext = ''
+) {
+  if (!newData.links?.length) return newData;
+  if (!isRelationshipSynthesisEnabled()) return newData;
+  try {
+    const nodeMap = buildNodeLookupMap(existingGraphNodes, newData.nodes);
+    newData.links = await synthesizeLinkRelationships({
+      openai,
+      model: getRelationshipSynthesisModel(),
+      links: newData.links,
+      nodeById: nodeMap,
+      fetchFn: globalThis.fetch,
+      generationContext
+    });
+  } catch (synErr) {
+    console.error('Relationship synthesis skipped:', synErr);
+  }
+  return newData;
+}
+
 // Add after other API endpoints
 app.post('/api/generate-node', async (req, res) => {
   const validated = validateGenerateNodeRequest(req.body);
@@ -395,8 +509,48 @@ app.post('/api/generate-node', async (req, res) => {
 
   try {
     const { selectedNodes } = validated;
+    const existingGraphNodes = validated.existingGraphNodes || [];
     const numNodesToGenerate = validated.numNodes;
     const timestamp = Date.now(); // Get current timestamp
+
+    const forbiddenLabels = new Set();
+    for (const n of existingGraphNodes) {
+      const k = normalizeConceptLabel(n.label || '');
+      if (k) forbiddenLabels.add(k);
+    }
+
+    const forbiddenBlock =
+      forbiddenLabels.size > 0
+        ? `
+      CRITICAL — EXISTING GRAPH CONCEPTS (normalized — do NOT add any new node whose label duplicates or trivially rephrases one of these):
+      ${Array.from(forbiddenLabels).slice(0, 650).join(', ')}
+
+      Each NEW label must be clearly distinct from every name above and from every other new node in this response.
+      Prefer specific named entities, technical terms, or subtopics rather than broad duplicates.
+      `
+        : '';
+
+    const hasGuidance =
+      typeof validated.generationContext === 'string' &&
+      validated.generationContext.trim().length > 0;
+
+    const generationGuidanceBlock = hasGuidance
+      ? `
+      USER GUIDANCE — TONE AND VOICE (apply to every new node's description and every relationship string; keep facts accurate and grounded in Wikipedia/summaries—do not invent claims):
+      ${validated.generationContext.trim()}
+
+      Reflect this guidance in how you write: descriptions and relationship labels must visibly match the requested tone, not only the concept choices. Avoid generic neutral encyclopedia wording when a different voice is requested.
+      `
+      : '';
+
+    const guidanceImportantBullet = hasGuidance
+      ? `- USER GUIDANCE is active: every "description" and every "relationship" string must clearly show that tone in its wording (still factual; do not invent information).\n      `
+      : '';
+
+    const anchorWikiBlock =
+      validated.expansionAlgorithm === 'manual' && selectedNodes.length > 0
+        ? await wikiAnchorLinesForNodes(selectedNodes)
+        : '';
 
     console.log('Number nodes to add:', numNodesToGenerate);
     console.log(
@@ -409,11 +563,13 @@ app.post('/api/generate-node', async (req, res) => {
       validated.expansionAlgorithm === 'randomizedGrowth'
         ? `
       Generate ${numNodesToGenerate} new, meaningful concepts to expand a knowledge graph.
+      ${forbiddenBlock}
+      ${generationGuidanceBlock}
 
       Each new concept should:
-      1. Be a real, well-defined concept or topic
-      2. Include a relevant Wikipedia URL
-      3. Have a concise but informative description
+      1. Be a real, well-defined concept or topic that does NOT overlap the forbidden list above
+      2. Include a relevant English Wikipedia URL (https://en.wikipedia.org/wiki/...)
+      3. Have a concise but informative description explaining why it is new relative to the existing graph
 
       Response must be a valid JSON object with this structure:
       {
@@ -431,23 +587,32 @@ app.post('/api/generate-node', async (req, res) => {
 
       IMPORTANT:
       - Generate real, meaningful concepts (not placeholders)
-      - Ensure all Wikipedia URLs are valid and relevant
+      ${guidanceImportantBullet}- Ensure all Wikipedia URLs are valid and relevant
       - Use "${timestamp}_1", "${timestamp}_2", etc. for node IDs
+      - Do not repeat the same idea under two labels in this batch
 
       Return ONLY the JSON object.
     `
         : `
-      Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to these existing nodes:
+      Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to these ANCHOR nodes.
+      ${forbiddenBlock}
+      ${generationGuidanceBlock}
+
+      Anchor nodes (use these exact ids in every link target field):
       ${selectedNodes
         .map(
-          node => `- ${node.label}: ${node.description || 'No description available'}`
+          node =>
+            `- id "${node.id}": ${node.label} — ${node.description || 'No description'}${node.wikiUrl ? ` — wiki: ${node.wikiUrl}` : ''}`
         )
         .join('\n')}
 
+      Wikipedia-based context for anchors (ground your relationships in this material when present):
+      ${anchorWikiBlock || '(No Wikipedia summaries — use labels and descriptions only.)'}
+
       Each new concept should:
-      1. Be a real, well-defined concept or topic
-      2. Have a clear, meaningful relationship to each existing node
-      3. Include a relevant Wikipedia URL
+      1. Be a real, well-defined concept or topic not already listed in EXISTING GRAPH CONCEPTS
+      2. Have a clear, meaningful relationship to each ANCHOR node, justified using anchor Wikipedia summaries when available
+      3. Include a relevant English Wikipedia URL for the NEW concept
       4. Have a concise but informative description
 
       Response must be a valid JSON object with this structure:
@@ -462,11 +627,11 @@ app.post('/api/generate-node', async (req, res) => {
           // Additional nodes use ${timestamp}_2, ${timestamp}_3, etc.
         ],
         "links": [
-          // Each new node must connect to all selected nodes
+          // Each new node must connect to all selected anchor nodes
           {
             "source": "${timestamp}_1",
-            "target": "<existing node id>",
-            "relationship": "<specific, meaningful relationship>"
+            "target": "<existing anchor node id>",
+            "relationship": "<specific relationship — reference facts from the anchor Wikipedia summary when possible>"
           }
           // Additional links for all connections
         ]
@@ -474,11 +639,11 @@ app.post('/api/generate-node', async (req, res) => {
 
       IMPORTANT:
       - Generate real, meaningful concepts (not placeholders)
-      - Create specific, logical relationships between nodes
+      ${guidanceImportantBullet}- Relationship strings must be specific (not generic "is related to"); tie them to the anchor topic when the summary gives hooks
       - Ensure all Wikipedia URLs are valid and relevant
-      - Each new node must connect to all selected nodes
-      - Use "${timestamp}_1", "${timestamp}_2", etc. for node IDs
-      - Use exact IDs for existing nodes: ${selectedNodes.map(n => `"${n.id}"`).join(', ')}
+      - Each new node must connect to all selected anchor nodes
+      - Use "${timestamp}_1", "${timestamp}_2", etc. for new node IDs
+      - Use exact anchor ids: ${selectedNodes.map(n => `"${n.id}"`).join(', ')}
 
       Return ONLY the JSON object.
     `;
@@ -496,14 +661,22 @@ app.post('/api/generate-node', async (req, res) => {
           2. Use the exact node IDs provided
           3. Create all required connections
           4. Follow the format exactly as shown
-          5. No extra text or explanations`
+          5. No extra text or explanations
+          6. Never duplicate existing graph concept labels when a forbidden list is given
+          7. When Wikipedia summaries are provided for anchors, use them to justify relationships${
+            hasGuidance
+              ? `
+          8. If the user message includes USER GUIDANCE, apply it to the tone and phrasing of every new node's description and every relationship string. Facts must remain accurate and grounded in Wikipedia material.`
+              : ''
+          }`
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.2, // Even lower temperature for more consistent output
+      // Slightly higher temperature when stylistic guidance is present so tone shows in descriptions/edges.
+      temperature: hasGuidance ? 0.48 : 0.2,
       max_tokens: 2000
     });
 
@@ -523,6 +696,15 @@ app.post('/api/generate-node', async (req, res) => {
       });
     }
 
+    const dupCheck = validateNewNodesAgainstExisting(newData, forbiddenLabels);
+    if (!dupCheck.ok) {
+      return res.json({
+        success: false,
+        error: dupCheck.error,
+        code: dupCheck.code
+      });
+    }
+
     // Add timestamps to generated graph artifacts (#62).
     // For manual mode: model did not include timestamps; for randomizedGrowth: nodes
     // come from the model, links are overwritten below but nodes still need timestamps.
@@ -538,8 +720,8 @@ app.post('/api/generate-node', async (req, res) => {
       }));
     }
 
-    const newNodeIds = new Set(newData.nodes.map(node => node.id));
-    const selectedNodeIds = new Set(selectedNodes.map(node => String(node.id))); // Convert to string
+    const newNodeIds = new Set(newData.nodes.map(node => String(node.id)));
+    const selectedNodeIds = new Set(selectedNodes.map(node => String(node.id)));
 
     if (validated.expansionAlgorithm === 'randomizedGrowth') {
       const orderedNewIds = newData.nodes.map(node => String(node.id));
@@ -558,16 +740,30 @@ app.post('/api/generate-node', async (req, res) => {
           code: attachErr.code || 'RANDOM_ATTACHMENT_FAILED'
         });
       }
+      await applySynthesizedRelationships(
+        newData,
+        existingGraphNodes,
+        openai,
+        validated.generationContext || ''
+      );
+
       console.log('Validation passed (randomizedGrowth):', {
         newNodes: newData.nodes.length,
         totalLinks: newData.links.length,
         connectionsPerNewNode: validated.connectionsPerNewNode
       });
     } else {
+      // Manual: drop edges not between a new node and a selected anchor (model often adds extras).
+      newData.links = normalizeManualExpansionLinks(
+        newData.links,
+        newNodeIds,
+        selectedNodeIds
+      );
+
       // Manual: each new node must connect to every highlighted (selected) node
       const connectionMap = new Map();
       newNodeIds.forEach(newId => {
-        connectionMap.set(newId, new Set());
+        connectionMap.set(String(newId), new Set());
       });
 
       console.log('Checking connections...');
@@ -631,6 +827,13 @@ app.post('/api/generate-node', async (req, res) => {
           details: missingConnections.join('\n')
         });
       }
+
+      await applySynthesizedRelationships(
+        newData,
+        existingGraphNodes,
+        openai,
+        validated.generationContext || ''
+      );
 
       console.log('Validation passed:', {
         newNodes: newData.nodes.length,

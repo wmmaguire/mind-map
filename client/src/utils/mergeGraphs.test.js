@@ -59,7 +59,7 @@ describe('mergeAnalyzedGraphs', () => {
     const t0 = merged.nodes[0].createdAt;
     const t1 = merged.nodes[1].createdAt;
     expect(typeof t0).toBe('number');
-    expect(t1).toBeGreaterThan(t0);
+    expect(t1).toBe(t0);
   });
 
   it('returns empty for empty input', () => {

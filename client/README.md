@@ -130,8 +130,9 @@ The backend persists **`UserActivity`** rows for **`SESSION_CREATE`** and **`SES
    - `GET /api/files/:filename` → `{ success, content }`
 3. It calls analysis **once per selected file** (parallel requests):
    - `POST /api/analyze` with `content`, optional `context`, `sessionId`, and **`sourceFiles`** listing that file only (each response is one graph and one server **`GraphTransform`**).
-4. It merges the returned graphs **client-side** for the library view only:
-   - **`client/src/utils/mergeGraphs.js`** namespaces node ids per file (`namespace__<localId>`) so ids from different analyzes cannot collide, then unions nodes and links. Unit tests: **`mergeGraphs.test.js`**.
+4. **Generate Graph** modal (**Analyze Selected**): header **Generate Graph**; primary **Apply**. **Guidance for this run** matches **AI Generation** — preset dropdown (**None**, **Funny**, **Happy**, **Profound**, **Weird**, **Sexy**, **Custom**) via **`GenerationGuidanceFields`** and shared copy in **`client/src/utils/generationGuidance.js`**; **Custom** opens a textarea. Presets resolve to the `context` string sent with each analyze request.
+5. It merges the returned graphs **client-side** for the library view only:
+   - **`client/src/utils/mergeGraphs.js`** namespaces node ids per file (`namespace__<localId>`) so ids from different analyzes cannot collide, then unions nodes and links. **`mergeAnalyzedGraphs`** assigns **one shared** `createdAt` / `timestamp` to **all** nodes and links from that **Apply** so history playback (**#36**) treats the import as a **single** step. Unit tests: **`mergeGraphs.test.js`**.
    - Renders via **`GraphVisualization`**.
 
 ### 4) Save/load graphs
@@ -156,6 +157,7 @@ In `GraphVisualization` users can:
 - Add nodes and relationships
 - Delete nodes/links
 - Use **AI Generation** (Actions → open the generate form) to request AI expansion (**#37** server budgets / **`dryRun`**, **#62** expansion modes):
+  - **Guidance for this run:** preset dropdown + optional custom text (same UX as the library **Generate Graph** modal); sent as **`generationContext`** on **`POST /api/generate-node`**.
   - In the Generate modal, **Expansion algorithm** selects **Manual** (default) or **Multi-cycle randomized** (dropdown on the menu row).
   - **Manual:** one `POST /api/generate-node` call; each new node must link to every highlighted node (existing server validation). The client blocks **Apply** with an inline error if manual mode was opened without at least one highlighted node.
   - **Multi-cycle randomized:** the client runs **N cycles**; each cycle is one `POST /api/generate-node` with `expansionAlgorithm: "randomizedGrowth"`, `connectionsPerNewNode`, and `existingGraphNodeIds` (all current graph node ids). The server still calls the model once per request, then **replaces** model links with **uniform random** attachment to nodes already present before each new node’s links in that batch (templated relationship text). The client blocks **Apply** if the graph has fewer nodes than **connections per new node**. Use **Stop after this cycle** on the **on-canvas chip** to stop before the next request; the chip shows **Cycle *k* of *N*** and a **determinate** progress bar across cycles.

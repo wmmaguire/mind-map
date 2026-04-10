@@ -4,6 +4,8 @@ import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
+import { resolveGenerationContext } from '../utils/generationGuidance';
+import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
 function GraphVisualization({
@@ -29,6 +31,9 @@ function GraphVisualization({
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
   const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
   const [rgNumCycles, setRgNumCycles] = useState(2);
+  /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
+  const [guidancePreset, setGuidancePreset] = useState('none');
+  const [guidanceCustomText, setGuidanceCustomText] = useState('');
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
   const [showGraphActionsHelp, setShowGraphActionsHelp] = useState(false);
@@ -99,6 +104,8 @@ function GraphVisualization({
     setShowGraphActionsHelp(false);
     setGenerateFormAnchorIds([]);
     setGenerateSubmitError(null);
+    setGuidancePreset('none');
+    setGuidanceCustomText('');
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -1326,15 +1333,25 @@ function GraphVisualization({
         selectedNodesPayload.map(n => `${n.label} (${n.id})`)
       );
 
-      const runOneGenerateRequest = async existingGraphNodeIds => {
+      const runOneGenerateRequest = async (nodesSnapshot, existingGraphNodeIds) => {
         const json = {
           selectedNodes: selectedNodesPayload,
-          numNodes: numNodesToAdd
+          numNodes: numNodesToAdd,
+          existingGraphNodes: (nodesSnapshot || []).map(n => ({
+            id: n.id,
+            label: n.label,
+            description: n.description,
+            wikiUrl: n.wikiUrl || ''
+          }))
         };
         if (expansionAlgorithm === 'randomizedGrowth') {
           json.expansionAlgorithm = 'randomizedGrowth';
           json.connectionsPerNewNode = rgConnectionsPerNewNode;
           json.existingGraphNodeIds = existingGraphNodeIds;
+        }
+        const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
+        if (g) {
+          json.generationContext = g;
         }
         return apiRequest('/api/generate-node', {
           method: 'POST',
@@ -1343,7 +1360,7 @@ function GraphVisualization({
       };
 
       if (expansionAlgorithm === 'manual') {
-        const result = await runOneGenerateRequest();
+        const result = await runOneGenerateRequest(data.nodes);
 
         if (!result.success) {
           operationStatus = 'FAILURE';
@@ -1381,7 +1398,10 @@ function GraphVisualization({
           setGenerateProgress({ current: c, total: totalCycles });
 
           const existingGraphNodeIds = working.nodes.map(n => String(n.id));
-          const result = await runOneGenerateRequest(existingGraphNodeIds);
+          const result = await runOneGenerateRequest(
+            working.nodes,
+            existingGraphNodeIds
+          );
 
           if (!result.success) {
             operationStatus = 'FAILURE';
@@ -2249,6 +2269,27 @@ function GraphVisualization({
                   </button>
                 </div>
               )}
+              <GenerationGuidanceFields
+                idPrefix="graph-generate"
+                preset={guidancePreset}
+                onPresetChange={value => {
+                  setGuidancePreset(value);
+                  setGenerateSubmitError(null);
+                }}
+                customText={guidanceCustomText}
+                onCustomTextChange={value => {
+                  setGuidanceCustomText(value);
+                  setGenerateSubmitError(null);
+                }}
+                disabled={isGenerating}
+                helpText={
+                  <>
+                    Applies to both the node-generation step and relationship wording.
+                    Presets send fixed instructions; Custom uses your text. Max 2000
+                    characters for custom. Must not override required links or node IDs.
+                  </>
+                }
+              />
               <div className="form-buttons">
                 <button
                   type="submit"

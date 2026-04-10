@@ -91,23 +91,18 @@ export function mergeAnalyzedGraphs(items) {
     return { nodes: [], links: [] };
   }
 
-  let seq = Date.now();
-  const bump = () => {
-    seq += 1;
-    return seq;
-  };
+  /** One clock value for the whole library "Apply" / analyze step so playback treats the batch as a single edit. */
+  const batchTime = Date.now();
 
   const nodes = [];
   const links = [];
   for (const { namespace, graph } of items) {
     const ng = namespaceGraph(graph, namespace);
     for (const node of ng.nodes) {
-      const t = bump();
-      nodes.push({ ...node, createdAt: t, timestamp: t });
+      nodes.push({ ...node, createdAt: batchTime, timestamp: batchTime });
     }
     for (const link of ng.links) {
-      const t = bump();
-      links.push({ ...link, createdAt: t, timestamp: t });
+      links.push({ ...link, createdAt: batchTime, timestamp: batchTime });
     }
   }
   return { nodes, links };
