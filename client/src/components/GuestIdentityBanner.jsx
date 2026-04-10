@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
 import { useLibraryUi } from '../context/LibraryUiContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
+import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
@@ -41,6 +42,7 @@ export default function GuestIdentityBanner() {
     togglePlaybackStrip,
     toggleGraphSearchBar,
   } = useGraphChromeUi();
+  const { sharePayload } = useGraphHistoryUi();
   const onVisualizeRoute = pathname === '/visualize';
 
   // Dev-only preview is now opt-in so real auth UI is testable in development (#63).
@@ -61,6 +63,16 @@ export default function GuestIdentityBanner() {
       ? `${authUser.name.slice(0, 26)}…`
       : authUser.name
     : displayId;
+
+  /** Registered trigger chip: at most 4 visible characters, one line; chevron (#86efac) stays on the right. */
+  const ACCOUNT_TRIGGER_LABEL_MAX = 4;
+  const accountTriggerLabel = (() => {
+    const raw = accountSubtitle;
+    if (raw == null || String(raw).trim() === '') return '—';
+    const s = String(raw).trim();
+    if (s.length <= ACCOUNT_TRIGGER_LABEL_MAX) return s;
+    return s.slice(0, ACCOUNT_TRIGGER_LABEL_MAX);
+  })();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -126,6 +138,16 @@ export default function GuestIdentityBanner() {
         </div>
         <div className="guest-identity-banner__trailing">
           <div className="guest-identity-banner__trailing-cluster">
+            {onVisualizeRoute && sharePayload ? (
+              <button
+                type="button"
+                className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
+                onClick={sharePayload.onShareClick}
+                aria-label="Copy read-only link to clipboard"
+              >
+                share
+              </button>
+            ) : null}
             {onVisualizeRoute ? (
               <div className="guest-identity-banner__view-wrap">
                 <button
@@ -360,6 +382,16 @@ export default function GuestIdentityBanner() {
         ref={menuWrapRef}
       >
         <div className="guest-identity-banner__trailing-cluster">
+          {onVisualizeRoute && sharePayload ? (
+            <button
+              type="button"
+              className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
+              onClick={sharePayload.onShareClick}
+              aria-label="Copy read-only link to clipboard"
+            >
+              share
+            </button>
+          ) : null}
           {onVisualizeRoute ? (
             <div className="guest-identity-banner__view-wrap">
               <button
@@ -433,7 +465,7 @@ export default function GuestIdentityBanner() {
               className="guest-identity-banner__account-control-id guest-identity-banner__account-control-id--trigger"
               title={authUser?.name?.trim() ? authUser.name : userId || ''}
             >
-              {accountSubtitle || '—'}
+              {accountTriggerLabel}
             </span>
             <span className="guest-identity-banner__account-control-chevron" aria-hidden>
               {menuOpen ? '▴' : '▾'}

@@ -31,7 +31,7 @@ function readStoredGraphHistoryPlaySpeed() {
 }
 
 export function GraphHistoryBannerControls() {
-  const { payload, sharePayload, savePayload } = useGraphHistoryUi();
+  const { payload, savePayload } = useGraphHistoryUi();
   const [playing, setPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(readStoredGraphHistoryPlaySpeed);
 
@@ -65,7 +65,7 @@ export function GraphHistoryBannerControls() {
 
   const showHistory = Boolean(payload && payload.entryCount >= 2);
 
-  if (!showHistory && !sharePayload && !savePayload) return null;
+  if (!showHistory && !savePayload) return null;
 
   const atStart = showHistory ? payload.index <= 0 : true;
   const atEnd = showHistory ? payload.index >= payload.entryCount - 1 : true;
@@ -149,50 +149,29 @@ export function GraphHistoryBannerControls() {
                     ))}
                   </select>
                 </div>
-                {sharePayload && (
-                  <button
-                    type="button"
-                    className="guest-identity-banner__library-share-btn"
-                    onClick={sharePayload.onShareClick}
-                    aria-label="Copy read-only link to clipboard"
-                  >
-                    share
-                  </button>
-                )}
               </div>
             </>
           )}
         </div>
       )}
-      {sharePayload && !showHistory && (
-        <button
-          type="button"
-          className="guest-identity-banner__library-share-btn"
-          onClick={sharePayload.onShareClick}
-          aria-label="Copy read-only link to clipboard"
-        >
-          share
-        </button>
-      )}
     </div>
   );
 }
 
-function playbackToolbarVisible(payload, sharePayload, savePayload) {
+function playbackToolbarVisible(payload, savePayload) {
   return (
-    Boolean(payload && payload.entryCount >= 2) ||
-    Boolean(sharePayload) ||
-    Boolean(savePayload)
+    Boolean(payload && payload.entryCount >= 2) || Boolean(savePayload)
   );
 }
 
 /**
- * Second shell strip below {@link GuestIdentityBanner}: share + history playback only (#36 / #39).
+ * Second shell strip below {@link GuestIdentityBanner}: history playback + save (#36). Read-only
+ * share control lives in {@link GuestIdentityBanner} beside View (#39).
  */
 export default function GraphPlaybackBanner() {
-  const { payload, sharePayload, savePayload } = useGraphHistoryUi();
+  const { payload, savePayload } = useGraphHistoryUi();
   const { playbackStripVisible } = useGraphChromeUi();
-  if (!playbackToolbarVisible(payload, sharePayload, savePayload)) {
+  if (!playbackToolbarVisible(payload, savePayload)) {
     return null;
   }
   if (!playbackStripVisible) {
@@ -203,7 +182,7 @@ export default function GraphPlaybackBanner() {
     <aside
       className="guest-identity-banner guest-identity-banner--registered guest-identity-banner--playback-strip"
       role="region"
-      aria-label="Graph save, playback, and share"
+      aria-label="Graph save and playback"
     >
       <div className="guest-identity-banner__playback-inner">
         <GraphHistoryBannerControls />

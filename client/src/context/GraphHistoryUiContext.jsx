@@ -9,8 +9,10 @@ import PropTypes from 'prop-types';
 const noop = () => {};
 
 /**
- * Bridges Library graph history + optional share control into {@link GraphPlaybackBanner} (#36 / #39).
- * Without {@link GraphHistoryUiProvider}, `setPayload` / `setSharePayload` / `setSavePayload` are no-ops.
+ * Bridges Library graph history + optional share/save into the shell (#36 / #39).
+ * {@link GuestIdentityBanner} reads `sharePayload` (read-only link) on `/visualize`;
+ * {@link GraphPlaybackBanner} reads history + save. Without {@link GraphHistoryUiProvider},
+ * `setPayload` / `setSharePayload` / `setSavePayload` are no-ops.
  *
  * @typedef {object} GraphHistoryUiPayload
  * @property {number} entryCount

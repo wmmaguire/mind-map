@@ -60,7 +60,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
     - Calls analysis (`POST /api/analyze`)
     - Displays graph using `GraphVisualization`
     - Saves/loads graphs (`POST /api/graphs/save`, `GET /api/graphs`, `GET /api/graphs/:filename`)
-    - **#36:** client-side **timestamp** replay (**`graphPlayback.js`**); **`GraphPlaybackBanner`** + **`GraphHistoryUiContext`** (see **`docs/graph-time-travel-spike.md`**)
+    - **#36 / #39:** client-side **timestamp** replay (**`graphPlayback.js`**); **`GraphPlaybackBanner`** (save + scrubber strip) + **`GraphHistoryUiContext`**; read-only **share** control on **`GuestIdentityBanner`** (left of **View** on **`/visualize`**). See **`docs/graph-time-travel-spike.md`**
   - **Visualization + editing**: `client/src/components/GraphVisualization.js`
     - D3 force graph rendering
     - Zoom-driven “community” merge/split behavior
