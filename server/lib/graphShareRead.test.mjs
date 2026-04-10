@@ -4,6 +4,7 @@ import {
   timingSafeEqualString,
   evaluateOwnedGraphRead,
   redactGraphMetadataForResponse,
+  stripShareSecretFromSaveMetadata,
 } from './graphShareRead.js';
 
 test('timingSafeEqualString rejects length mismatch and non-strings', () => {
@@ -66,4 +67,15 @@ test('redactGraphMetadataForResponse keeps dbId for owner responses', () => {
   );
   assert.equal(m.dbId, 'y');
   assert.equal('shareReadToken' in m, false);
+});
+
+test('stripShareSecretFromSaveMetadata removes shareReadToken only', () => {
+  const out = stripShareSecretFromSaveMetadata({
+    name: 'G',
+    userId: 'u1',
+    shareReadToken: 'should-not-persist-from-client',
+  });
+  assert.equal(out.name, 'G');
+  assert.equal(out.userId, 'u1');
+  assert.equal('shareReadToken' in out, false);
 });

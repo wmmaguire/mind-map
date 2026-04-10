@@ -13,6 +13,7 @@ import { recordUserActivity } from '../lib/recordUserActivity.js';
 import {
   evaluateOwnedGraphRead,
   redactGraphMetadataForResponse,
+  stripShareSecretFromSaveMetadata,
 } from '../lib/graphShareRead.js';
 import crypto from 'crypto';
 
@@ -32,7 +33,8 @@ router.post('/graphs/save', async (req, res) => {
       });
     }
 
-    const { graph, metadata: rawMeta } = req.body;
+    const { graph, metadata: rawMetaIn } = req.body;
+    const rawMeta = stripShareSecretFromSaveMetadata(rawMetaIn);
 
     if (!graph || !rawMeta) {
       return res.status(400).json({

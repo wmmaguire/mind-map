@@ -63,3 +63,17 @@ export function redactGraphMetadataForResponse(metadata, { shareViewer }) {
   if (shareViewer) delete m.dbId;
   return m;
 }
+
+/**
+ * Drop `shareReadToken` from client-supplied metadata on `POST /api/graphs/save` (#39).
+ * Read-only secrets are minted only via `POST …/share-read-token`, never accepted from save bodies.
+ *
+ * @param {object} [metadata]
+ * @returns {object|undefined}
+ */
+export function stripShareSecretFromSaveMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return metadata;
+  // eslint-disable-next-line no-unused-vars -- strip secret; remainder is persisted metadata
+  const { shareReadToken, ...rest } = metadata;
+  return rest;
+}

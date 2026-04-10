@@ -22,7 +22,7 @@ mind-map/
 │   ├── server.js
 │   ├── routes/
 │   │   ├── files.js      # /api/files, /api/upload, file content
-│   │   └── graphs.js     # /api/graphs/* (save, list, load, views)
+│   │   └── graphs.js     # /api/graphs/* (save, list, load, views, share-read-token #39)
 │   ├── models/           # Mongoose schemas (Session, File, Graph, UserActivity, …)
 │   ├── lib/              # shared helpers (e.g. recordUserActivity)
 │   ├── package.json

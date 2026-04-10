@@ -53,6 +53,32 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 
 **Note:** **#36 (timestamp playback, Apr 2026)** — **Graph time travel (client slice):** replay uses **per-entity** **`createdAt`** (fallback **`timestamp`**) and **`buildGraphAtPlaybackTime`** in **`graphPlayback.js`**; **`LibraryVisualize`** keeps **`committedGraph`** + **`playbackStepIndex`**. **UI:** **`GraphPlaybackBanner`** (second strip in **`App.js`**, below **`GuestIdentityBanner`**) — **save**, **◀** / **▶**, range slider, **Play** / **Pause**, **speed** (interval **1800 ms / speed**, persisted in **`localStorage`**), **share** (**#39**). **`GraphHistoryUiContext`** exposes **`payload`**, **`sharePayload`**, **`savePayload`**. Identity banner is **title-only** (graph title **blank** when unnamed). **`graphHistory.js`** snapshot **reducer** is **not** used for this path (kept for **`normalizeGraphSnapshot`** / **`materializeGraphSnapshot`** + **`graphHistory.test.js`**). **Follow-ups:** GitHub **#70** (*Backlog: Graph time travel phase 2+*) and *Backlog: Graph playback implementation follow-ups* below. Suggested comments: **#36**, **#33**, **#39**, **#29**, **#16**, **#24** / **#52** / **#56** / **#57** / **#70**.
 
+**Note:** **#39 (read-only share links, Apr 2026)** — **First slice:** mint **`POST /api/graphs/:filename/share-read-token`** (owner header = **`metadata.userId`**); load **`GET /api/graphs/:filename?shareToken=`** with constant-time compare; **`redactGraphMetadataForResponse`** hides **`shareReadToken`** and (for share viewers) **`dbId`**. Client: **`/visualize?shareGraph=&shareToken=`**, **`shareViewerMode`**, **`readOnly`** graph (**no Actions FAB** / edits). **Write hardening (branch `issue-39-sharing-collaboration`):** **`POST /api/graphs/save`** returns **403** if **`?shareToken=`** is present (**`SHARE_READ_ONLY`**); **`stripShareSecretFromSaveMetadata`** removes **`shareReadToken`** from save JSON so clients cannot set the secret via save. Tests: **`lib/graphShareRead.test.mjs`**, **`routes/graphs.share.integration.test.mjs`** (temp **`DATA_DIR`**, **`mongoose.bufferCommands`** toggled for fast failure without Mongo). **`server/READEME.md`** §6 documents **future graph comments** (owner / collaborator / share viewer / **`/api/feedback`** scope). **Epic remainder** (expiry, passwords, revoke UX, collaboration, audit, JWT-bound mint): GitHub **#74**.
+
+### Backlog: Sharing & collaboration phase 2+ — GitHub **#74**
+
+**Title:** `Backlog: Sharing & collaboration — phase 2+ (post–#39 read-only slice)`
+
+**Body:**
+
+```markdown
+## Context
+**#39** shipped **read-only** snapshot sharing (secret query token + owner mint route + client **`readOnly`**). Apr 2026 hardening: save rejects **`?shareToken=`** and strips **`metadata.shareReadToken`** from save bodies; integration test + permission sketch for future **comments** in **`server/READEME.md`** §6.
+
+## Backlog (out of scope for current #39 implementation)
+
+1. **Link policy** — Optional **expiry**, **password**, single-use links; **revoke** without rotating filename; owner UI for active links.
+2. **AuthZ hardening** — Bind mint/list/revoke to **JWT-verified** identity (**#64**); rate-limit **`?shareToken=`** guesses on **`GET /api/graphs/:filename`**.
+3. **Write-surface audit** — Confirm no other **`POST`/`PATCH`/`DELETE`** paths accept share secrets or leak owner-only ops to viewers (e.g. **`/api/generate-node`**, **`/api/operations`** with stolen session).
+4. **Graph comments / annotations** — Threaded discussion, permissions per **`server/READEME.md`** §6 sketch (owner vs collaborator vs share viewer).
+5. **Version handoff** — Pair **read-only** links with **#70** server revisions / “view at timestamp” for recipients.
+6. **Telemetry / audit** — Distinguish **share** opens in **`UserActivity`** / **`GraphView`** without exposing **`shareReadToken`** in logs.
+7. **E2E** — Playwright/Cypress: mint link → incognito open → assert no save/actions (**#24**).
+8. **UX polish** — Clear errors for expired/invalid token; optional “exit share mode” affordance (**#40**, **#50**).
+
+Refs: #39 #33 #36 #40 #50 #64 #70 #24
+```
+
 ### Backlog: Graph time travel phase 2+ — GitHub **#70**
 
 **Title:** `Backlog: Graph time travel phase 2+ (persist, diff, UX)`
