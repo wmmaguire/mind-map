@@ -26,6 +26,7 @@ function GraphVisualization({
   readOnly = false,
 }) {
   const svgRef = useRef();
+  const graphCanvasWrapRef = useRef(null);
   const selectedNodeIds = useRef(new Set());
   const selectedNodeId = useRef(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
@@ -625,9 +626,14 @@ function GraphVisualization({
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(50));
 
-    // Create tooltip
-    const tooltip = d3.select('body').append('div')
-      .attr('class', 'tooltip')
+    // Tooltip: anchored lower-left of graph canvas (not cursor-following)
+    const tooltipMount =
+      graphCanvasWrapRef.current || svgRef.current?.parentElement || null;
+    const tooltip = (tooltipMount ? d3.select(tooltipMount) : d3.select('body'))
+      .append('div')
+      .attr('class', 'tooltip graph-canvas-tooltip')
+      .attr('role', 'status')
+      .attr('aria-live', 'polite')
       .style('opacity', 0);
 
     // Draw the links with clickable areas
@@ -807,9 +813,7 @@ function GraphVisualization({
           tooltipContent = '<strong>Error displaying node information</strong>';
         }
         
-        tooltip.html(tooltipContent)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 10) + 'px');
+        tooltip.html(tooltipContent);
       })
       .call(dragBehavior);
 
@@ -865,9 +869,7 @@ function GraphVisualization({
         <strong>${targetLabel}</strong>
       `;
 
-      tooltip.html(tooltipContent)
-        .style('left', (event.pageX + 10) + 'px')
-        .style('top', (event.pageY - 10) + 'px');
+      tooltip.html(tooltipContent);
     }
 
     function handleLinkMouseout() {
@@ -894,9 +896,7 @@ function GraphVisualization({
         <strong>${targetLabel}</strong>
       `;
   
-      tooltip.html(tooltipContent)
-        .style('left', (event.pageX + 10) + 'px')
-        .style('top', (event.pageY - 10) + 'px');
+      tooltip.html(tooltipContent);
     }
 
     function handleNodeClick(event, node) {
@@ -996,9 +996,7 @@ function GraphVisualization({
           }
         }
 
-        tooltip.html(tooltipContent)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 10) + 'px');
+        tooltip.html(tooltipContent);
 
       } catch (error) {
         console.error('Error in handleNodeClick:', error);
@@ -1412,9 +1410,7 @@ function GraphVisualization({
             tooltipContent = '<strong>Error displaying node information</strong>';
           }
           
-          tooltip.html(tooltipContent)
-            .style('left', (event.pageX + 10) + 'px')
-            .style('top', (event.pageY - 10) + 'px');
+          tooltip.html(tooltipContent);
         });
 
       // Add circles with proper sizing and coloring using colorScale
@@ -2711,7 +2707,7 @@ function GraphVisualization({
         </div>
       )}
 
-      <div className="graph-canvas-wrap">
+      <div className="graph-canvas-wrap" ref={graphCanvasWrapRef}>
         <svg ref={svgRef} className="graph-visualization" data-testid="graph-main-svg" />
         <svg
           ref={minimapSvgRef}
