@@ -10,6 +10,7 @@ import { IdentityProvider } from './context/IdentityContext';
 import { GraphTitleProvider } from './context/GraphTitleContext';
 import { LibraryUiProvider } from './context/LibraryUiContext';
 import { GraphHistoryUiProvider } from './context/GraphHistoryUiContext';
+import { GraphChromeUiProvider } from './context/GraphChromeUiContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function AuthIdentityBridge({ children }) {
@@ -37,7 +38,9 @@ root.render(
             <GraphTitleProvider>
               <LibraryUiProvider>
                 <GraphHistoryUiProvider>
-                  <App />
+                  <GraphChromeUiProvider>
+                    <App />
+                  </GraphChromeUiProvider>
                 </GraphHistoryUiProvider>
               </LibraryUiProvider>
             </GraphTitleProvider>

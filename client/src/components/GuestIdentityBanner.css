@@ -321,6 +321,70 @@
   justify-self: end;
   position: relative;
   min-width: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.guest-identity-banner__view-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.guest-identity-banner__view-trigger {
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.guest-identity-banner__view-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.guest-identity-banner__view-trigger:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.guest-identity-banner__view-trigger-label {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.guest-identity-banner__menu--view {
+  right: auto;
+  left: 0;
+  min-width: 10rem;
+}
+
+.guest-identity-banner__menu-item--checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  color: #e2e8f0;
+}
+
+.guest-identity-banner__menu-check {
+  display: inline-flex;
+  width: 1rem;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #86efac;
 }
 
 /* Auth modal (GitHub #63) */

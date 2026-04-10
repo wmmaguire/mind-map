@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
+import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import './GuestIdentityBanner.css';
 
 /** Interval at 1× speed (ms between steps while Play is active). */
@@ -190,7 +191,11 @@ function playbackToolbarVisible(payload, sharePayload, savePayload) {
  */
 export default function GraphPlaybackBanner() {
   const { payload, sharePayload, savePayload } = useGraphHistoryUi();
+  const { playbackStripVisible } = useGraphChromeUi();
   if (!playbackToolbarVisible(payload, sharePayload, savePayload)) {
+    return null;
+  }
+  if (!playbackStripVisible) {
     return null;
   }
 

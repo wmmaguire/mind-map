@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
+import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
 import { resolveGenerationContext } from '../utils/generationGuidance';
 import {
@@ -102,6 +103,7 @@ function GraphVisualization({
   const resetCanvasViewRef = useRef(null);
 
   const { sessionId } = useSession();
+  const { graphSearchBarVisible } = useGraphChromeUi();
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -2113,51 +2115,53 @@ function GraphVisualization({
 
   return (
     <div className="graph-visualization-container">
-      <div
-        className="graph-discovery-bar"
-        role="search"
-        aria-label="Find concepts on the graph"
-      >
-        <label htmlFor="graph-discovery-search" className="graph-discovery-bar__label">
-          Find
-        </label>
-        <input
-          id="graph-discovery-search"
-          data-testid="graph-discovery-search"
-          type="search"
-          className="graph-discovery-bar__input"
-          placeholder="Search labels…"
-          value={discoveryQuery}
-          onChange={e => setDiscoveryQuery(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              focusNextDiscoveryMatch();
-            }
-          }}
-        />
-        <span className="graph-discovery-bar__meta" data-testid="graph-discovery-count">
-          {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
-        </span>
-        <button
-          type="button"
-          className="graph-discovery-bar__focus"
-          data-testid="graph-discovery-focus"
-          onClick={() => focusNextDiscoveryMatch()}
+      {graphSearchBarVisible ? (
+        <div
+          className="graph-discovery-bar"
+          role="search"
+          aria-label="Find concepts on the graph"
         >
-          Focus next
-        </button>
-        <button
-          type="button"
-          className="graph-discovery-bar__reset-view"
-          data-testid="graph-discovery-show-all"
-          onClick={() => resetCanvasViewRef.current?.()}
-          title="Zoom to fit all nodes and show each concept (no clusters)"
-          aria-label="Show all nodes: zoom to fit and ungroup clusters"
-        >
-          Show all
-        </button>
-      </div>
+          <label htmlFor="graph-discovery-search" className="graph-discovery-bar__label">
+            Find
+          </label>
+          <input
+            id="graph-discovery-search"
+            data-testid="graph-discovery-search"
+            type="search"
+            className="graph-discovery-bar__input"
+            placeholder="Search labels…"
+            value={discoveryQuery}
+            onChange={e => setDiscoveryQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                focusNextDiscoveryMatch();
+              }
+            }}
+          />
+          <span className="graph-discovery-bar__meta" data-testid="graph-discovery-count">
+            {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
+          </span>
+          <button
+            type="button"
+            className="graph-discovery-bar__focus"
+            data-testid="graph-discovery-focus"
+            onClick={() => focusNextDiscoveryMatch()}
+          >
+            Focus next
+          </button>
+          <button
+            type="button"
+            className="graph-discovery-bar__reset-view"
+            data-testid="graph-discovery-show-all"
+            onClick={() => resetCanvasViewRef.current?.()}
+            title="Zoom to fit all nodes and show each concept (no clusters)"
+            aria-label="Show all nodes: zoom to fit and ungroup clusters"
+          >
+            Show all
+          </button>
+        </div>
+      ) : null}
 
       {graphActionMenu && (
         <div

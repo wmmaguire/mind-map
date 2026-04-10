@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IDENTITY_KIND_GUEST,
   useIdentity,
@@ -6,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useGraphTitle } from '../context/GraphTitleContext';
 import { useLibraryUi } from '../context/LibraryUiContext';
+import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
@@ -32,6 +34,14 @@ export default function GuestIdentityBanner() {
   } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
+  const { pathname } = useLocation();
+  const {
+    playbackStripVisible,
+    graphSearchBarVisible,
+    togglePlaybackStrip,
+    toggleGraphSearchBar,
+  } = useGraphChromeUi();
+  const onVisualizeRoute = pathname === '/visualize';
 
   // Dev-only preview is now opt-in so real auth UI is testable in development (#63).
   // Set REACT_APP_ENABLE_DEV_PREVIEW=true to restore the old behavior.
@@ -53,6 +63,7 @@ export default function GuestIdentityBanner() {
     : displayId;
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const menuWrapRef = useRef(null);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -69,15 +80,16 @@ export default function GuestIdentityBanner() {
   const [settingsBusy, setSettingsBusy] = useState(false);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !viewMenuOpen) return;
     const onDoc = (e) => {
       if (menuWrapRef.current && !menuWrapRef.current.contains(e.target)) {
         setMenuOpen(false);
+        setViewMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [menuOpen]);
+  }, [menuOpen, viewMenuOpen]);
 
   if (isGuest) {
     return (
@@ -113,6 +125,60 @@ export default function GuestIdentityBanner() {
           )}
         </div>
         <div className="guest-identity-banner__trailing">
+          {onVisualizeRoute ? (
+            <div className="guest-identity-banner__view-wrap">
+              <button
+                type="button"
+                className="guest-identity-banner__view-trigger"
+                aria-expanded={viewMenuOpen}
+                aria-haspopup="menu"
+                aria-controls="guest-chrome-view-menu"
+                id="guest-chrome-view-trigger"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setViewMenuOpen((o) => !o);
+                }}
+              >
+                <span className="guest-identity-banner__view-trigger-label">View</span>
+                <span className="guest-identity-banner__account-control-chevron" aria-hidden>
+                  {viewMenuOpen ? '▴' : '▾'}
+                </span>
+              </button>
+              {viewMenuOpen ? (
+                <div
+                  id="guest-chrome-view-menu"
+                  className="guest-identity-banner__menu guest-identity-banner__menu--view"
+                  role="menu"
+                  aria-labelledby="guest-chrome-view-trigger"
+                >
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                    role="menuitemcheckbox"
+                    aria-checked={playbackStripVisible}
+                    onClick={() => togglePlaybackStrip()}
+                  >
+                    <span className="guest-identity-banner__menu-check" aria-hidden>
+                      {playbackStripVisible ? '✓' : '○'}
+                    </span>
+                    Playback
+                  </button>
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                    role="menuitemcheckbox"
+                    aria-checked={graphSearchBarVisible}
+                    onClick={() => toggleGraphSearchBar()}
+                  >
+                    <span className="guest-identity-banner__menu-check" aria-hidden>
+                      {graphSearchBarVisible ? '✓' : '○'}
+                    </span>
+                    Search
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {devControls ? (
             <button
               type="button"
@@ -292,12 +358,69 @@ export default function GuestIdentityBanner() {
         ref={menuWrapRef}
       >
         <>
+          {onVisualizeRoute ? (
+            <div className="guest-identity-banner__view-wrap">
+              <button
+                type="button"
+                className="guest-identity-banner__view-trigger"
+                aria-expanded={viewMenuOpen}
+                aria-haspopup="menu"
+                aria-controls="guest-chrome-view-menu-reg"
+                id="guest-chrome-view-trigger-reg"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setViewMenuOpen((o) => !o);
+                }}
+              >
+                <span className="guest-identity-banner__view-trigger-label">View</span>
+                <span className="guest-identity-banner__account-control-chevron" aria-hidden>
+                  {viewMenuOpen ? '▴' : '▾'}
+                </span>
+              </button>
+              {viewMenuOpen ? (
+                <div
+                  id="guest-chrome-view-menu-reg"
+                  className="guest-identity-banner__menu guest-identity-banner__menu--view"
+                  role="menu"
+                  aria-labelledby="guest-chrome-view-trigger-reg"
+                >
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                    role="menuitemcheckbox"
+                    aria-checked={playbackStripVisible}
+                    onClick={() => togglePlaybackStrip()}
+                  >
+                    <span className="guest-identity-banner__menu-check" aria-hidden>
+                      {playbackStripVisible ? '✓' : '○'}
+                    </span>
+                    Playback
+                  </button>
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                    role="menuitemcheckbox"
+                    aria-checked={graphSearchBarVisible}
+                    onClick={() => toggleGraphSearchBar()}
+                  >
+                    <span className="guest-identity-banner__menu-check" aria-hidden>
+                      {graphSearchBarVisible ? '✓' : '○'}
+                    </span>
+                    Search
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <button
             type="button"
             className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            onClick={() => setMenuOpen((o) => !o)}
+            onClick={() => {
+              setViewMenuOpen(false);
+              setMenuOpen((o) => !o);
+            }}
           >
             <span className="guest-identity-banner__account-control-primary">
               Signed in
