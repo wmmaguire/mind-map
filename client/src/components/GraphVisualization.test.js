@@ -189,6 +189,29 @@ describe('GraphVisualization graph action menu', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows discovery search, match count, minimap, and focus control (#38)', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    expect(screen.getByTestId('graph-discovery-search')).toBeInTheDocument();
+    expect(screen.getByTestId('graph-discovery-count')).toHaveTextContent(/0 match/);
+    expect(screen.getByTestId('graph-minimap')).toBeInTheDocument();
+    expect(screen.getByTestId('graph-discovery-focus')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('graph-discovery-search'), {
+      target: { value: 'one' },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('graph-discovery-count')).toHaveTextContent(/1 match/);
+    });
+  });
+
   it('still closes add-node modal on Escape', () => {
     render(
       <GraphVisualization

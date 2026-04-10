@@ -5,6 +5,10 @@ import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
 import { resolveGenerationContext } from '../utils/generationGuidance';
+import {
+  nodesMatchingLabelQuery,
+  createFocusZoomTransform,
+} from '../utils/graphDiscovery';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -82,6 +86,17 @@ function GraphVisualization({
   /** Node ids (from menu snapshot) to connect after "Add Node" submit; cleared after use. */
   const connectNewNodeToIdsRef = useRef([]);
 
+  /** GitHub #38: label search + minimap (refs avoid re-running the D3 effect on each keystroke). */
+  const [discoveryQuery, setDiscoveryQuery] = useState('');
+  const [discoveryFocusIndex, setDiscoveryFocusIndex] = useState(0);
+  const discoveryQueryRef = useRef('');
+  const zoomBehaviorRef = useRef(null);
+  const updateHighlightingRef = useRef(null);
+  const updateMinimapRef = useRef(null);
+  const graphTransformRef = useRef(null);
+  const minimapRafRef = useRef(null);
+  const minimapSvgRef = useRef(null);
+
   const { sessionId } = useSession();
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
@@ -106,6 +121,9 @@ function GraphVisualization({
     setGenerateSubmitError(null);
     setGuidancePreset('none');
     setGuidanceCustomText('');
+    setDiscoveryQuery('');
+    discoveryQueryRef.current = '';
+    setDiscoveryFocusIndex(0);
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -259,6 +277,33 @@ function GraphVisualization({
   const width = widthProp ?? 800;
   const height = heightProp ?? 600;
 
+  useEffect(() => {
+    discoveryQueryRef.current = discoveryQuery;
+    updateHighlightingRef.current?.();
+  }, [discoveryQuery]);
+
+  useEffect(() => {
+    setDiscoveryFocusIndex(0);
+  }, [discoveryQuery]);
+
+  const focusNextDiscoveryMatch = useCallback(() => {
+    const q = discoveryQuery.trim();
+    if (!q || !data?.nodes?.length) return;
+    const matches = nodesMatchingLabelQuery(data.nodes, q);
+    if (!matches.length) return;
+    const idx = discoveryFocusIndex % matches.length;
+    const node = matches[idx];
+    const nx = node.x != null ? node.x : width / 2;
+    const ny = node.y != null ? node.y : height / 2;
+    const t = createFocusZoomTransform(nx, ny, width, height, 1.2);
+    const svg = d3.select(svgRef.current);
+    const zoom = zoomBehaviorRef.current;
+    if (svg.node() && zoom) {
+      svg.transition().duration(400).call(zoom.transform, t);
+    }
+    setDiscoveryFocusIndex((idx + 1) % matches.length);
+  }, [discoveryQuery, discoveryFocusIndex, data, width, height]);
+
   // Add new refs without modifying existing state
   const previousZoomRef = useRef(1);
   const MERGE_THRESHOLD = 0.8; // When to merge: current zoom is 80% of previous
@@ -270,6 +315,8 @@ function GraphVisualization({
 
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
+  const searchHighlightFill = '#f39c12';
+  const searchHighlightStroke = '#d68910';
 
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
@@ -444,11 +491,15 @@ function GraphVisualization({
 
     // Modify the zoom behavior
     const g = svg.append('g');
-    svg.call(d3.zoom()
+    graphTransformRef.current = d3.zoomIdentity;
+
+    const zoom = d3.zoom()
       .extent([[0, 0], [width, height]])
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
+        graphTransformRef.current = event.transform;
         g.attr('transform', event.transform);
+        updateMinimapRef.current?.();
         const currentZoom = event.transform.k;
         
         console.log('Zoom event:', {
@@ -542,7 +593,10 @@ function GraphVisualization({
 
 
         previousZoomRef.current = currentZoom;
-      }));
+      });
+
+    svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
 
     // Create a map of nodes for reference
     const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
@@ -955,48 +1009,171 @@ function GraphVisualization({
       }
     }
 
-    function updateHighlighting() {
-      // Highlight selected nodes
-      g.selectAll('.node circle')
-        .style('fill', d => selectedNodeIds.current.has(d.id) ? highlightedColor : d.color)
-        .style('stroke', d => selectedNodeIds.current.has(d.id) ?  '#f1c40f' : '#fff')
-        .style('stroke-width', d => selectedNodeIds.current.has(d.id) ?  4 : 2)
-        .style('r', d => selectedNodeIds.current.has(d.id) ?  25 : (d && d.nodes && d.nodes.length > 1) ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length)) : 20);
-
-      console.log(selectedNodeIds.current);
-      // both required for the links to be highlighted (pre/post updateVisualization)
-      linkGroups.selectAll('.link-line')
-        .style('stroke-opacity', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? 1 : 0.6)
-        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? highlightedColor : '#999')
-        .style('stroke-width', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)?  3 : 1);
-      g.selectAll('.link')
-        .style('stroke-opacity', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? 1 : 0.6)
-        .style('stroke',  l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id) ? highlightedColor : '#999')
-        .style('stroke-width', l => selectedNodeIds.current.has(l.source.id) || selectedNodeIds.current.has(l.target.id)?  3 : 1);
-
-
-      // Reset all nodes and links to default state
-      if (selectedNodeIds.current.size === 0) {
-        console.log('Resetting all nodes and links to default state');
-        g.selectAll('.node circle')
-          .style('fill', d => d.color)
-          .style('stroke', '#fff')
-          .style('stroke-width', 2)
-          .style('r', d => (d && d.nodes && d.nodes.length > 1) ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length)) : 20);
-      
-        // both required for the links to be highlighted (pre/post updateVisualization)
-        linkGroups.selectAll('.link-line')
-          .style('stroke-opacity', 0.6) 
-          .style('stroke', '#999')
-          .style('stroke-width', 1);
-        g.selectAll('.link')
-          .style('stroke-opacity', 0.6) 
-          .style('stroke', '#999')
-          .style('stroke-width', 1);
-
-      }
-      
+    function linkEndpointIds(l) {
+      const sid = typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
+      return { sid, tid };
     }
+
+    function getSearchMatchIds() {
+      const q = (discoveryQueryRef.current || '').trim();
+      if (!q) return new Set();
+      return new Set(nodesMatchingLabelQuery(data.nodes, q).map(n => n.id));
+    }
+
+    function datumMatchesSearch(d, matchIds) {
+      if (!matchIds || matchIds.size === 0) return false;
+      if (d && Array.isArray(d.nodes) && d.nodes.length) {
+        return d.nodes.some(n => n && matchIds.has(n.id));
+      }
+      return matchIds.has(d.id);
+    }
+
+    function renderMinimap() {
+      const el = minimapSvgRef.current;
+      if (!el || !data.nodes?.length) return;
+      const T = graphTransformRef.current || d3.zoomIdentity;
+      const tw = width;
+      const th = height;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      data.nodes.forEach(n => {
+        if (n.x == null || n.y == null) return;
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x);
+        maxY = Math.max(maxY, n.y);
+      });
+      if (!Number.isFinite(minX)) {
+        minX = 0;
+        maxX = tw;
+        minY = 0;
+        maxY = th;
+      } else {
+        const span = Math.max(maxX - minX, maxY - minY, 1);
+        const pad = span * 0.08;
+        minX -= pad;
+        maxX += pad;
+        minY -= pad;
+        maxY += pad;
+      }
+      const mw = 140;
+      const mh = 100;
+      const sx = x => ((x - minX) / (maxX - minX || 1)) * mw;
+      const sy = y => ((y - minY) / (maxY - minY || 1)) * mh;
+      const svgMini = d3.select(el);
+      svgMini.selectAll('*').remove();
+      const root = svgMini.append('g').attr('class', 'graph-minimap-content');
+      data.nodes.forEach(n => {
+        if (n.x == null || n.y == null) return;
+        root
+          .append('circle')
+          .attr('cx', sx(n.x))
+          .attr('cy', sy(n.y))
+          .attr('r', 2)
+          .attr('fill', '#4a90e2')
+          .attr('opacity', 0.65);
+      });
+      const corners = [
+        [0, 0],
+        [tw, 0],
+        [tw, th],
+        [0, th],
+      ].map(([px, py]) => T.invert([px, py]));
+      const xs = corners.map(c => c[0]);
+      const ys = corners.map(c => c[1]);
+      const vx0 = Math.min(...xs);
+      const vx1 = Math.max(...xs);
+      const vy0 = Math.min(...ys);
+      const vy1 = Math.max(...ys);
+      root
+        .append('rect')
+        .attr('x', sx(vx0))
+        .attr('y', sy(vy0))
+        .attr('width', Math.max(1, sx(vx1) - sx(vx0)))
+        .attr('height', Math.max(1, sy(vy1) - sy(vy0)))
+        .attr('fill', 'rgba(231, 76, 60, 0.08)')
+        .attr('stroke', '#e74c3c')
+        .attr('stroke-width', 1.25)
+        .attr('pointer-events', 'none');
+    }
+
+    updateMinimapRef.current = renderMinimap;
+
+    function updateHighlighting() {
+      const matchIds = getSearchMatchIds();
+
+      g.selectAll('.node circle')
+        .style('fill', d => {
+          if (selectedNodeIds.current.has(d.id)) return highlightedColor;
+          if (datumMatchesSearch(d, matchIds)) return searchHighlightFill;
+          return d.color || defaultNodeColor;
+        })
+        .style('stroke', d => {
+          if (selectedNodeIds.current.has(d.id)) return '#f1c40f';
+          if (datumMatchesSearch(d, matchIds)) return searchHighlightStroke;
+          return '#fff';
+        })
+        .style('stroke-width', d => {
+          if (selectedNodeIds.current.has(d.id)) return 4;
+          if (datumMatchesSearch(d, matchIds)) return 3;
+          return 2;
+        })
+        .style('r', d => {
+          if (selectedNodeIds.current.has(d.id)) return 25;
+          const mergedR =
+            d && d.nodes && d.nodes.length > 1
+              ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length))
+              : 20;
+          const bigMergedR =
+            d && d.nodes && d.nodes.length > 1
+              ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length))
+              : 20;
+          if (datumMatchesSearch(d, matchIds)) {
+            return Math.min((d && d.nodes && d.nodes.length > 1 ? mergedR : 20) + 3, 45);
+          }
+          return d && d.nodes && d.nodes.length > 1 ? bigMergedR : 20;
+        });
+
+      const applyLinkStyle = (sel) => {
+        sel
+          .style('stroke-opacity', l => {
+            const { sid, tid } = linkEndpointIds(l);
+            const selHit =
+              selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
+            const searchHit =
+              matchIds.size > 0 && (matchIds.has(sid) || matchIds.has(tid));
+            if (selHit || searchHit) return 1;
+            return 0.6;
+          })
+          .style('stroke', l => {
+            const { sid, tid } = linkEndpointIds(l);
+            const selHit =
+              selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
+            if (selHit) return highlightedColor;
+            const searchHit =
+              matchIds.size > 0 && (matchIds.has(sid) || matchIds.has(tid));
+            if (searchHit) return searchHighlightFill;
+            return '#999';
+          })
+          .style('stroke-width', l => {
+            const { sid, tid } = linkEndpointIds(l);
+            const selHit =
+              selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
+            const searchHit =
+              matchIds.size > 0 && (matchIds.has(sid) || matchIds.has(tid));
+            if (selHit || searchHit) return 3;
+            return 1;
+          });
+      };
+
+      applyLinkStyle(linkGroups.selectAll('.link-line'));
+      applyLinkStyle(g.selectAll('.link'));
+    }
+
+    updateHighlightingRef.current = updateHighlighting;
 
     // Add click handler to svg to deselect
     svg.on('click', () => {
@@ -1028,6 +1205,12 @@ function GraphVisualization({
 
     // Update positions on each tick
     simulation.on('tick', () => {
+      if (!minimapRafRef.current) {
+        minimapRafRef.current = requestAnimationFrame(() => {
+          minimapRafRef.current = null;
+          updateMinimapRef.current?.();
+        });
+      }
       // Update link positions
       linkGroups.selectAll('line')
         .attr('x1', d => d.source.x)
@@ -1281,8 +1464,15 @@ function GraphVisualization({
 
     // Cleanup
     return () => {
+      if (minimapRafRef.current) {
+        cancelAnimationFrame(minimapRafRef.current);
+        minimapRafRef.current = null;
+      }
       simulation.stop();
       tooltip.remove();
+      zoomBehaviorRef.current = null;
+      updateHighlightingRef.current = null;
+      updateMinimapRef.current = null;
     };
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
@@ -1837,8 +2027,49 @@ function GraphVisualization({
   const generateFormErrorDisplay =
     generateFormValidationMessage || generateSubmitError;
 
+  const discoveryMatchCount = nodesMatchingLabelQuery(
+    data?.nodes || [],
+    discoveryQuery
+  ).length;
+
   return (
     <div className="graph-visualization-container">
+      <div
+        className="graph-discovery-bar"
+        role="search"
+        aria-label="Find concepts on the graph"
+      >
+        <label htmlFor="graph-discovery-search" className="graph-discovery-bar__label">
+          Find
+        </label>
+        <input
+          id="graph-discovery-search"
+          data-testid="graph-discovery-search"
+          type="search"
+          className="graph-discovery-bar__input"
+          placeholder="Search labels…"
+          value={discoveryQuery}
+          onChange={e => setDiscoveryQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              focusNextDiscoveryMatch();
+            }
+          }}
+        />
+        <span className="graph-discovery-bar__meta" data-testid="graph-discovery-count">
+          {discoveryMatchCount} match{discoveryMatchCount === 1 ? '' : 'es'}
+        </span>
+        <button
+          type="button"
+          className="graph-discovery-bar__focus"
+          data-testid="graph-discovery-focus"
+          onClick={() => focusNextDiscoveryMatch()}
+        >
+          Focus next
+        </button>
+      </div>
+
       {graphActionMenu && (
         <div
           id="graph-action-menu"
@@ -2387,7 +2618,18 @@ function GraphVisualization({
         </div>
       )}
 
-      <svg ref={svgRef} className="graph-visualization"></svg>
+      <div className="graph-canvas-wrap">
+        <svg ref={svgRef} className="graph-visualization" data-testid="graph-main-svg" />
+        <svg
+          ref={minimapSvgRef}
+          className="graph-minimap"
+          width={140}
+          height={100}
+          viewBox="0 0 140 100"
+          aria-hidden
+          data-testid="graph-minimap"
+        />
+      </div>
       {actionsFabButton || null}
     </div>
   );
