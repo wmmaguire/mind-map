@@ -14,6 +14,13 @@
   z-index: 100;
 }
 
+/* Title / account row stacks above the playback strip (second aside) so View dropdown
+   isn’t covered by share/history controls (same z-index 100 + DOM order hid menus). */
+.guest-identity-banner:not(.guest-identity-banner--playback-strip) {
+  position: relative;
+  z-index: 120;
+}
+
 .guest-identity-banner--guest {
   background: #1e293b;
 }
@@ -29,6 +36,8 @@
   justify-items: center;
   padding: 0.28rem 0.75rem;
   border-bottom-color: #14532d;
+  position: relative;
+  z-index: 100;
 }
 
 .guest-identity-banner__playback-inner {
@@ -379,6 +388,7 @@
   right: auto;
   left: 0;
   min-width: 10rem;
+  z-index: 250;
 }
 
 .guest-identity-banner__menu-item--checkbox {
