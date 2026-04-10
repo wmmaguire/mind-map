@@ -3,6 +3,10 @@ import {
   filterFilesByQuery,
   sortFiles,
   getFilteredSortedFiles,
+  getGraphDisplayName,
+  filterGraphsByQuery,
+  sortGraphs,
+  getFilteredSortedGraphs,
   FILE_SORT_NAME_ASC,
   FILE_SORT_NAME_DESC,
   FILE_SORT_DATE_ASC,
@@ -84,6 +88,62 @@ describe('libraryFileList', () => {
       const files = [f1, f2];
       const out = getFilteredSortedFiles(files, 'e', FILE_SORT_NAME_DESC);
       expect(out.map(getFileDisplayName)).toEqual(['Beta', 'Alpha']);
+    });
+  });
+
+  const g1 = {
+    filename: 'graph-a.json',
+    metadata: {
+      name: 'Alpha Study',
+      nodeCount: 1,
+      edgeCount: 0,
+      generatedAt: '2026-01-02T00:00:00.000Z',
+    },
+  };
+  const g2 = {
+    filename: 'graph-b.json',
+    metadata: {
+      name: 'Beta Map',
+      nodeCount: 2,
+      edgeCount: 1,
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  };
+
+  describe('getGraphDisplayName', () => {
+    it('prefers metadata.name over filename', () => {
+      expect(getGraphDisplayName(g1)).toBe('Alpha Study');
+    });
+
+    it('falls back to filename or Unnamed Graph', () => {
+      expect(
+        getGraphDisplayName({
+          filename: 'only.json',
+          metadata: {},
+        })
+      ).toBe('only.json');
+      expect(getGraphDisplayName({ metadata: {} })).toBe('Unnamed Graph');
+    });
+  });
+
+  describe('filterGraphsByQuery', () => {
+    it('filters by display name and filename', () => {
+      expect(filterGraphsByQuery([g1, g2], 'beta')).toEqual([g2]);
+      expect(filterGraphsByQuery([g1, g2], 'graph-a')).toEqual([g1]);
+    });
+  });
+
+  describe('sortGraphs', () => {
+    it('sorts by saved date newest first', () => {
+      const out = sortGraphs([g2, g1], FILE_SORT_DATE_DESC);
+      expect(out).toEqual([g1, g2]);
+    });
+  });
+
+  describe('getFilteredSortedGraphs', () => {
+    it('applies filter then sort by name', () => {
+      const out = getFilteredSortedGraphs([g1, g2], 'study', FILE_SORT_NAME_DESC);
+      expect(out).toEqual([g1]);
     });
   });
 });

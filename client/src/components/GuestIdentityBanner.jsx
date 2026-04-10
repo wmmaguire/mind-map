@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   IDENTITY_KIND_GUEST,
   useIdentity,
@@ -17,8 +18,10 @@ export const DEV_PREVIEW_USER_ID = 'dev-preview-user';
 /**
  * Shell strip: centered graph title; **account identity and actions** consolidated in the
  * trailing control (guest preview button or signed-in menu) — #31 / #33.
+ *
+ * @param {{ onOpenUpload?: () => void }} props
  */
-export default function GuestIdentityBanner() {
+export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
   const {
     identityKind,
     isRegistered,
@@ -34,8 +37,16 @@ export default function GuestIdentityBanner() {
     updateProfile,
   } = useAuth();
   const { graphTitle } = useGraphTitle();
-  const { mobileRailVisible, openMobileLibrary } = useLibraryUi();
+  const { openMobileLibrary } = useLibraryUi();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const showHomeNav = pathname !== '/';
+  const onLandingRoute = pathname === '/';
+  const shareViewerMode =
+    pathname === '/visualize' &&
+    Boolean(searchParams.get('shareGraph')?.trim()) &&
+    Boolean(searchParams.get('shareToken')?.trim());
   const {
     playbackStripVisible,
     graphSearchBarVisible,
@@ -112,7 +123,33 @@ export default function GuestIdentityBanner() {
         aria-label="Account mode"
       >
         <div className="guest-identity-banner__leading">
-          {mobileRailVisible && (
+          {showHomeNav ? (
+            <button
+              type="button"
+              className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__home-banner"
+              onClick={() => navigate('/')}
+              aria-label="Go to home"
+            >
+              <span className="library-mobile-rail__icon" aria-hidden>
+                🏠
+              </span>
+              <span className="library-mobile-rail__label">Home</span>
+            </button>
+          ) : null}
+          {onLandingRoute ? (
+            <button
+              type="button"
+              className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__visualize-banner"
+              aria-label="Visualize: open library and network graphs"
+              onClick={() => navigate('/visualize')}
+            >
+              <span className="library-mobile-rail__icon" aria-hidden>
+                🔍
+              </span>
+              <span className="library-mobile-rail__label">Visualize</span>
+            </button>
+          ) : null}
+          {onVisualizeRoute ? (
             <button
               type="button"
               className="library-mobile-rail library-mobile-rail--banner"
@@ -124,7 +161,7 @@ export default function GuestIdentityBanner() {
               </span>
               <span className="library-mobile-rail__label">Library</span>
             </button>
-          )}
+          ) : null}
         </div>
         <div className="guest-identity-banner__center-stack">
           {showTitle ? (
@@ -138,34 +175,25 @@ export default function GuestIdentityBanner() {
         </div>
         <div className="guest-identity-banner__trailing">
           <div className="guest-identity-banner__trailing-cluster">
-            {onVisualizeRoute && sharePayload ? (
-              <button
-                type="button"
-                className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
-                onClick={sharePayload.onShareClick}
-                aria-label="Copy read-only share link to clipboard"
-              >
-                SHARE
-              </button>
-            ) : null}
             {onVisualizeRoute ? (
               <div className="guest-identity-banner__view-wrap">
                 <button
                   type="button"
-                  className="guest-identity-banner__view-trigger"
+                  className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__view-menu-chip"
                   aria-expanded={viewMenuOpen}
                   aria-haspopup="menu"
                   aria-controls="guest-chrome-view-menu"
                   id="guest-chrome-view-trigger"
+                  aria-label="View menu"
                   onClick={() => {
                     setMenuOpen(false);
                     setViewMenuOpen((o) => !o);
                   }}
                 >
-                  <span className="guest-identity-banner__view-trigger-label">View</span>
-                  <span className="guest-identity-banner__account-control-chevron" aria-hidden>
-                    {viewMenuOpen ? '▴' : '▾'}
+                  <span className="library-mobile-rail__icon" aria-hidden>
+                    👁️
                   </span>
+                  <span className="library-mobile-rail__label">View</span>
                 </button>
                 {viewMenuOpen ? (
                   <div
@@ -174,6 +202,20 @@ export default function GuestIdentityBanner() {
                     role="menu"
                     aria-labelledby="guest-chrome-view-trigger"
                   >
+                    {sharePayload ? (
+                      <button
+                        type="button"
+                        className="guest-identity-banner__menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          sharePayload.onShareClick();
+                          setViewMenuOpen(false);
+                        }}
+                        aria-label="Copy read-only share link to clipboard"
+                      >
+                        Share link
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
@@ -201,6 +243,23 @@ export default function GuestIdentityBanner() {
                   </div>
                 ) : null}
               </div>
+            ) : null}
+            {!shareViewerMode ? (
+              <button
+                type="button"
+                className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__upload-chip"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setViewMenuOpen(false);
+                  onOpenUpload();
+                }}
+                aria-label="Upload files"
+              >
+                <span className="library-mobile-rail__icon" aria-hidden>
+                  📄
+                </span>
+                <span className="library-mobile-rail__label">Upload</span>
+              </button>
             ) : null}
             {devControls ? (
               <button
@@ -356,7 +415,33 @@ export default function GuestIdentityBanner() {
       aria-label="Account mode"
     >
       <div className="guest-identity-banner__leading">
-        {mobileRailVisible && (
+        {showHomeNav ? (
+          <button
+            type="button"
+            className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__home-banner"
+            onClick={() => navigate('/')}
+            aria-label="Go to home"
+          >
+            <span className="library-mobile-rail__icon" aria-hidden>
+              🏠
+            </span>
+            <span className="library-mobile-rail__label">Home</span>
+          </button>
+        ) : null}
+        {onLandingRoute ? (
+          <button
+            type="button"
+            className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__visualize-banner"
+            aria-label="Visualize: open library and network graphs"
+            onClick={() => navigate('/visualize')}
+          >
+            <span className="library-mobile-rail__icon" aria-hidden>
+              🔍
+            </span>
+            <span className="library-mobile-rail__label">Visualize</span>
+          </button>
+        ) : null}
+        {onVisualizeRoute ? (
           <button
             type="button"
             className="library-mobile-rail library-mobile-rail--banner"
@@ -368,7 +453,7 @@ export default function GuestIdentityBanner() {
             </span>
             <span className="library-mobile-rail__label">Library</span>
           </button>
-        )}
+        ) : null}
       </div>
       <div className="guest-identity-banner__center-stack">
         {showTitle ? (
@@ -382,34 +467,25 @@ export default function GuestIdentityBanner() {
         ref={menuWrapRef}
       >
         <div className="guest-identity-banner__trailing-cluster">
-          {onVisualizeRoute && sharePayload ? (
-            <button
-              type="button"
-              className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
-              onClick={sharePayload.onShareClick}
-              aria-label="Copy read-only share link to clipboard"
-            >
-              SHARE
-            </button>
-          ) : null}
           {onVisualizeRoute ? (
             <div className="guest-identity-banner__view-wrap">
               <button
                 type="button"
-                className="guest-identity-banner__view-trigger"
+                className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__view-menu-chip"
                 aria-expanded={viewMenuOpen}
                 aria-haspopup="menu"
                 aria-controls="guest-chrome-view-menu-reg"
                 id="guest-chrome-view-trigger-reg"
+                aria-label="View menu"
                 onClick={() => {
                   setMenuOpen(false);
                   setViewMenuOpen((o) => !o);
                 }}
               >
-                <span className="guest-identity-banner__view-trigger-label">View</span>
-                <span className="guest-identity-banner__account-control-chevron" aria-hidden>
-                  {viewMenuOpen ? '▴' : '▾'}
+                <span className="library-mobile-rail__icon" aria-hidden>
+                  👁️
                 </span>
+                <span className="library-mobile-rail__label">View</span>
               </button>
               {viewMenuOpen ? (
                 <div
@@ -418,6 +494,20 @@ export default function GuestIdentityBanner() {
                   role="menu"
                   aria-labelledby="guest-chrome-view-trigger-reg"
                 >
+                  {sharePayload ? (
+                    <button
+                      type="button"
+                      className="guest-identity-banner__menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        sharePayload.onShareClick();
+                        setViewMenuOpen(false);
+                      }}
+                      aria-label="Copy read-only share link to clipboard"
+                    >
+                      Share link
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
@@ -446,9 +536,26 @@ export default function GuestIdentityBanner() {
               ) : null}
             </div>
           ) : null}
+          {!shareViewerMode ? (
+            <button
+              type="button"
+              className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__upload-chip"
+              onClick={() => {
+                setMenuOpen(false);
+                setViewMenuOpen(false);
+                onOpenUpload();
+              }}
+              aria-label="Upload files"
+            >
+              <span className="library-mobile-rail__icon" aria-hidden>
+                📄
+              </span>
+              <span className="library-mobile-rail__label">Upload</span>
+            </button>
+          ) : null}
           <button
             type="button"
-            className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
+            className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__account-rail-chip"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
             aria-label={
@@ -461,8 +568,11 @@ export default function GuestIdentityBanner() {
               setMenuOpen((o) => !o);
             }}
           >
+            <span className="library-mobile-rail__icon" aria-hidden>
+              👤
+            </span>
             <span
-              className="guest-identity-banner__account-control-id guest-identity-banner__account-control-id--trigger"
+              className="library-mobile-rail__label"
               title={authUser?.name?.trim() ? authUser.name : userId || ''}
             >
               {accountTriggerLabel}
@@ -581,3 +691,7 @@ export default function GuestIdentityBanner() {
     </aside>
   );
 }
+
+GuestIdentityBanner.propTypes = {
+  onOpenUpload: PropTypes.func,
+};

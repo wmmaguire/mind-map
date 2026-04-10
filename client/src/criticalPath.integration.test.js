@@ -98,7 +98,15 @@ describe('critical path integration (mocked fetch)', () => {
   });
 
   it('loads visualize route and empty library', async () => {
+    const user = userEvent.setup();
     renderApp(['/visualize']);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /open library/i })
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /open library/i }));
 
     await waitFor(() => {
       expect(
@@ -110,7 +118,7 @@ describe('critical path integration (mocked fetch)', () => {
       expect(screen.getByText(/No uploaded files yet/i)).toBeInTheDocument();
     });
     expect(
-      screen.getByRole('link', { name: /Go to home/i })
+      screen.getByRole('button', { name: /Go to home/i })
     ).toBeInTheDocument();
 
     expect(
@@ -130,8 +138,17 @@ describe('critical path integration (mocked fetch)', () => {
     });
 
     await user.click(
-      screen.getByRole('button', { name: /Visualize/i })
+      screen.getByRole('button', {
+        name: /visualize: open library and network graphs/i,
+      })
     );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /open library/i })
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /open library/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/No uploaded files yet/i)).toBeInTheDocument();

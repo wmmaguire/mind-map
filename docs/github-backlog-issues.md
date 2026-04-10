@@ -86,7 +86,7 @@ Refs: #20 #46 #32 #64
 
 **Note:** **#62** — **Graph expansion modes:** dropdown to choose **manual generate** (current **`/api/generate-node`**) vs **multi-cycle randomized growth** (parameterized AI nodes per cycle, connections per node, cycle count; random attachment to existing nodes). Supersedes the cancelled **#37** budget-preview experiment; see GitHub **#62** for acceptance criteria and open questions.
 
-**Note:** **#68** / **#69** — **Backlog (future algorithms):** **#68** — multi-cycle randomized **strategy slider** (low-community ←→ random ←→ high-community) for choosing attachment targets and optional per-cycle **deletions** with the same bias; **#69** — **Explosion** mode: zoom in close enough to a node to trigger a Wikipedia-backed, **fully-connected** subgraph expansion. See `https://github.com/wmmaguire/mind-map/issues/68` and `https://github.com/wmmaguire/mind-map/issues/69`.
+**Note:** **#68** / **#69** — **Backlog (future algorithms):** **#68** — multi-cycle randomized **strategy slider** (low-community ←→ random ←→ high-community) for choosing attachment targets and optional per-cycle **deletions** with the same bias; **#69** — **Explosion** mode: zoom in close enough to a node to trigger a Wikipedia-backed, **fully-connected** subgraph expansion. See `https://github.com/wmmaguire/mind-map/issues/68` and `https://github.com/wmmaguire/mind-map/issues/69`. **Related doc issue (create manually):** *Backlog: Node image / Wikipedia thumbnail* at end of this file—optional **`thumbnailUrl`** on nodes + MediaWiki API resolution for **`wikiUrl`**, tooltip / D3 display.
 
 **Note:** **#36 (timestamp playback, Apr 2026)** — **Graph time travel (client slice):** replay uses **per-entity** **`createdAt`** (fallback **`timestamp`**) and **`buildGraphAtPlaybackTime`** in **`graphPlayback.js`**; **`LibraryVisualize`** keeps **`committedGraph`** + **`playbackStepIndex`**. **UI:** **`GraphPlaybackBanner`** (second strip in **`App.js`**, below **`GuestIdentityBanner`**) — **save**, **◀** / **▶**, range slider, **Play** / **Pause**, **speed** (interval **1800 ms / speed**, persisted in **`localStorage`**), **share** (**#39**). **`GraphHistoryUiContext`** exposes **`payload`**, **`sharePayload`**, **`savePayload`**. Identity banner is **title-only** (graph title **blank** when unnamed). **`graphHistory.js`** snapshot **reducer** is **not** used for this path (kept for **`normalizeGraphSnapshot`** / **`materializeGraphSnapshot`** + **`graphHistory.test.js`**). **Follow-ups:** GitHub **#70** (*Backlog: Graph time travel phase 2+*) and *Backlog: Graph playback implementation follow-ups* below. Suggested comments: **#36**, **#33**, **#39**, **#29**, **#16**, **#24** / **#52** / **#56** / **#57** / **#70**.
 
@@ -254,11 +254,11 @@ Refs: #62 #37 #24 #50 #57 #56
 
 **Note:** Client **#31** (accounts / identity epic — **in-progress foundation** on branch **`issue-31-guest-identity-foundation`**) — **Guest identity:** **`client/src/context/IdentityContext.jsx`** (`IdentityProvider`, **`useIdentity()`**, `identityKind: 'guest'`, `isRegistered: false`); **`GuestIdentityBanner`** in **`App.js`**; **`index.js`** wraps **`IdentityProvider`** inside **`SessionProvider`**. Commit **`2887b26`**. Tests: **`IdentityContext.test.jsx`**, **`App.test.js`**, **`criticalPath.integration.test.js`**. **Library Actions FAB placement:** **`GraphVisualization`** accepts **`actionsFabPlacement`**: **`fixedViewport`** (default: **`position: fixed`** top-right of the window, used for non-Library routes) vs **`libraryGraphMount`** (**`LibraryVisualize`** passes this): FAB stays inside **`.graph-visualization-container`** with **`position: absolute`** top-right over the **SVG** (class **`graph-actions-fab--library-graph-mount`**, scoped in **`LibraryVisualize.css`**), not in the **visualization title** bar. Commit **`22cb6ac`**. A short-lived **portal-into-header** experiment (**`bc0b3cc`**) was **reverted** in favor of graph-anchored placement. **Post–#33:** the Library **graph title** moved to **`GuestIdentityBanner`** via **`GraphTitleContext`**; **`VISUALIZATION_HEADER_PX`** was removed from **`LibraryVisualize`** (full-height graph panel). **Still backlog (outside this foundation slice):** full **sign-in / OAuth** — continues under **#33** / future epic; **`ResizeObserver`** / flex-only layout polish — **#53**; full **z-index** pass — **#52**; browser **E2E** — **#24**; **`VisualizationPage`** save payload vs server — **#49**.
 
-**Note:** Client **#33** (Library + accounts UI — branch **`issue-33-library-accounts-ui`**, docs at **`f430bae`**) — **`apiRequest`** optional **`auth: { userId }`** → **`X-Mindmap-User-Id`** (**`http.js`**); **`IdentityProvider`** supports optional **`initialRegisteredUserId`** / **`REACT_APP_MINDMAP_USER_ID`** and dev **`setDevRegisteredUserId`**; **`LibraryVisualize`** + modal **`Library.js`** pass mindmap auth on list/analyze/save/delete paths; save adds **`metadata.userId`** when registered. **UI:** **`LibrarySidebar`** / **`LibrarySourcesPanel`** / **`LibraryAccountChip`**; **`GuestIdentityBanner`** — graph title (**`GraphTitleContext`**), sign-in / account menu (**#63**), **mobile Library** (**`LibraryUiContext`**). **Tests:** wrap **`GraphTitleProvider`** + **`LibraryUiProvider`** where needed. **Out of scope / follow-ups:** real **OAuth / bearer** tokens; dedupe **LibraryAccountChip** vs banner copy where needed; **E2E** (**#24**) for **`/visualize`** banner + library open; **a11y** review of banner **menu**.
+**Note:** Client **#33** (Library + accounts UI — branch **`issue-33-library-accounts-ui`**, docs at **`f430bae`**) — **`apiRequest`** optional **`auth: { userId }`** → **`X-Mindmap-User-Id`** (**`http.js`**); **`IdentityProvider`** supports optional **`initialRegisteredUserId`** / **`REACT_APP_MINDMAP_USER_ID`** and dev **`setDevRegisteredUserId`**; **`LibraryVisualize`** + modal **`Library.js`** pass mindmap auth on list/analyze/save/delete paths; save adds **`metadata.userId`** when registered. **UI:** **`LibrarySidebar`** / **`LibrarySourcesPanel`**; **`GuestIdentityBanner`** — graph title (**`GraphTitleContext`**), sign-in / account menu (**#63**), shell rails (**#40**), **Library** (**`LibraryUiContext`**). **`LibraryAccountChip`** removed in **#40** (account in banner only). **Tests:** wrap **`GraphTitleProvider`** + **`LibraryUiProvider`** where needed. **Out of scope / follow-ups:** real **OAuth / bearer** tokens; **E2E** (**#24**) for **`/visualize`** banner + library open; **a11y** review of banner **menu**.
 
 **Note:** Server **#32** (user-scoped file & graph listing) — Implemented **`67677b4`** on branch **`issue-32-user-scoped-listings`**, extended on **`issue-63-auth-registration-login`** with **account isolation**: **`GET /api/files?sessionId=`** returns only **guest** rows (no non-empty **`File.userId`**); **`GET /api/graphs?sessionId=`** skips graph JSON with **`metadata.userId`**; **`GET/DELETE`** by filename enforce owner checks for account-owned resources (**`server/READEME.md`** §3). **`GET /api/files`**: Mongo **`File.find`** by **`sessionId`** (guest) or **`userId`** (header/query); legacy unscoped read of **`metadata/`** if no query. **`GET /api/graphs`**: filters disk JSON accordingly. **`POST /api/upload`** sets **`File.userId`** when **`X-Mindmap-User-Id`** is sent (**#63**). **Out of scope / follow-ups:** **#64** (JWT-verified owner vs **`X-Mindmap-User-Id`**), **#65** (gate legacy unscoped **`GET /api/files`**), **#66** (authorize **`POST /api/analyze`**); guest → account **migration** of legacy session files — product; automated tests — **#24**; Mongo vs **`metadata/`** reconciliation — **#46**; sharing epic — future.
 
-**Note:** **#63** (registration / login / profile + library integration — branch **`issue-63-auth-registration-login`**) — Server: **`User`** model, **`POST/GET/PATCH /api/auth/*`**, httpOnly **`mindmap_auth`** JWT cookie, **`PATCH /api/me`** for display name; **`POST /upload`** + **`graphs/save`** attach **`userId`** from header; listing/read/delete rules above. Client: **`AuthProvider`**, **`AuthIdentityBridge`**, **`GuestIdentityBanner`** (sign-in modal, user settings, sign out), **`LibraryVisualize`** / **`Library.js`** / **`FileUpload`** pass **`auth: { userId }`**; **`LibraryAccountChip`** shows **name** when present. **Removed:** redundant **Guest** label; dev **End preview** menu item (refresh clears preview state). **Docs:** **`server/READEME.md`**, **`client/README.md`**, **`docs/status.md`**, this file. **Follow-ups outside #63:** **#64**, **#65**, **#66**; OAuth — **#33** / future epic.
+**Note:** **#63** (registration / login / profile + library integration — branch **`issue-63-auth-registration-login`**) — Server: **`User`** model, **`POST/GET/PATCH /api/auth/*`**, httpOnly **`mindmap_auth`** JWT cookie, **`PATCH /api/me`** for display name; **`POST /upload`** + **`graphs/save`** attach **`userId`** from header; listing/read/delete rules above. Client: **`AuthProvider`**, **`AuthIdentityBridge`**, **`GuestIdentityBanner`** (sign-in modal, user settings, sign out, account rail chip — **#40**), **`LibraryVisualize`** / **`Library.js`** / **`FileUpload`** pass **`auth: { userId }`**. **`LibraryAccountChip`** removed (**#40**). **Removed:** redundant **Guest** label; dev **End preview** menu item (refresh clears preview state). **Docs:** **`server/READEME.md`**, **`client/README.md`**, **`docs/status.md`**, this file. **Follow-ups outside #63:** **#64**, **#65**, **#66**; OAuth — **#33** / future epic.
 
 **Note:** **#67** — Expand **Account settings** with more editable profile/preferences fields (e.g. bio, avatar URL, timezone); **email change** / **password change** as separate verified flows.
 
@@ -375,4 +375,198 @@ Paste into GitHub as needed:
 
 ```markdown
 **Update (Apr 2026):** Disjoint union + shared batch timestamp unchanged; **#72** may inform fused or time-ordered graphs and `createdAt` assignment.
+```
+
+### GitHub **#40** — library empty graph + shell navigation (Apr 2026)
+
+**Shipped (branch `issue-40-library-graph-empty-state`):**
+
+- **`GraphVisualization`**: prop **`emptyStateVariant`** (`default` | `library`); when the graph has **no nodes** and **`readOnly`** is false, an accessible **empty-state** region explains how to add concepts (library copy is a short ordered list). **Share viewers** see a compact read-only empty status instead. **`LibraryVisualize`** passes **`library`** except in **`shareViewerMode`**.
+- **Docked tooltip**: **`graph-canvas-tooltip`** is positioned **beside** the clicked node/link (clamped inside the graph canvas) instead of a fixed corner.
+- **`GuestIdentityBanner`**: optional **`onOpenUpload`** (from **`App`**) drives a shell **Upload** chip (hidden in **`shareViewerMode`**). Leading rails: **Home** (when not on `/`), **Visualize** (on `/`), **Library** (on `/visualize`). **Share link** moved into the **View** dropdown. Account trigger restyled as a rail chip (**👤** + label). **`LibraryAccountChip`** removed from the library sidebar—identity is banner-only.
+- **`LibraryUiContext`**: **`registerMobileLibraryRail(active, openFn)`** no longer exposes **`mobileRailVisible`**; **`LibraryVisualize`** registers **`active: true`** whenever mounted so the banner can show **Library** on **`/visualize`** without a separate visibility flag.
+- **`LibraryVisualize`**: desktop sidebar width is **capped** so the graph viewport keeps at least **~200px**; **mobile** library drawer: persisted width (**`localStorage`**), optional maximize, drag-to-dismiss when released below **~140px**; **Graphs** list filtered/sorted with **`getFilteredSortedGraphs`** (same query/sort keys as files).
+- **`LibrarySourcesPanel` / `LibrarySidebar`**: empty-state CTAs (**Home**, upload) where applicable.
+- **Landing `/`**: removed the old **feature-card** grid; primary CTAs are the banner rails.
+- **Tests**: **`GraphVisualization.test.js`** (empty states), **`GuestIdentityBanner.test.jsx`**, **`libraryFileList.test.js`** (graphs), **`criticalPath.integration.test.js`** tweak.
+
+#### Follow-ups **outside** #40 (address on referenced issues or future backlog)
+
+| Topic | Where to track |
+|--------|----------------|
+| Browser **E2E** for empty graph overlay, View menu (**Share**), banner rails (**Home** / **Upload**), mobile drawer drag-to-close | **#24** |
+| **Z-index** / stacking: new rail chips vs **Actions** FAB vs library overlay vs modals | **#52** |
+| **Focus order** / **roving focus** for **View** menu, **Upload** chip, empty-state region vs modals | **#56** |
+| Screen reader: empty-state **steps** announcements; tooltip **repositioning** + SR | **#57** |
+| Replace **`window.alert`** on failures with toast (**#50**); landing **marketing** copy if product wants more than banner CTAs | **#50** + optional backlog *Landing value props* below |
+| Narrow-viewport **library** density / playback strip overlap | **#52**, **#70** |
+| **i18n** / copy polish for empty-state strings | Future or **#50** UX pass |
+
+### Suggested GitHub issue comments (#40 implementation, paste as needed)
+
+**On #40 — comment body (closure / summary):**
+
+```markdown
+**Shipped (Apr 2026):** Library **empty graph** guidance in **`GraphVisualization`** (`emptyStateVariant`, `library` vs `default`, read-only share empty copy). Shell **Home** / **Visualize** / **Library** / **Upload** rails; **Share link** under **View**; **`LibraryAccountChip`** removed. Library sidebar respects **min graph width**; mobile drawer width + drag-to-dismiss; **graphs** search/sort via **`getFilteredSortedGraphs`**. Landing feature cards removed. Canvas **tooltip** anchors near selection. Follow-ups (E2E, z-index, a11y focus, SR) are listed under *GitHub #40* in `docs/github-backlog-issues.md`.
+```
+
+**On #25 — comment body:**
+
+```markdown
+**Update (#40):** Desktop library **sidebar** max width is tied to viewport so the graph keeps **≥200px**. Mobile library **drawer** adds persisted width, maximize, and drag-left to close. Worth a quick **#52** pass so new **banner** chips and the drawer still stack cleanly with the **Actions** FAB.
+```
+
+**On #27 — comment body:**
+
+```markdown
+**Update (#40):** When the graph has **no nodes**, an **empty-state** overlay covers the canvas (editable mode). Confirm **Actions** FAB / **#graph-action-menu** still feel discoverable and are not obscured on short viewports; if needed, track z-index tweaks under **#52**.
+```
+
+**On #29 — comment body:**
+
+```markdown
+**Update (#40):** **`graph-edit-mode-chip`** and modals should **suppress** the editable empty overlay (`emptyStateBlockedByModal`). If chip + empty copy ever compete visually, treat as polish under **#56** / **#52**.
+```
+
+**On #33 — comment body:**
+
+```markdown
+**Update (#40):** **`LibraryAccountChip`** was **removed** from the library chrome; signed-in identity uses the **banner** rail chip only (dedupes the old sidebar duplicate). **`GuestIdentityBanner`** takes **`onOpenUpload`** from **`App`** for the shell **Upload** button.
+```
+
+**On #39 — comment body:**
+
+```markdown
+**Update (#40):** **Copy read-only link** moved from a top-level **SHARE** button into the **View** menu (**Share link**). Recipient URL and **`readOnly`** behavior unchanged; update any manual E2E notes that still say “SHARE on the title row.”
+```
+
+**On #50 — comment body:**
+
+```markdown
+**Update (#40):** Landing **`/`** no longer shows the **feature-card** grid—navigation is via **Home** / **Visualize** in the banner. If marketing wants richer landing content again, file a small backlog issue or extend this one; optional toast/snackbar for share copy failures remains a general **#50** item.
+```
+
+**On #52 — comment body:**
+
+```markdown
+**Update (#40):** New **banner** controls (**Home**, **Visualize**, **Library**, **Upload**, **View**, account chip) reuse **`library-mobile-rail`** styling. Please verify stacking vs **Actions** FAB (**1190**), library overlay (**1200**), and modals when you next do a **z-index** audit.
+```
+
+**On #56 — comment body:**
+
+```markdown
+**Update (#40):** **View** menu now hosts **Share link** and other items; **Upload** is a separate chip. Consider focus return and **Tab** order when dismissing menus after **#40** shell changes.
+```
+
+**On #57 — comment body:**
+
+```markdown
+**Update (#40):** Empty graph uses **`role="region"`** + **`aria-label="Getting started with an empty graph"`** for the editable overlay. **Tooltip** position updates when selecting nodes—verify SR users get equivalent info (node label / wiki link) and that announcements are not noisy.
+```
+
+**On #63 — comment body:**
+
+```markdown
+**Update (#40):** Account **name/id** display moved entirely to **`GuestIdentityBanner`** (rail chip); **`LibraryAccountChip`** component was deleted. Auth flows unchanged.
+```
+
+**On #24 — comment body:**
+
+```markdown
+**Update (#40):** Good E2E candidates: empty graph **region** visible on **`/visualize`** with no graph; **View** → **Share link** for owners; **Upload** chip opens root **`FileUpload`** modal; mobile **Library** drawer drag-to-dismiss; **graphs** list obeys search/sort like files.
+```
+
+### Backlog: Landing value props / marketing grid (create manually)
+
+**Title:** `Backlog: Landing page — optional value-prop cards or hero (post–#40)`
+
+**Body:**
+
+```markdown
+## Context
+**#40** removed the **`/`** feature-card grid in favor of **Home** / **Visualize** rails in **`GuestIdentityBanner`**.
+
+## Scope (future)
+- Product/design: restore cards, a hero, or other onboarding without duplicating navigation.
+- Coordinate with **#50** (shared notifications / error UX) if CTAs trigger modals.
+
+Refs: #40 #50 #33
+```
+
+### Backlog: Node image / Wikipedia thumbnail — follow-up issue (create manually)
+
+**Title:** `Backlog: Optional node thumbnail (Wikipedia + graph payload + tooltip / canvas)`
+
+**Body:**
+
+```markdown
+## Summary
+Extend graph **nodes** with an optional **image URL** (or server-resolved thumbnail) so the UI can show a picture in the **docked tooltip** (`graph-canvas-tooltip`) and/or on the **node** in D3. For nodes that already have **`wikiUrl`** (e.g. “Learn more” in **`GraphVisualization.js`**), resolve a **stable thumbnail** via the **MediaWiki API** (not client-side HTML scraping—CORS and ToU).
+
+## Context (Apr 2026)
+- Today nodes carry **`wikiUrl`**; tooltip HTML includes `<a href="…" target="_blank">Learn more</a>` when set.
+- D3 datum shape can already carry extra fields; persistence is graph JSON / Mongo **`Graph.payload`**—schema and migrations need a decision if the field is first-class.
+
+## Proposed scope
+
+1. **Data model** — Add optional **`thumbnailUrl`** / **`imageUrl`** (or nested **`media: { thumbnailUrl }`**) on nodes; document in API + client PropTypes; backward-compatible defaults for existing graphs.
+2. **Resolution (Wikipedia)** — **Server-side** helper: parse **`wikiUrl`** → title + wiki host → **`action=query`** + **`prop=pageimages`** (or equivalent) → store URL on node when analyze/generate/save runs, or lazy-resolve on first open (with caching + rate limits).
+3. **AI-generated nodes** — When the pipeline sets **`wikiUrl`**, optionally run the same resolver once and persist thumbnail (avoid N+1 on every client render).
+4. **Client / D3** — Tooltip: safe `<img>` (allowlist `https:` only, max dimensions, `alt` from label). Optional: SVG **`<image>`** or pattern on node circles; lazy-load / decode error fallback.
+5. **Non-Wiki URLs** — Out of scope or later: Open Graph / generic fetch only via **backend** (same CORS/abuse constraints).
+
+## Acceptance criteria (draft)
+- [ ] Existing graphs without the new field unchanged.
+- [ ] At least one path (e.g. post-analyze or explicit refresh) populates thumbnail for en.wikipedia.org links used today.
+- [ ] No client-side fetch of arbitrary Wikipedia article HTML for image scraping.
+
+## Related
+- **`GraphVisualization.js`** tooltip and node merge paths (`wikiUrl`).
+- **`server`** analyze / generate routes if thumbnails are filled at ingest time.
+
+Refs: #27 #29 #37 #62 #69 #21 #48
+```
+
+#### Suggested GitHub comments (node thumbnail backlog — paste on Refs issues)
+
+**On #27 — comment body:**
+
+```markdown
+**Context (Apr 2026):** Saved graphs are **Mongo-authoritative** (`Graph.payload.nodes[]`). A future **optional `thumbnailUrl`** on nodes would ship in that payload and show in the **docked canvas tooltip** (now positioned **beside** the selected node) and optionally on the node glyph—see backlog *Optional node thumbnail* in `docs/github-backlog-issues.md`.
+```
+
+**On #29 — comment body:**
+
+```markdown
+**Context (Apr 2026):** If we add **node thumbnails**, the **`graph-edit-mode-chip`** and empty-state overlays should stay visually distinct from any **`<image>`** on nodes; track layout polish with tooltip + chip work.
+```
+
+**On #37 — comment body:**
+
+```markdown
+**Context (Apr 2026):** **`dryRun`** / budget caps remain server-side. If **generate-node** later persists **`thumbnailUrl`** from Wikipedia resolution, ensure **preview** paths do not hammer the MediaWiki API—may need caching or opt-in.
+```
+
+**On #62 — comment body:**
+
+```markdown
+**Context (Apr 2026):** **Generate** flows that set **`wikiUrl`** are a natural place to **resolve thumbnails once** server-side (backlog: MediaWiki **pageimages**) and store on nodes in **`Graph.payload`**—avoids N+1 client fetches.
+```
+
+**On #69 — comment body:**
+
+```markdown
+**Context (Apr 2026):** **Explosion** / Wikipedia-backed subgraph work will create many **`wikiUrl`** nodes; thumbnail resolution should be **batched + cached** server-side (same backlog as *Optional node thumbnail*).
+```
+
+**On #21 — comment body:**
+
+```markdown
+**Context (Apr 2026):** **`mergeAnalyzedGraphs`** can carry through arbitrary node fields from the API. If the server adds **`thumbnailUrl`** per node, merged library graphs should preserve it per namespaced id; no client-side Wikipedia scraping.
+```
+
+**On #48 — comment body:**
+
+```markdown
+**Context (Apr 2026):** Batch analyze partial success remains open. If we add **per-node thumbnail hydration** after analyze, decide whether thumbnail fetch failures are **non-fatal** (skip image) so one bad URL does not fail the whole batch.
 ```

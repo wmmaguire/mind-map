@@ -17,6 +17,7 @@ import { apiRequest, getApiErrorMessage } from '../api/http';
 import { buildAnalyzeNamespace, mergeAnalyzedGraphs } from '../utils/mergeGraphs';
 import {
   getFilteredSortedFiles,
+  getFilteredSortedGraphs,
   FILE_SORT_NAME_ASC,
 } from '../utils/libraryFileList';
 import {
@@ -32,22 +33,67 @@ import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './LibraryVisualize.css';
 
 const SIDEBAR_WIDTH_KEY = 'mindmap.librarySidebarWidth';
+const MOBILE_LIBRARY_DRAWER_WIDTH_KEY = 'mindmap.mobileLibraryDrawerWidth';
 const SECTIONS_KEY = 'mindmap.librarySections';
 const MIN_SIDEBAR_WIDTH = 240;
-const MAX_SIDEBAR_WIDTH = 480;
+const MIN_GRAPH_VIEWPORT_PX = 200;
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const RESIZE_HANDLE_PX = 6;
-function readStoredSidebarWidth() {
+
+const MIN_MOBILE_LIBRARY_DRAWER_WIDTH = 220;
+/** Release width below this (after dragging left) closes the drawer. */
+const MOBILE_LIBRARY_DRAWER_CLOSE_BELOW_PX = 140;
+
+function maxMobileLibraryDrawerWidth(viewportWidth) {
+  return Math.max(
+    MIN_MOBILE_LIBRARY_DRAWER_WIDTH,
+    Math.min(Math.floor(viewportWidth * 0.96), viewportWidth - 16)
+  );
+}
+
+function defaultMobileLibraryDrawerWidth(viewportWidth) {
+  return Math.min(352, maxMobileLibraryDrawerWidth(viewportWidth));
+}
+
+function readStoredMobileLibraryDrawerWidth(viewportWidth) {
+  const cap = maxMobileLibraryDrawerWidth(viewportWidth);
   try {
-    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const raw = localStorage.getItem(MOBILE_LIBRARY_DRAWER_WIDTH_KEY);
     const w = parseInt(raw, 10);
-    if (Number.isFinite(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) {
+    if (Number.isFinite(w) && w >= MIN_MOBILE_LIBRARY_DRAWER_WIDTH && w <= cap) {
       return w;
+    }
+    if (Number.isFinite(w) && w >= MIN_MOBILE_LIBRARY_DRAWER_WIDTH) {
+      return Math.min(w, cap);
     }
   } catch {
     /* ignore */
   }
-  return DEFAULT_SIDEBAR_WIDTH;
+  return defaultMobileLibraryDrawerWidth(viewportWidth);
+}
+
+function maxSidebarWidthForViewport(viewportWidth) {
+  const maxAllowed = viewportWidth - RESIZE_HANDLE_PX - MIN_GRAPH_VIEWPORT_PX;
+  return Math.max(MIN_SIDEBAR_WIDTH, maxAllowed);
+}
+
+function readStoredSidebarWidth() {
+  const vw =
+    typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const cap = maxSidebarWidthForViewport(vw);
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const w = parseInt(raw, 10);
+    if (Number.isFinite(w) && w >= MIN_SIDEBAR_WIDTH && w <= cap) {
+      return w;
+    }
+    if (Number.isFinite(w) && w >= MIN_SIDEBAR_WIDTH) {
+      return Math.min(w, cap);
+    }
+  } catch {
+    /* ignore */
+  }
+  return Math.min(DEFAULT_SIDEBAR_WIDTH, cap);
 }
 
 function readStoredSections() {
@@ -64,7 +110,7 @@ function readStoredSections() {
   }
 }
 
-function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
+function LibraryVisualize({ fileRefreshToken }) {
   const [searchParams] = useSearchParams();
   const shareGraph = searchParams.get('shareGraph');
   const shareToken = searchParams.get('shareToken');
@@ -109,6 +155,15 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const [showSidebar, setShowSidebar] = useState(false);
 
   const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
+  const [mobileLibraryDrawerWidth, setMobileLibraryDrawerWidth] = useState(
+    () =>
+      readStoredMobileLibraryDrawerWidth(
+        typeof window !== 'undefined' ? window.innerWidth : 768
+      )
+  );
+  /** Mobile: drawer spans full library-visualize width (covers graph canvas). */
+  const [mobileLibraryDrawerMaximized, setMobileLibraryDrawerMaximized] =
+    useState(false);
   const [filesSectionOpen, setFilesSectionOpen] = useState(
     () => readStoredSections().files
   );
@@ -153,6 +208,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   const displayFiles = useMemo(
     () => getFilteredSortedFiles(files, fileSearchQuery, fileSort),
     [files, fileSearchQuery, fileSort]
+  );
+
+  const displayGraphs = useMemo(
+    () => getFilteredSortedGraphs(savedGraphs, fileSearchQuery, fileSort),
+    [savedGraphs, fileSearchQuery, fileSort]
   );
 
   const defaultNodeColor = '#4a90e2'; // default node color is blue
@@ -328,6 +388,22 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
   useEffect(() => {
     try {
       localStorage.setItem(
+        MOBILE_LIBRARY_DRAWER_WIDTH_KEY,
+        String(mobileLibraryDrawerWidth)
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [mobileLibraryDrawerWidth]);
+
+  useEffect(() => {
+    const cap = maxMobileLibraryDrawerWidth(dimensions.width);
+    setMobileLibraryDrawerWidth((w) => Math.min(w, cap));
+  }, [dimensions.width]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
         SECTIONS_KEY,
         JSON.stringify({ files: filesSectionOpen, graphs: graphsSectionOpen })
       );
@@ -340,19 +416,47 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     setShowSidebar(true);
   }, []);
 
+  const handleMobileLibraryDrawerDragEnd = useCallback(
+    (finalWidth) => {
+      if (finalWidth < MOBILE_LIBRARY_DRAWER_CLOSE_BELOW_PX) {
+        setShowSidebar(false);
+        setMobileLibraryDrawerMaximized(false);
+        setMobileLibraryDrawerWidth(
+          defaultMobileLibraryDrawerWidth(dimensions.width)
+        );
+      }
+    },
+    [dimensions.width]
+  );
+
+  const handleMobileLibraryDrawerWidthChange = useCallback((value) => {
+    setMobileLibraryDrawerMaximized(false);
+    setMobileLibraryDrawerWidth(value);
+  }, []);
+
+  const toggleMobileLibraryDrawerMaximized = useCallback(() => {
+    setMobileLibraryDrawerMaximized((v) => !v);
+  }, []);
+
   useEffect(() => {
-    const mobile = dimensions.width <= 768;
-    registerMobileLibraryRail(
-      mobile && !showSidebar,
-      openLibrarySidebar
-    );
+    if (!showSidebar) {
+      setMobileLibraryDrawerMaximized(false);
+    }
+  }, [showSidebar]);
+
+  const desktopSidebarMaxWidth = useMemo(
+    () => maxSidebarWidthForViewport(dimensions.width),
+    [dimensions.width]
+  );
+
+  useEffect(() => {
+    setSidebarWidth((sw) => Math.min(sw, desktopSidebarMaxWidth));
+  }, [desktopSidebarMaxWidth]);
+
+  useLayoutEffect(() => {
+    registerMobileLibraryRail(true, openLibrarySidebar);
     return () => registerMobileLibraryRail(false, null);
-  }, [
-    dimensions.width,
-    showSidebar,
-    openLibrarySidebar,
-    registerMobileLibraryRail,
-  ]);
+  }, [openLibrarySidebar, registerMobileLibraryRail]);
 
   useEffect(() => {
     const raw = currentSource?.name;
@@ -370,8 +474,9 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
     const onMove = (moveEvent) => {
       const delta = moveEvent.clientX - startX;
+      const cap = maxSidebarWidthForViewport(dimensions.width);
       const next = Math.min(
-        MAX_SIDEBAR_WIDTH,
+        cap,
         Math.max(MIN_SIDEBAR_WIDTH, startWidth + delta)
       );
       setSidebarWidth(next);
@@ -385,10 +490,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [sidebarWidth]);
+  }, [sidebarWidth, dimensions.width]);
 
   const handleResizeKeyDown = useCallback(
     (e) => {
+      const cap = maxSidebarWidthForViewport(dimensions.width);
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         setSidebarWidth((w) =>
@@ -397,11 +503,11 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         setSidebarWidth((w) =>
-          Math.min(MAX_SIDEBAR_WIDTH, w + 16)
+          Math.min(cap, w + 16)
         );
       }
     },
-    []
+    [dimensions.width]
   );
 
   const handleErrorBannerAction = () => {
@@ -856,11 +962,13 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
     graphViewportWidth = showSidebar
       ? dimensions.width
       : Math.max(200, dimensions.width - 48);
-  } else {
+  } else if (showSidebar) {
     graphViewportWidth = Math.max(
-      200,
+      MIN_GRAPH_VIEWPORT_PX,
       dimensions.width - sidebarWidth - RESIZE_HANDLE_PX
     );
+  } else {
+    graphViewportWidth = Math.max(MIN_GRAPH_VIEWPORT_PX, dimensions.width);
   }
 
   const graphViewportHeight = Math.max(200, dimensions.height);
@@ -888,6 +996,33 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         showSidebar={showSidebar}
         setShowSidebar={setShowSidebar}
         sidebarWidth={sidebarWidth}
+        mobileLibraryDrawerWidth={
+          isMobile
+            ? mobileLibraryDrawerMaximized
+              ? dimensions.width
+              : mobileLibraryDrawerWidth
+            : undefined
+        }
+        onMobileLibraryDrawerWidthChange={
+          isMobile ? handleMobileLibraryDrawerWidthChange : undefined
+        }
+        mobileLibraryDrawerMinWidth={MIN_MOBILE_LIBRARY_DRAWER_WIDTH}
+        mobileLibraryDrawerMaxWidth={
+          isMobile
+            ? mobileLibraryDrawerMaximized
+              ? dimensions.width
+              : maxMobileLibraryDrawerWidth(dimensions.width)
+            : undefined
+        }
+        onMobileLibraryDrawerDragEnd={
+          isMobile ? handleMobileLibraryDrawerDragEnd : undefined
+        }
+        mobileLibraryDrawerMaximized={
+          isMobile ? mobileLibraryDrawerMaximized : false
+        }
+        onToggleMobileLibraryDrawerMaximized={
+          isMobile ? toggleMobileLibraryDrawerMaximized : undefined
+        }
         error={error}
         onErrorBannerAction={handleErrorBannerAction}
         sourcesPanelProps={{
@@ -899,6 +1034,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           filesLoading,
           error,
           displayFiles,
+          displayGraphs,
           fileSearchQuery,
           setFileSearchQuery,
           fileSort,
@@ -908,7 +1044,6 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
           deletingFiles,
           savedGraphs,
           graphData: committedGraph,
-          onOpenUpload,
           onSelectAllFiltered: handleSelectAllFiltered,
           onClearFileSelection: handleClearFileSelection,
           onDeleteSelected: handleDeleteSelected,
@@ -926,7 +1061,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
         }}
       />
 
-      {!isMobile && (
+      {!isMobile && showSidebar && (
         <div
           className={`sidebar-resize-handle${isResizingSidebar ? ' is-active' : ''}`}
           onMouseDown={handleResizeStart}
@@ -1126,12 +1261,10 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 }
 
 LibraryVisualize.propTypes = {
-  onOpenUpload: PropTypes.func,
   fileRefreshToken: PropTypes.number,
 };
 
 LibraryVisualize.defaultProps = {
-  onOpenUpload: () => {},
   fileRefreshToken: 0,
 };
 

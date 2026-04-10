@@ -73,3 +73,81 @@ export function sortFiles(files, sortKey) {
 export function getFilteredSortedFiles(files, query, sortKey) {
   return sortFiles(filterFilesByQuery(files, query), sortKey);
 }
+
+/**
+ * @param {object} graph — saved graph row from API (metadata + filename)
+ * @returns {string}
+ */
+export function getGraphDisplayName(graph) {
+  if (!graph || typeof graph !== 'object') return '';
+  const meta =
+    graph.metadata && typeof graph.metadata === 'object' ? graph.metadata : {};
+  const name =
+    meta.name != null && String(meta.name).trim() !== ''
+      ? String(meta.name).trim()
+      : '';
+  if (name) return name;
+  const fn = graph.filename != null ? String(graph.filename).trim() : '';
+  return fn || 'Unnamed Graph';
+}
+
+function parseGraphMs(graph) {
+  const meta = graph?.metadata || {};
+  const t = Date.parse(meta.generatedAt || '');
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * @param {object[]} graphs
+ * @param {string} query
+ * @returns {object[]}
+ */
+export function filterGraphsByQuery(graphs, query) {
+  if (!Array.isArray(graphs)) return [];
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return graphs;
+  return graphs.filter((g) => {
+    const display = getGraphDisplayName(g).toLowerCase();
+    const fn = String(g.filename || '').toLowerCase();
+    return display.includes(q) || fn.includes(q);
+  });
+}
+
+/**
+ * @param {object[]} graphs
+ * @param {string} sortKey — one of FILE_SORT_*
+ * @returns {object[]}
+ */
+export function sortGraphs(graphs, sortKey) {
+  if (!Array.isArray(graphs)) return [];
+  const copy = [...graphs];
+  switch (sortKey) {
+  case FILE_SORT_NAME_DESC:
+    return copy.sort((a, b) =>
+      getGraphDisplayName(b).localeCompare(getGraphDisplayName(a), undefined, {
+        sensitivity: 'base',
+      })
+    );
+  case FILE_SORT_DATE_DESC:
+    return copy.sort((a, b) => parseGraphMs(b) - parseGraphMs(a));
+  case FILE_SORT_DATE_ASC:
+    return copy.sort((a, b) => parseGraphMs(a) - parseGraphMs(b));
+  case FILE_SORT_NAME_ASC:
+  default:
+    return copy.sort((a, b) =>
+      getGraphDisplayName(a).localeCompare(getGraphDisplayName(b), undefined, {
+        sensitivity: 'base',
+      })
+    );
+  }
+}
+
+/**
+ * @param {object[]} graphs
+ * @param {string} query
+ * @param {string} sortKey
+ * @returns {object[]}
+ */
+export function getFilteredSortedGraphs(graphs, query, sortKey) {
+  return sortGraphs(filterGraphsByQuery(graphs, query), sortKey);
+}

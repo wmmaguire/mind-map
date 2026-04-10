@@ -42,12 +42,13 @@ svg {
   color: #357abd;
 }
 
-/* Docked panel: lower-left of graph canvas (avoids cursor overlap with nodes) */
+/* Position set in JS: just left of clicked node/link (clamped inside canvas) */
 .graph-canvas-wrap .graph-canvas-tooltip {
-  left: 10px;
-  bottom: 10px;
-  top: auto;
+  left: 0;
+  top: 0;
   right: auto;
+  bottom: auto;
+  transform: none;
   z-index: 30;
   max-width: min(320px, calc(100% - 160px));
   max-height: min(40vh, 280px);

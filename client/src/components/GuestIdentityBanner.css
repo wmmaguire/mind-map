@@ -30,6 +30,23 @@
   border-bottom-color: #14532d;
 }
 
+/* Same strip height on landing, visualize, with/without graph title (center matches rail chip). */
+.guest-identity-banner--registered:not(.guest-identity-banner--playback-strip) {
+  box-sizing: border-box;
+  min-height: calc(1.85rem + 0.56rem + 1px);
+}
+
+.guest-identity-banner--registered:not(.guest-identity-banner--playback-strip)
+  .guest-identity-banner__graph-title,
+.guest-identity-banner--registered:not(.guest-identity-banner--playback-strip)
+  .guest-identity-banner__center-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.85rem;
+  box-sizing: border-box;
+}
+
 /* Second strip: share + playback only (below main GuestIdentityBanner). */
 .guest-identity-banner--playback-strip {
   grid-template-columns: 1fr;
@@ -67,15 +84,18 @@
   top: auto;
   bottom: auto;
   width: auto;
-  height: auto;
+  box-sizing: border-box;
+  line-height: 1;
   min-height: 1.85rem;
+  max-height: 1.85rem;
+  height: 1.85rem;
   z-index: 1;
   display: inline-flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 0.3rem;
-  padding: 0.15rem 0.45rem;
+  padding: 0 0.45rem;
   margin: 0;
   border: 1px solid #475569;
   border-radius: 6px;
@@ -95,6 +115,15 @@
   outline-offset: 2px;
 }
 
+.guest-identity-banner a.library-mobile-rail--banner {
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+  /* Match <button> chips: anchors ignore border-box/height differently without this */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 .guest-identity-banner .library-mobile-rail--banner .library-mobile-rail__icon {
   font-size: 1rem;
   line-height: 1;
@@ -108,6 +137,14 @@
   writing-mode: horizontal-tb;
   text-orientation: mixed;
   transform: none;
+}
+
+/* Registered account menu trigger: same chip as UPLOAD; clip short display label. */
+.guest-identity-banner .library-mobile-rail--banner.guest-identity-banner__account-rail-chip .library-mobile-rail__label {
+  max-width: 4.5ch;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .guest-identity-banner__center-stack {
@@ -181,48 +218,6 @@
 .guest-identity-banner__save-graph-btn:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 1px;
-}
-
-.guest-identity-banner__library-share-btn {
-  flex-shrink: 0;
-  min-height: 1.65rem;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-  color: #e2e8f0;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid #475569;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.guest-identity-banner__library-share-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.guest-identity-banner__library-share-btn:focus {
-  outline: 2px solid #38bdf8;
-  outline-offset: 1px;
-}
-
-/* #39: share chip beside View on title row — match view-trigger height */
-.guest-identity-banner__library-share-btn--title-row {
-  min-height: 2.65rem;
-  padding: 0.2rem 0.45rem;
-  font-size: 0.72rem;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-transform: none;
-  letter-spacing: 0.06em;
-}
-
-.guest-identity-banner__library-share-btn--title-row:focus-visible {
-  outline: 2px solid #38bdf8;
-  outline-offset: 2px;
 }
 
 /* #36 graph history — banner strip (Library → visualize) */
@@ -370,37 +365,17 @@
   flex-shrink: 0;
 }
 
-.guest-identity-banner__view-trigger {
-  margin: 0;
-  padding: 0.2rem 0.45rem;
-  min-height: 2.65rem;
-  box-sizing: border-box;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #e2e8f0;
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.guest-identity-banner__view-trigger:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.guest-identity-banner__view-trigger:focus-visible {
-  outline: 2px solid #38bdf8;
-  outline-offset: 2px;
-}
-
-.guest-identity-banner__view-trigger-label {
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* View menu: same chip treatment as Home / Library (see .library-mobile-rail--banner). */
+.guest-identity-banner__view-menu-chip,
+.guest-identity-banner__upload-chip,
+.guest-identity-banner__visualize-banner,
+.guest-identity-banner__account-rail-chip {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  /* Do not inherit banner line-height (1.25) — it inflates <a> chips on `/` */
+  line-height: 1;
 }
 
 .guest-identity-banner__menu--view {
@@ -611,44 +586,11 @@
   max-width: 100%;
 }
 
-.guest-identity-banner__account-control--registered-trigger {
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  white-space: nowrap;
-  max-width: fit-content;
-}
-
-.guest-identity-banner__account-control-id {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  text-transform: none;
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 18ch;
-}
-
-/* Registered trigger: name/id is the only visible label (no “Signed in” row). */
-.guest-identity-banner__account-control-id--trigger {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #f8fafc;
-  max-width: 4.5ch;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
-}
-
 .guest-identity-banner__account-control-chevron {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   color: #86efac;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .guest-identity-banner__menu {

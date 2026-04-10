@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import FileUpload from './components/FileUpload';
 import LibraryVisualize from './components/LibraryVisualize';
 import GiveFeedbackControl from './components/GiveFeedbackControl';
@@ -25,7 +25,7 @@ function App() {
 
   return (
     <div className="App">
-      <GuestIdentityBanner />
+      <GuestIdentityBanner onOpenUpload={openUploadModal} />
       <GraphPlaybackBanner />
       <GiveFeedbackControl />
       {showUpload && (
@@ -49,36 +49,6 @@ function App() {
                 <p className="description">
                   Transform your ideas into interactive visual networks
                 </p>
-
-                <div className="features-grid">
-                  <div
-                    className="feature-card"
-                    onClick={openUploadModal}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        openUploadModal();
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="feature-icon">📄</div>
-                    <h3>Upload</h3>
-                    <p>Upload your text files and let AI analyze the connections</p>
-                  </div>
-
-                  <Link
-                    to="/visualize"
-                    className="feature-card"
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="feature-icon">🔍</div>
-                    <h3>Visualize</h3>
-                    <p>See your content transformed into interactive network graphs</p>
-                  </Link>
-                </div>
               </div>
             </div>
           )}
@@ -86,11 +56,8 @@ function App() {
         <Route
           path="/visualize"
           element={(
-            <div>
-              <LibraryVisualize
-                onOpenUpload={openUploadModal}
-                fileRefreshToken={fileRefreshToken}
-              />
+            <div className="app-route-visualize">
+              <LibraryVisualize fileRefreshToken={fileRefreshToken} />
             </div>
           )}
         />

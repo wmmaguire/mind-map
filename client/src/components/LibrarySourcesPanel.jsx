@@ -21,6 +21,7 @@ export default function LibrarySourcesPanel({
   filesLoading,
   error,
   displayFiles,
+  displayGraphs,
   fileSearchQuery,
   setFileSearchQuery,
   fileSort,
@@ -30,7 +31,6 @@ export default function LibrarySourcesPanel({
   deletingFiles,
   savedGraphs,
   graphData,
-  onOpenUpload,
   onSelectAllFiltered,
   onClearFileSelection,
   onDeleteSelected,
@@ -50,6 +50,59 @@ export default function LibrarySourcesPanel({
             to use the full Library.
           </p>
         </div>
+      )}
+      <div className="library-sources-toolbar library-file-toolbar">
+        <div className="library-file-toolbar__search">
+          <label className="sr-only" htmlFor="library-file-search">
+            Search library
+          </label>
+          <input
+            id="library-file-search"
+            type="search"
+            className="library-file-search-input"
+            placeholder="Search library…"
+            value={fileSearchQuery}
+            onChange={(e) => setFileSearchQuery(e.target.value)}
+            autoComplete="off"
+            aria-label="Search files and graphs"
+          />
+        </div>
+        <div className="library-file-toolbar__sort">
+          <label className="sr-only" htmlFor="library-file-sort">
+            Sort library
+          </label>
+          <select
+            id="library-file-sort"
+            className="library-file-sort-select"
+            value={fileSort}
+            onChange={(e) => setFileSort(e.target.value)}
+            aria-label="Sort files and graphs"
+          >
+            <option value={FILE_SORT_NAME_ASC}>Name (A–Z)</option>
+            <option value={FILE_SORT_NAME_DESC}>Name (Z–A)</option>
+            <option value={FILE_SORT_DATE_DESC}>Newest first</option>
+            <option value={FILE_SORT_DATE_ASC}>Oldest first</option>
+          </select>
+        </div>
+      </div>
+      {fileSearchQuery.trim() &&
+        ((!shareViewerMode && !filesLoading && files.length > 0) ||
+          savedGraphs.length > 0) && (
+        <p className="file-list-filter-hint library-sources-filter-hint" role="status">
+          {!shareViewerMode && !filesLoading && files.length > 0 ? (
+            <>
+              Showing {displayFiles.length} of {files.length} files
+            </>
+          ) : null}
+          {!shareViewerMode && !filesLoading && files.length > 0 && savedGraphs.length > 0
+            ? ' · '
+            : null}
+          {savedGraphs.length > 0 ? (
+            <>
+              Showing {displayGraphs.length} of {savedGraphs.length} graphs
+            </>
+          ) : null}
+        </p>
       )}
       <section
         className="library-section"
@@ -107,66 +160,51 @@ export default function LibrarySourcesPanel({
               </div>
             ) : (
               <>
-                <div className="library-file-toolbar">
-                  <div className="library-file-toolbar__search">
-                    <label className="sr-only" htmlFor="library-file-search">
-                      Search files
-                    </label>
-                    <input
-                      id="library-file-search"
-                      type="search"
-                      className="library-file-search-input"
-                      placeholder="Search files…"
-                      value={fileSearchQuery}
-                      onChange={(e) => setFileSearchQuery(e.target.value)}
-                      autoComplete="off"
-                      aria-label="Search files"
-                    />
-                  </div>
-                  <div className="library-file-toolbar__sort">
-                    <label className="sr-only" htmlFor="library-file-sort">
-                      Sort files
-                    </label>
-                    <select
-                      id="library-file-sort"
-                      className="library-file-sort-select"
-                      value={fileSort}
-                      onChange={(e) => setFileSort(e.target.value)}
-                      aria-label="Sort files"
+                <div className="file-list-header">
+                  <span className="file-list-header__count">
+                    Selected: {selectedFiles.size} file
+                    {selectedFiles.size === 1 ? '' : 's'}
+                  </span>
+                  <div className="file-list-header__actions">
+                    <button
+                      type="button"
+                      className="file-list-action-btn"
+                      onClick={onSelectAllFiltered}
+                      disabled={displayFiles.length === 0}
+                      aria-label="Select all filtered files"
                     >
-                      <option value={FILE_SORT_NAME_ASC}>Name (A–Z)</option>
-                      <option value={FILE_SORT_NAME_DESC}>Name (Z–A)</option>
-                      <option value={FILE_SORT_DATE_DESC}>
-                        Newest upload first
-                      </option>
-                      <option value={FILE_SORT_DATE_ASC}>
-                        Oldest upload first
-                      </option>
-                    </select>
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="file-list-action-btn"
+                      onClick={onClearFileSelection}
+                      disabled={selectedFiles.size === 0}
+                      aria-label="Clear selection"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="library-toolbar-btn library-toolbar-btn--danger"
+                      onClick={onDeleteSelected}
+                      disabled={
+                        selectedFiles.size === 0 || deletingFiles
+                      }
+                      aria-label="Delete selected files"
+                    >
+                      {deletingFiles ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <button
+                      className="library-toolbar-btn library-toolbar-btn--primary"
+                      type="button"
+                      onClick={onAnalyzeClick}
+                      disabled={analyzing || selectedFiles.size === 0}
+                      aria-label="Analyze selected files"
+                    >
+                      {analyzing ? 'Analyzing…' : 'Analyze'}
+                    </button>
                   </div>
-                </div>
-                {fileSearchQuery.trim() && (
-                  <p className="file-list-filter-hint" role="status">
-                    Showing {displayFiles.length} of {files.length} files
-                  </p>
-                )}
-                <div className="file-list-actions">
-                  <button
-                    type="button"
-                    className="file-list-action-btn"
-                    onClick={onSelectAllFiltered}
-                    disabled={displayFiles.length === 0}
-                  >
-                    Select all
-                  </button>
-                  <button
-                    type="button"
-                    className="file-list-action-btn"
-                    onClick={onClearFileSelection}
-                    disabled={selectedFiles.size === 0}
-                  >
-                    Clear selection
-                  </button>
                 </div>
                 {displayFiles.length === 0 ? (
                   <div className="file-list-empty file-list-empty--compact">
@@ -180,80 +218,42 @@ export default function LibrarySourcesPanel({
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <div className="file-list-header">
-                      <span className="file-list-header__count">
-                        Selected: {selectedFiles.size} file
-                        {selectedFiles.size === 1 ? '' : 's'}
-                      </span>
-                      <div className="file-list-header__actions">
-                        <button
-                          type="button"
-                          className="library-toolbar-btn library-toolbar-btn--add"
-                          onClick={onOpenUpload}
-                        >
-                          <span className="library-toolbar-btn__icon" aria-hidden>
-                            +
+                  <ul
+                    className="file-list-items"
+                    onKeyDown={onFileListKeyDown}
+                  >
+                    {displayFiles.map((file, index) => (
+                      <li
+                        key={file.filename || file.id || index}
+                        className={`file-item ${
+                          selectedFiles.has(file) ? 'selected' : ''
+                        }`}
+                      >
+                        <label className="file-label">
+                          <input
+                            type="checkbox"
+                            className="file-item-checkbox"
+                            checked={selectedFiles.has(file)}
+                            onChange={() => onFileSelect(file)}
+                          />
+                          <span className="file-name">
+                            {getFileDisplayName(file)}
                           </span>
-                          Add new
-                        </button>
-                        <button
-                          type="button"
-                          className="library-toolbar-btn library-toolbar-btn--danger"
-                          onClick={onDeleteSelected}
-                          disabled={
-                            selectedFiles.size === 0 || deletingFiles
-                          }
-                        >
-                          {deletingFiles ? 'Deleting…' : 'Delete selected'}
-                        </button>
-                        <button
-                          className="library-toolbar-btn library-toolbar-btn--primary"
-                          type="button"
-                          onClick={onAnalyzeClick}
-                          disabled={analyzing || selectedFiles.size === 0}
-                        >
-                          {analyzing ? 'Analyzing…' : 'Analyze Selected'}
-                        </button>
-                      </div>
-                    </div>
-                    <ul
-                      className="file-list-items"
-                      onKeyDown={onFileListKeyDown}
-                    >
-                      {displayFiles.map((file, index) => (
-                        <li
-                          key={file.filename || file.id || index}
-                          className={`file-item ${
-                            selectedFiles.has(file) ? 'selected' : ''
-                          }`}
-                        >
-                          <label className="file-label">
-                            <input
-                              type="checkbox"
-                              className="file-item-checkbox"
-                              checked={selectedFiles.has(file)}
-                              onChange={() => onFileSelect(file)}
-                            />
-                            <span className="file-name">
-                              {getFileDisplayName(file)}
+                          {file.uploadDate && (
+                            <span className="file-meta">
+                              {new Date(
+                                file.uploadDate
+                              ).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
                             </span>
-                            {file.uploadDate && (
-                              <span className="file-meta">
-                                {new Date(
-                                  file.uploadDate
-                                ).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                })}
-                              </span>
-                            )}
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
+                          )}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </>
             )}
@@ -288,8 +288,19 @@ export default function LibrarySourcesPanel({
                 </p>
               ) : savedGraphs.length === 0 ? (
                 <p className="no-saved-graphs">No saved graphs yet.</p>
+              ) : displayGraphs.length === 0 ? (
+                <div className="file-list-empty file-list-empty--compact">
+                  <p>No graphs match your search.</p>
+                  <button
+                    type="button"
+                    className="file-list-empty__cta file-list-empty__cta--btn"
+                    onClick={() => setFileSearchQuery('')}
+                  >
+                    Clear search
+                  </button>
+                </div>
               ) : (
-                savedGraphs.map((graph, index) => (
+                displayGraphs.map((graph, index) => (
                   <div key={index} className="saved-graph-item">
                     <div className="graph-info">
                       <strong>{graph.metadata.name || 'Unnamed Graph'}</strong>
@@ -330,6 +341,7 @@ LibrarySourcesPanel.propTypes = {
   filesLoading: PropTypes.bool.isRequired,
   error: PropTypes.string,
   displayFiles: PropTypes.array.isRequired,
+  displayGraphs: PropTypes.array.isRequired,
   fileSearchQuery: PropTypes.string.isRequired,
   setFileSearchQuery: PropTypes.func.isRequired,
   fileSort: PropTypes.string.isRequired,
@@ -339,7 +351,6 @@ LibrarySourcesPanel.propTypes = {
   deletingFiles: PropTypes.bool.isRequired,
   savedGraphs: PropTypes.array.isRequired,
   graphData: PropTypes.object,
-  onOpenUpload: PropTypes.func.isRequired,
   onSelectAllFiltered: PropTypes.func.isRequired,
   onClearFileSelection: PropTypes.func.isRequired,
   onDeleteSelected: PropTypes.func.isRequired,

@@ -5,6 +5,15 @@
   flex-direction: column;
 }
 
+/* Fills space below shell strips so /visualize (and mobile library overlay) sizes to the pane, not 100vh + banners. */
+.app-route-visualize {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .landing-container {
   display: flex;
   flex-direction: column;
@@ -26,48 +35,6 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   width: 90%;
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  animation: fadeIn 0.8s ease-out 0.4s backwards;
-}
-
-.feature-card {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  outline: none;
-}
-
-.feature-card:hover,
-.feature-card:focus {
-   transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.feature-icon {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-}
-
-.feature-card h3 {
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.feature-card p {
-  color: #666;
-  font-size: 0.9rem;
-  line-height: 1.4;
 }
 
 .action-section {
@@ -151,10 +118,6 @@
 }
 
 @media (max-width: 600px) {
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-  
   .content {
     padding: 2rem;
   }

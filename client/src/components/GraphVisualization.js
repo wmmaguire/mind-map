@@ -630,7 +630,7 @@ function GraphVisualization({
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(50));
 
-    // Tooltip: anchored lower-left of graph canvas (not cursor-following)
+    // Tooltip: placed just left of the clicked node/link (clamped inside canvas)
     const tooltipMount =
       graphCanvasWrapRef.current || svgRef.current?.parentElement || null;
     const tooltip = (tooltipMount ? d3.select(tooltipMount) : d3.select('body'))
@@ -639,6 +639,43 @@ function GraphVisualization({
       .attr('role', 'status')
       .attr('aria-live', 'polite')
       .style('opacity', 0);
+
+    function positionCanvasTooltipNearTarget(targetEl) {
+      const mount = graphCanvasWrapRef.current;
+      if (!mount || !targetEl || typeof targetEl.getBoundingClientRect !== 'function') {
+        return;
+      }
+      const tipNode = mount.querySelector('.graph-canvas-tooltip');
+      if (!tipNode) return;
+      const mountRect = mount.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const pad = 8;
+      const gap = 10;
+      const tw = tipNode.offsetWidth || tipNode.getBoundingClientRect().width;
+      const th = tipNode.offsetHeight || tipNode.getBoundingClientRect().height;
+      let left = targetRect.left - mountRect.left - tw - gap;
+      if (left < pad) {
+        left = targetRect.right - mountRect.left + gap;
+      }
+      let top = targetRect.top - mountRect.top + (targetRect.height - th) / 2;
+      top = Math.max(pad, Math.min(top, mountRect.height - th - pad));
+      left = Math.max(pad, Math.min(left, mountRect.width - tw - pad));
+      d3.select(tipNode)
+        .style('left', `${left}px`)
+        .style('top', `${top}px`)
+        .style('transform', 'none')
+        .style('right', 'auto')
+        .style('bottom', 'auto');
+    }
+
+    function scheduleTooltipPosition(targetEl) {
+      if (!targetEl) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          positionCanvasTooltipNearTarget(targetEl);
+        });
+      });
+    }
 
     // Draw the links with clickable areas
     const linkGroups = g.append('g')
@@ -818,6 +855,7 @@ function GraphVisualization({
         }
         
         tooltip.html(tooltipContent);
+        scheduleTooltipPosition(event.currentTarget);
       })
       .call(dragBehavior);
 
@@ -874,6 +912,7 @@ function GraphVisualization({
       `;
 
       tooltip.html(tooltipContent);
+      scheduleTooltipPosition(event.currentTarget);
     }
 
     function handleLinkMouseout() {
@@ -900,7 +939,12 @@ function GraphVisualization({
         <strong>${targetLabel}</strong>
       `;
   
+      d3.select('.tooltip')
+        .transition()
+        .duration(200)
+        .style('opacity', 0.9);
       tooltip.html(tooltipContent);
+      scheduleTooltipPosition(event.currentTarget);
     }
 
     function handleNodeClick(event, node) {
@@ -1001,6 +1045,7 @@ function GraphVisualization({
         }
 
         tooltip.html(tooltipContent);
+        scheduleTooltipPosition(event.currentTarget);
 
       } catch (error) {
         console.error('Error in handleNodeClick:', error);
@@ -1415,6 +1460,7 @@ function GraphVisualization({
           }
           
           tooltip.html(tooltipContent);
+          scheduleTooltipPosition(event.currentTarget);
         });
 
       // Add circles with proper sizing and coloring using colorScale

@@ -4,7 +4,6 @@ import React, {
   useContext,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import PropTypes from 'prop-types';
 
@@ -12,16 +11,14 @@ const LibraryUiContext = createContext(null);
 
 /**
  * Coordinates Library shell UI that lives outside {@link LibraryVisualize}
- * (e.g. mobile “open library” control in {@link GuestIdentityBanner}).
+ * (banner “Open Library” in {@link GuestIdentityBanner}; ref registered while visualize mounts).
  */
 export function LibraryUiProvider({ children }) {
   const openLibraryRef = useRef(() => {});
-  const [mobileRailVisible, setMobileRailVisible] = useState(false);
 
-  const registerMobileLibraryRail = useCallback((visible, openFn) => {
-    setMobileRailVisible(Boolean(visible));
+  const registerMobileLibraryRail = useCallback((active, openFn) => {
     openLibraryRef.current =
-      typeof openFn === 'function' ? openFn : () => {};
+      active && typeof openFn === 'function' ? openFn : () => {};
   }, []);
 
   const openMobileLibrary = useCallback(() => {
@@ -30,11 +27,10 @@ export function LibraryUiProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      mobileRailVisible,
       openMobileLibrary,
       registerMobileLibraryRail,
     }),
-    [mobileRailVisible, openMobileLibrary, registerMobileLibraryRail]
+    [openMobileLibrary, registerMobileLibraryRail]
   );
 
   return (
