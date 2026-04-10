@@ -486,7 +486,7 @@
   box-sizing: border-box;
 }
 
-/* Actions FAB: top-right of graph/SVG area, not the title bar (GraphVisualization #27) */
+/* Actions FAB: top-right of .graph-canvas-wrap (SVG area), below discovery bar (#38) */
 .library-visualize .library-graph-mount .graph-actions-fab--library-graph-mount {
   position: absolute;
   top: max(8px, env(safe-area-inset-top, 0px));

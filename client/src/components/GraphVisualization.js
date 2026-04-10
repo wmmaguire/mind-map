@@ -2629,8 +2629,8 @@ function GraphVisualization({
           aria-hidden
           data-testid="graph-minimap"
         />
+        {actionsFabButton || null}
       </div>
-      {actionsFabButton || null}
     </div>
   );
 }
