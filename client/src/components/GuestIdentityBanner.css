@@ -323,10 +323,18 @@
   min-width: 0;
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: flex-end;
+}
+
+.guest-identity-banner__trailing-cluster {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.35rem;
+  max-width: 100%;
 }
 
 .guest-identity-banner__view-wrap {
@@ -337,6 +345,8 @@
 .guest-identity-banner__view-trigger {
   margin: 0;
   padding: 0.2rem 0.45rem;
+  min-height: 2.65rem;
+  box-sizing: border-box;
   border: 1px solid #475569;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);

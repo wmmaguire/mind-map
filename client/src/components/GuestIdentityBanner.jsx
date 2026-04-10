@@ -125,90 +125,92 @@ export default function GuestIdentityBanner() {
           )}
         </div>
         <div className="guest-identity-banner__trailing">
-          {onVisualizeRoute ? (
-            <div className="guest-identity-banner__view-wrap">
+          <div className="guest-identity-banner__trailing-cluster">
+            {onVisualizeRoute ? (
+              <div className="guest-identity-banner__view-wrap">
+                <button
+                  type="button"
+                  className="guest-identity-banner__view-trigger"
+                  aria-expanded={viewMenuOpen}
+                  aria-haspopup="menu"
+                  aria-controls="guest-chrome-view-menu"
+                  id="guest-chrome-view-trigger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setViewMenuOpen((o) => !o);
+                  }}
+                >
+                  <span className="guest-identity-banner__view-trigger-label">View</span>
+                  <span className="guest-identity-banner__account-control-chevron" aria-hidden>
+                    {viewMenuOpen ? '▴' : '▾'}
+                  </span>
+                </button>
+                {viewMenuOpen ? (
+                  <div
+                    id="guest-chrome-view-menu"
+                    className="guest-identity-banner__menu guest-identity-banner__menu--view"
+                    role="menu"
+                    aria-labelledby="guest-chrome-view-trigger"
+                  >
+                    <button
+                      type="button"
+                      className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                      role="menuitemcheckbox"
+                      aria-checked={playbackStripVisible}
+                      onClick={() => togglePlaybackStrip()}
+                    >
+                      <span className="guest-identity-banner__menu-check" aria-hidden>
+                        {playbackStripVisible ? '✓' : '○'}
+                      </span>
+                      Playback
+                    </button>
+                    <button
+                      type="button"
+                      className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                      role="menuitemcheckbox"
+                      aria-checked={graphSearchBarVisible}
+                      onClick={() => toggleGraphSearchBar()}
+                    >
+                      <span className="guest-identity-banner__menu-check" aria-hidden>
+                        {graphSearchBarVisible ? '✓' : '○'}
+                      </span>
+                      Search
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {devControls ? (
               <button
                 type="button"
-                className="guest-identity-banner__view-trigger"
-                aria-expanded={viewMenuOpen}
-                aria-haspopup="menu"
-                aria-controls="guest-chrome-view-menu"
-                id="guest-chrome-view-trigger"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setViewMenuOpen((o) => !o);
-                }}
+                className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
+                onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
               >
-                <span className="guest-identity-banner__view-trigger-label">View</span>
-                <span className="guest-identity-banner__account-control-chevron" aria-hidden>
-                  {viewMenuOpen ? '▴' : '▾'}
+                <span className="guest-identity-banner__account-control-primary">
+                  Guest
+                </span>
+                <span className="guest-identity-banner__account-control-secondary">
+                  Preview {DEV_PREVIEW_USER_ID}
                 </span>
               </button>
-              {viewMenuOpen ? (
-                <div
-                  id="guest-chrome-view-menu"
-                  className="guest-identity-banner__menu guest-identity-banner__menu--view"
-                  role="menu"
-                  aria-labelledby="guest-chrome-view-trigger"
-                >
-                  <button
-                    type="button"
-                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
-                    role="menuitemcheckbox"
-                    aria-checked={playbackStripVisible}
-                    onClick={() => togglePlaybackStrip()}
-                  >
-                    <span className="guest-identity-banner__menu-check" aria-hidden>
-                      {playbackStripVisible ? '✓' : '○'}
-                    </span>
-                    Playback
-                  </button>
-                  <button
-                    type="button"
-                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
-                    role="menuitemcheckbox"
-                    aria-checked={graphSearchBarVisible}
-                    onClick={() => toggleGraphSearchBar()}
-                  >
-                    <span className="guest-identity-banner__menu-check" aria-hidden>
-                      {graphSearchBarVisible ? '✓' : '○'}
-                    </span>
-                    Search
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {devControls ? (
-            <button
-              type="button"
-              className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
-              onClick={() => setDevRegisteredUserId(DEV_PREVIEW_USER_ID)}
-            >
-              <span className="guest-identity-banner__account-control-primary">
-                Guest
-              </span>
-              <span className="guest-identity-banner__account-control-secondary">
-                Preview {DEV_PREVIEW_USER_ID}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
-              onClick={() => {
-                setAuthMode('login');
-                setAuthModalOpen(true);
-              }}
-            >
-              <span className="guest-identity-banner__account-control-primary">
-                {authStatus === 'loading' ? 'Checking…' : 'Sign in'}
-              </span>
-              <span className="guest-identity-banner__account-control-secondary">
-                Create account
-              </span>
-            </button>
-          )}
+            ) : (
+              <button
+                type="button"
+                className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
+                onClick={() => {
+                  setAuthMode('login');
+                  setAuthModalOpen(true);
+                }}
+              >
+                <span className="guest-identity-banner__account-control-primary">
+                  {authStatus === 'loading' ? 'Checking…' : 'Sign in'}
+                </span>
+                <span className="guest-identity-banner__account-control-secondary">
+                  Create account
+                </span>
+              </button>
+            )}
+          </div>
         </div>
         {authModalOpen ? (
           <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account">
@@ -357,7 +359,7 @@ export default function GuestIdentityBanner() {
         className="guest-identity-banner__trailing"
         ref={menuWrapRef}
       >
-        <>
+        <div className="guest-identity-banner__trailing-cluster">
           {onVisualizeRoute ? (
             <div className="guest-identity-banner__view-wrap">
               <button
@@ -435,112 +437,112 @@ export default function GuestIdentityBanner() {
               {menuOpen ? '▴' : '▾'}
             </span>
           </button>
-          {menuOpen && (
-            <div className="guest-identity-banner__menu" role="menu">
-              <div className="guest-identity-banner__menu-meta" role="none">
-                Active account
-              </div>
-              <div
-                className="guest-identity-banner__menu-id"
-                role="none"
-                title={userId || ''}
-              >
-                {userId || '—'}
-              </div>
-              {authStatus === 'authenticated' && authUser ? (
-                <button
-                  type="button"
-                  className="guest-identity-banner__menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setSettingsName(authUser.name || '');
-                    setSettingsError('');
-                    setSettingsOpen(true);
-                    setMenuOpen(false);
-                  }}
-                >
-                  User settings
-                </button>
-              ) : null}
+        </div>
+        {menuOpen && (
+          <div className="guest-identity-banner__menu" role="menu">
+            <div className="guest-identity-banner__menu-meta" role="none">
+              Active account
+            </div>
+            <div
+              className="guest-identity-banner__menu-id"
+              role="none"
+              title={userId || ''}
+            >
+              {userId || '—'}
+            </div>
+            {authStatus === 'authenticated' && authUser ? (
               <button
                 type="button"
                 className="guest-identity-banner__menu-item"
                 role="menuitem"
-                onClick={async () => {
-                  await logout();
+                onClick={() => {
+                  setSettingsName(authUser.name || '');
+                  setSettingsError('');
+                  setSettingsOpen(true);
                   setMenuOpen(false);
                 }}
               >
-                Sign out
+                User settings
               </button>
-            </div>
-          )}
-          {settingsOpen && authUser ? (
-            <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account settings">
-              <div className="guest-identity-banner__auth-modal">
-                <div className="guest-identity-banner__auth-header">
-                  <strong>Account settings</strong>
-                  <button
-                    type="button"
-                    className="guest-identity-banner__auth-close"
-                    onClick={() => setSettingsOpen(false)}
-                    aria-label="Close"
-                  >
-                    ×
+            ) : null}
+            <button
+              type="button"
+              className="guest-identity-banner__menu-item"
+              role="menuitem"
+              onClick={async () => {
+                await logout();
+                setMenuOpen(false);
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+        {settingsOpen && authUser ? (
+          <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account settings">
+            <div className="guest-identity-banner__auth-modal">
+              <div className="guest-identity-banner__auth-header">
+                <strong>Account settings</strong>
+                <button
+                  type="button"
+                  className="guest-identity-banner__auth-close"
+                  onClick={() => setSettingsOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <form
+                className="guest-identity-banner__auth-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSettingsBusy(true);
+                  setSettingsError('');
+                  try {
+                    await updateProfile({ name: settingsName });
+                    setSettingsOpen(false);
+                  } catch (err) {
+                    setSettingsError(err?.message || 'Could not save');
+                  } finally {
+                    setSettingsBusy(false);
+                  }
+                }}
+              >
+                <label className="guest-identity-banner__auth-field">
+                  Name
+                  <input
+                    type="text"
+                    value={settingsName}
+                    onChange={(e) => setSettingsName(e.target.value)}
+                    autoComplete="name"
+                    maxLength={120}
+                    placeholder="Display name"
+                  />
+                </label>
+                <label className="guest-identity-banner__auth-field guest-identity-banner__auth-field--readonly">
+                  Email
+                  <input type="email" value={authUser.email || ''} readOnly tabIndex={-1} />
+                </label>
+                <p className="guest-identity-banner__settings-hint">
+                  Email cannot be changed here.
+                </p>
+                {settingsError ? (
+                  <div className="guest-identity-banner__auth-error" role="alert">
+                    {settingsError}
+                  </div>
+                ) : null}
+                <div className="guest-identity-banner__auth-actions guest-identity-banner__auth-actions--split">
+                  <button type="button" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={settingsBusy}>
+                    {settingsBusy ? 'Saving…' : 'Save'}
                   </button>
                 </div>
-                <form
-                  className="guest-identity-banner__auth-form"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setSettingsBusy(true);
-                    setSettingsError('');
-                    try {
-                      await updateProfile({ name: settingsName });
-                      setSettingsOpen(false);
-                    } catch (err) {
-                      setSettingsError(err?.message || 'Could not save');
-                    } finally {
-                      setSettingsBusy(false);
-                    }
-                  }}
-                >
-                  <label className="guest-identity-banner__auth-field">
-                    Name
-                    <input
-                      type="text"
-                      value={settingsName}
-                      onChange={(e) => setSettingsName(e.target.value)}
-                      autoComplete="name"
-                      maxLength={120}
-                      placeholder="Display name"
-                    />
-                  </label>
-                  <label className="guest-identity-banner__auth-field guest-identity-banner__auth-field--readonly">
-                    Email
-                    <input type="email" value={authUser.email || ''} readOnly tabIndex={-1} />
-                  </label>
-                  <p className="guest-identity-banner__settings-hint">
-                    Email cannot be changed here.
-                  </p>
-                  {settingsError ? (
-                    <div className="guest-identity-banner__auth-error" role="alert">
-                      {settingsError}
-                    </div>
-                  ) : null}
-                  <div className="guest-identity-banner__auth-actions guest-identity-banner__auth-actions--split">
-                    <button type="button" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>
-                      Cancel
-                    </button>
-                    <button type="submit" disabled={settingsBusy}>
-                      {settingsBusy ? 'Saving…' : 'Save'}
-                    </button>
-                  </div>
-                </form>
-              </div>
+              </form>
             </div>
-          ) : null}
-        </>
+          </div>
+        ) : null}
       </div>
     </aside>
   );
