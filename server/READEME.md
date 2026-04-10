@@ -78,9 +78,9 @@ The server intentionally stores some data **on disk** and related metadata **in 
 |--------|----------------------|--------------------|------------|
 | **Session identity** | MongoDB `Session` (UUID `sessionId` + `_id`) | — | All API flows that need a session validate against `Session` (or fail). |
 | **Raw upload bytes** | `uploads/` under **`DATA_DIR`** | MongoDB `File` document (`path`, names, `sessionId`, etc.) | A successful **`POST /api/upload`** requires **metadata JSON on disk**, **multer file on disk**, and **`File.save()`**. If the DB write fails, artifacts are removed so disk and DB stay aligned (see upload flow). |
-| **Library file list** | MongoDB `File` when **`GET /api/files?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`** (#32) | **`metadata/*.json`** mirror | Scoped listing uses **`File`**; legacy unscoped **`GET /api/files`** still scans **metadata/** only. **Session-only** listings exclude rows with **`File.userId`** set (account-owned), so guests do not see another account’s uploads after sign-out in the same browser session. Upload writes both; drift is possible if metadata is edited by hand. |
+| **Library file list** | MongoDB `File` when **`GET /api/files?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`** (#32) | **`metadata/*.json`** mirror | Scoped listing uses **`File`** and **skips rows whose `path` no longer exists on disk** (common after PaaS redeploys with ephemeral disk) so the UI does not offer phantom files. Legacy unscoped **`GET /api/files`** still scans **metadata/** only. **Session-only** listings exclude rows with **`File.userId`** set (account-owned). Upload writes both disk + DB; drift is possible if data is edited outside the app. |
 | **Serving file content** | **`GET /api/files/:filename`** reads **`uploads/`** by filename | **`File`** / metadata **`userId`** for **403** when the caller is not the owner | Account-owned files require matching **`X-Mindmap-User-Id`**; see §3 *File listing + file content retrieval*. |
-| **Saved graph snapshot** | Pair: **`graphs/graph_*.json`** + MongoDB `Graph` | `GraphView` when load tracking runs | **`POST /api/graphs/save`** writes **JSON to disk first**, then **`dbGraph.save()`**. If Mongo fails after the file write, a graph JSON file may exist **without** a matching `Graph` document—see GitHub **#44**. **`GET /api/graphs`** lists files in **`graphs/`**; load uses disk JSON and may join Mongo by `metadata.generatedAt`. |
+| **Saved graph snapshot** | MongoDB **`Graph`** (`payload` = `{ nodes, links }`, **`metadata.filename`** = stable id such as **`graph_<timestamp>.json`**, **`metadata.sessionUuid`**, optional **`metadata.userId`**) | Legacy **`graphs/graph_*.json`** on disk (optional; **one-off import** via script below) | **`POST /api/graphs/save`** persists **only** to Mongo (no new disk snapshot). **`GET /api/graphs`** / **`GET /api/graphs/:filename`** read from Mongo. **`GraphView`** on load when DB graph id is known. **Import:** run **`node server/scripts/migrate-graphs-to-mongo.js`** once if you still have old JSON files under **`graphs/`** (upserts by **`metadata.filename`**). GitHub **#44** orphan-graph-on-disk scenario applies to **legacy** saves, not new Mongo-only saves. |
 | **Analyze runs** | MongoDB `GraphTransform` | `UserActivity` (`ANALYZE_COMPLETE`) | Transform is authoritative; audit is supplementary. |
 | **Graph UI telemetry** | MongoDB `GraphOperation` | — | No duplicate row in `UserActivity` (see persistence matrix). |
 | **Feedback** | MongoDB `Feedback` | `UserActivity` (`FEEDBACK_SUBMIT`) | Feedback doc is authoritative. |
@@ -89,8 +89,8 @@ The server intentionally stores some data **on disk** and related metadata **in 
 ### Divergence scenarios (operators & contributors)
 
 1. **Upload rollback (handled):** DB error after disk writes → handler deletes uploaded file + metadata JSON → **503** / **409**; no orphaned `File` row.
-2. **Graph save partial write (known gap):** DB error after `graphs/` write → orphan JSON on disk; **`UserActivity` `GRAPH_SNAPSHOT_SAVE`** is only written after successful Mongo save, so monitoring will not show a “success” audit for a failed DB row—see **#44** for hardening options.
-3. **Library list vs Mongo:** Corrupt or stray `metadata/*.json` entries are skipped (`null` in list); `File` collection can still contain rows for paths no longer on disk if data was changed outside the app.
+2. **Legacy graph save partial write:** Historical flow wrote **`graphs/`** before Mongo; DB failure could leave orphan JSON—see **#44**. **Current** saves are Mongo-only (no new orphan disk files from save).
+3. **Library list vs Mongo / disk:** Corrupt or stray `metadata/*.json` entries are skipped (`null` in list); `File` can still reference paths missing on disk after host redeploy—scoped **`GET /api/files`** omits those rows from the API list, but **stale `File` documents** may remain until a reconcile job (backlog—see **`docs/github-backlog-issues.md`**).
 4. **Mongo unavailable:** Session creation, upload, analyze, graph save, and other DB-backed routes fail or return errors; disk-only endpoints are limited—treat Mongo as **required** for normal operation.
 
 ### Related documentation
@@ -109,9 +109,10 @@ The server intentionally stores some data **on disk** and related metadata **in 
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, UserActivity, etc.)
 - `lib/`: shared helpers (`recordUserActivity.js`, `sessionObjectId.js`)
 - `scripts/migrate.js`: migration script (see root README for how it’s used)
+- `scripts/migrate-graphs-to-mongo.js`: **one-off** import of legacy **`graphs/*.json`** into the **`Graph`** collection (requires **`MONGODB_URI`**)
 - `uploads/`: uploaded raw files (written by multer)
 - `metadata/`: metadata JSON files describing uploads (written by server code)
-- `graphs/`: saved graph JSON snapshots
+- `graphs/`: **legacy** on-disk graph snapshots (optional; not written by **`POST /api/graphs/save`** after Mongo-only persistence)
 
 ## Request/data flows
 
@@ -268,18 +269,17 @@ Relevant code:
 - `server/lib/generateNodeBudget.js` (validation + dry-run preview; tests: **`lib/generateNodeBudget.test.mjs`**)
 - `server/lib/relationshipSynthesisConfig.js`, **`synthesizeLinkRelationships.js`**, **`wikipediaExtract.js`**, **`manualExpansionLinks.js`**
 
-### 6) Save/load graphs (filesystem + MongoDB)
+### 6) Save/load graphs (MongoDB)
 
 **Goal**: persist generated/edited graphs and reload them later.
 
 - `POST /api/graphs/save`
-  - writes `server/graphs/graph_<timestamp>.json`
-  - also stores a `Graph` document in Mongo
+  - stores a **`Graph`** document in Mongo (**`payload`**, **`metadata.filename`** = `graph_<timestamp>.json`, **`metadata.sessionUuid`**, optional **`metadata.userId`**, etc.). **Does not** write **`server/graphs/*.json`**.
 - `GET /api/graphs`
-  - lists saved graph JSON snapshots in `server/graphs/`. **#32:** pass **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**, or **`?sessionId=`** for guest session snapshots **excluding** any JSON whose **`metadata.userId`** is set (account-owned graphs are not listed in session-only mode). Omitting both returns **all** snapshots (**legacy**). Response may include **`listingScope`**.
+  - lists from the **`Graph`** collection. **#32:** pass **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**, or **`?sessionId=`** for guest session graphs **excluding** account-owned rows. Omitting both returns **all** graphs (**legacy**). Response may include **`listingScope`**.
 - `POST /api/graphs/save` — **`metadata.userId`** is taken from **`X-Mindmap-User-Id`** when present, else from the request body (header wins).
 - `GET /api/graphs/:filename`
-  - Loads a snapshot from disk. If **`metadata.userId`** is set, requires matching **`X-Mindmap-User-Id`** **or** a valid **`?shareToken=`** that matches **`metadata.shareReadToken`** (constant-time compare; **#39**).
+  - Loads by **`metadata.filename`** from Mongo. If **`metadata.userId`** is set, requires matching **`X-Mindmap-User-Id`** **or** a valid **`?shareToken=`** that matches **`metadata.shareReadToken`** (constant-time compare; **#39**).
   - **Share links (#39):** Mint or rotate with **`POST /api/graphs/:filename/share-read-token`** (**`X-Mindmap-User-Id`** must equal **`metadata.userId`**; only graphs saved while signed in). The token is **never** echoed on **`GET`** responses. **`POST /api/graphs/save`** returns **403** if **`?shareToken=`** is present so share secrets do not authorize writes. **`shareReadToken`** in the save JSON body is **ignored** (stripped before persist) so clients cannot mint or overwrite the secret via save. Share viewers omit **`dbId`** in metadata.
   - **Comments / collaboration (not implemented — permissions model for future work):** The **`shareReadToken`** grants **read-only graph snapshot access** only (no writes, no comments). When graph or library **comments** exist, plan for at least: **Owner** — full edit + moderate; **Signed-in collaborator** (future) — comment/write per graph policy; **Share link holder** — read-only unless upgraded to a signed-in role. Until then, treat **`POST /api/feedback`** as product feedback to operators, not per-graph threaded discussion.
   - Optionally enriches/links to Mongo data and records a `GraphView`
@@ -327,7 +327,7 @@ Relevant code:
 ## Notes / current caveats (as implemented)
 
 - **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
-- Disk vs Mongo guarantees and orphan-graph behavior: see **Data consistency (hybrid persistence)** above and GitHub **#44**.
+- Disk vs Mongo guarantees, legacy orphan **`graphs/`** files, and **upload** durability on ephemeral hosts: see **Data consistency (hybrid persistence)** above, GitHub **#20** / **#44**, and **`docs/github-backlog-issues.md`** (ops note).
 - **Legacy DB:** If uploads still fail with duplicate key on `sessionId`, drop the old `sessionId` unique index on `files` (see upload flow above).
 
 ## Quick reference: scripts

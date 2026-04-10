@@ -98,7 +98,7 @@ describe('GuestIdentityBanner', () => {
       </MemoryRouter>
     );
     const shareBtn = screen.getByRole('button', {
-      name: /copy read-only link to clipboard/i,
+      name: /copy read-only share link to clipboard/i,
     });
     const viewBtn = screen.getByRole('button', { name: /^View\b/i });
     expect(

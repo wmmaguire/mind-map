@@ -143,9 +143,9 @@ export default function GuestIdentityBanner() {
                 type="button"
                 className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
                 onClick={sharePayload.onShareClick}
-                aria-label="Copy read-only link to clipboard"
+                aria-label="Copy read-only share link to clipboard"
               >
-                share
+                SHARE
               </button>
             ) : null}
             {onVisualizeRoute ? (
@@ -387,9 +387,9 @@ export default function GuestIdentityBanner() {
               type="button"
               className="guest-identity-banner__library-share-btn guest-identity-banner__library-share-btn--title-row"
               onClick={sharePayload.onShareClick}
-              aria-label="Copy read-only link to clipboard"
+              aria-label="Copy read-only share link to clipboard"
             >
-              share
+              SHARE
             </button>
           ) : null}
           {onVisualizeRoute ? (

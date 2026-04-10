@@ -3,12 +3,9 @@
  * Paths: /api/graphs/save, /api/graphs, POST …/share-read-token, /api/graphs/:filename, /api/graphs/:graphId/views
  */
 import express from 'express';
-import path from 'path';
-import { promises as fs } from 'fs';
 import mongoose from 'mongoose';
 import Graph from '../models/graph.js';
 import GraphView from '../models/graphView.js';
-import { graphsDir } from '../config.js';
 import { recordUserActivity } from '../lib/recordUserActivity.js';
 import {
   evaluateOwnedGraphRead,
@@ -58,51 +55,42 @@ router.post('/graphs/save', async (req, res) => {
       ...(resolvedUserId ? { userId: resolvedUserId } : {}),
     };
 
-    const uniquePrefix = Date.now().toString(36) + '-';
+    if (!Array.isArray(graph.nodes) || !Array.isArray(graph.links)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Graph must include nodes[] and links[] arrays',
+        code: 'INVALID_GRAPH_SHAPE',
+      });
+    }
 
-    const nodeMap = new Map();
-    const processedNodes = graph.nodes.map((node) => {
-      const nodeId = uniquePrefix + node.id.toString();
-      const objectId = new mongoose.Types.ObjectId();
-      nodeMap.set(nodeId, objectId);
-      return {
-        id: nodeId,
-        label: node.label || '',
-        description: node.description || '',
-        wikiUrl: node.wikiUrl || '',
-        size: node.size || 20,
-        color: node.color || '#4a90e2'
-      };
-    });
+    const processedNodes = graph.nodes.map((node) => ({
+      id: String(node.id),
+      label: node.label || '',
+      description: node.description || '',
+      wikiUrl: node.wikiUrl || node.wikipediaUrl || '',
+      size: node.size || 20,
+      color: node.color || '#4a90e2',
+      ...(node.timestamp != null ? { timestamp: node.timestamp } : {}),
+    }));
 
-    const sourceFiles =
-      metadata.sourceFiles
-        ?.map(() => {
-          try {
-            return new mongoose.Types.ObjectId();
-          } catch (error) {
-            return null;
-          }
-        })
-        .filter((id) => id !== null) || [];
+    const processedLinks = graph.links.map((link) => ({
+      source: String(typeof link.source === 'object' ? link.source.id : link.source),
+      target: String(typeof link.target === 'object' ? link.target.id : link.target),
+      relationship: link.relationship || '',
+      ...(link.timestamp != null ? { timestamp: link.timestamp } : {}),
+    }));
 
-    const processedLinks = graph.links.map((link) => {
-      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-
-      return {
-        source: nodeMap.get(uniquePrefix + sourceId.toString()),
-        target: nodeMap.get(uniquePrefix + targetId.toString()),
-        relationship: link.relationship || ''
-      };
-    });
+    const sourceFiles = [];
 
     const sessionObjectId = new mongoose.Types.ObjectId(
       parseInt(metadata.sessionId.replace(/-/g, '').slice(0, 12), 16)
     );
 
+    const filename = `graph_${Date.now()}.json`;
+
     const dbGraph = new Graph({
       metadata: {
+        filename,
         name: metadata.name || 'Untitled Graph',
         description: metadata.description || '',
         sourceFiles,
@@ -113,42 +101,19 @@ router.post('/graphs/save', async (req, res) => {
         nodeCount: processedNodes.length,
         edgeCount: processedLinks.length,
         sessionId: sessionObjectId,
+        sessionUuid: metadata.sessionId,
         ...(metadata.userId && typeof metadata.userId === 'string'
           ? { userId: metadata.userId.trim() }
           : {}),
+      },
+      payload: {
+        nodes: processedNodes,
+        links: processedLinks,
       },
       nodes: processedNodes,
-      links: processedLinks
+      // Legacy schema field (ObjectId refs) is no longer canonical; leave empty.
+      links: []
     });
-
-    const graphData = {
-      graph: {
-        nodes: processedNodes,
-        links: graph.links.map((link) => {
-          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-
-          return {
-            source: uniquePrefix + sourceId.toString(),
-            target: uniquePrefix + targetId.toString(),
-            relationship: link.relationship || ''
-          };
-        })
-      },
-      metadata: {
-        ...dbGraph.metadata,
-        sessionId: metadata.sessionId,
-        sourceFiles: metadata.sourceFiles || [],
-        ...(metadata.userId && typeof metadata.userId === 'string'
-          ? { userId: metadata.userId.trim() }
-          : {}),
-      }
-    };
-
-    const filename = `graph_${Date.now()}.json`;
-
-    await fs.mkdir(graphsDir, { recursive: true });
-    await fs.writeFile(path.join(graphsDir, filename), JSON.stringify(graphData, null, 2));
 
     await dbGraph.save();
 
@@ -179,8 +144,6 @@ router.post('/graphs/save', async (req, res) => {
 
 router.get('/graphs', async (req, res) => {
   try {
-    await fs.mkdir(graphsDir, { recursive: true });
-
     const userId =
       (typeof req.query.userId === 'string' && req.query.userId.trim()) ||
       (typeof req.get(USER_ID_HEADER) === 'string' &&
@@ -189,31 +152,29 @@ router.get('/graphs', async (req, res) => {
     const sessionId =
       typeof req.query.sessionId === 'string' ? req.query.sessionId.trim() : '';
 
-    const files = await fs.readdir(graphsDir);
-    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+    const query = userId
+      ? { 'metadata.userId': userId }
+      : sessionId
+        ? {
+            'metadata.sessionUuid': sessionId,
+            $or: [
+              { 'metadata.userId': { $exists: false } },
+              { 'metadata.userId': null },
+              { 'metadata.userId': '' },
+            ],
+          }
+        : {};
 
-    const graphs = [];
-    for (const file of jsonFiles) {
-      const content = await fs.readFile(path.join(graphsDir, file), 'utf8');
-      const data = JSON.parse(content);
-      const meta = data.metadata || {};
-      if (userId) {
-        if (meta.userId !== userId) continue;
-      } else if (sessionId) {
-        if (meta.sessionId !== sessionId) continue;
-        // Account-owned graphs must not appear in session-only listing after logout.
-        if (
-          meta.userId != null &&
-          String(meta.userId).trim() !== ''
-        ) {
-          continue;
-        }
-      }
-      graphs.push({
-        filename: file,
-        metadata: meta,
-      });
-    }
+    const docs = await Graph.find(query)
+      .sort({ 'metadata.generatedAt': -1 })
+      .lean();
+
+    const graphs = docs.map((g) => ({
+      filename: g?.metadata?.filename || String(g._id),
+      metadata: redactGraphMetadataForResponse(g.metadata || {}, {
+        shareViewer: false,
+      }),
+    }));
 
     res.json({
       success: true,
@@ -241,7 +202,6 @@ router.get('/graphs', async (req, res) => {
 router.post('/graphs/:filename/share-read-token', async (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
-    const filePath = path.join(graphsDir, filename);
 
     const headerUserId =
       typeof req.get(USER_ID_HEADER) === 'string'
@@ -255,10 +215,8 @@ router.post('/graphs/:filename/share-read-token', async (req, res) => {
       });
     }
 
-    let content;
-    try {
-      content = await fs.readFile(filePath, 'utf8');
-    } catch {
+    const dbGraph = await Graph.findOne({ 'metadata.filename': filename }).lean();
+    if (!dbGraph) {
       return res.status(404).json({
         success: false,
         error: 'Graph not found',
@@ -266,8 +224,7 @@ router.post('/graphs/:filename/share-read-token', async (req, res) => {
       });
     }
 
-    const fileData = JSON.parse(content);
-    const metaUid = fileData.metadata?.userId;
+    const metaUid = dbGraph?.metadata?.userId;
     if (metaUid == null || String(metaUid).trim() === '') {
       return res.status(400).json({
         success: false,
@@ -285,16 +242,9 @@ router.post('/graphs/:filename/share-read-token', async (req, res) => {
     }
 
     const token = crypto.randomBytes(24).toString('hex');
-    fileData.metadata = {
-      ...fileData.metadata,
-      shareReadToken: token,
-    };
-
-    await fs.writeFile(filePath, JSON.stringify(fileData, null, 2));
-
     try {
       await Graph.findOneAndUpdate(
-        { 'metadata.generatedAt': fileData.metadata.generatedAt },
+        { 'metadata.filename': filename },
         { $set: { 'metadata.shareReadToken': token } }
       );
     } catch (dbErr) {
@@ -345,10 +295,36 @@ router.get('/graphs/:graphId/views', async (req, res) => {
 router.get('/graphs/:filename', async (req, res) => {
   try {
     const filename = decodeURIComponent(req.params.filename);
-    const filePath = path.join(graphsDir, filename);
+    let fileData = null;
+    let viaMongo = false;
 
-    const content = await fs.readFile(filePath, 'utf8');
-    const fileData = JSON.parse(content);
+    let dbGraph = null;
+    try {
+      dbGraph = await Graph.findOne({ 'metadata.filename': filename }).lean();
+    } catch (e) {
+      // Allow file-based loads when Mongo is unavailable (tests, local dev without DB).
+      console.warn('Mongo graph lookup skipped:', e?.message || e);
+      dbGraph = null;
+    }
+
+    if (dbGraph) {
+      viaMongo = true;
+      fileData = {
+        graph: dbGraph.payload || { nodes: [], links: [] },
+        metadata: {
+          ...(dbGraph.metadata || {}),
+          dbId: dbGraph._id,
+          // For client expectations: sessionId is the session UUID string.
+          sessionId: dbGraph.metadata?.sessionUuid || dbGraph.metadata?.sessionId,
+        },
+      };
+    } else {
+      return res.status(404).json({
+        success: false,
+        error: 'Graph not found',
+        code: 'NOT_FOUND',
+      });
+    }
 
     const headerUserId =
       typeof req.get(USER_ID_HEADER) === 'string'
@@ -370,7 +346,7 @@ router.get('/graphs/:filename', async (req, res) => {
       });
     }
 
-    console.log('Loading graph from file:', {
+    console.log(`Loading graph from ${viaMongo ? 'mongo' : 'file'}:`, {
       nodes: fileData.graph.nodes.length,
       links: fileData.graph.links.map((l) => ({
         source: l.source,
@@ -380,46 +356,42 @@ router.get('/graphs/:filename', async (req, res) => {
     });
 
     try {
-      const dbGraph = await Graph.findOne({
-        'metadata.generatedAt': fileData.metadata.generatedAt
-      });
-
-      if (dbGraph) {
-        fileData.metadata = {
-          ...fileData.metadata,
-          dbId: dbGraph._id
-        };
-
-        const sessionId = new mongoose.Types.ObjectId(
-          parseInt(fileData.metadata.sessionId.replace(/-/g, '').slice(0, 12), 16)
-        );
+      const graphIdForViews = dbGraph?._id;
+      if (graphIdForViews) {
+        const sessionUuid = String(fileData.metadata.sessionId || '').trim();
+        const sessionIdObj =
+          sessionUuid && sessionUuid.includes('-')
+            ? new mongoose.Types.ObjectId(
+                parseInt(sessionUuid.replace(/-/g, '').slice(0, 12), 16)
+              )
+            : new mongoose.Types.ObjectId();
 
         const graphView = new GraphView({
-          graphId: dbGraph._id,
-          sessionId,
+          graphId: graphIdForViews,
+          sessionId: sessionIdObj,
           metadata: {
-            loadSource: 'file',
+            loadSource: viaMongo ? 'database' : 'file',
             filename,
-          }
+          },
         });
 
         try {
           await graphView.save();
           await recordUserActivity({
-            sessionObjectId: sessionId,
-            sessionUuid: fileData.metadata.sessionId,
+            sessionObjectId: sessionIdObj,
+            sessionUuid,
             action: 'GRAPH_VIEW_RECORD',
             status: 'SUCCESS',
             resourceType: 'GraphView',
             resourceId: graphView._id,
             summary: `Loaded graph file ${filename}`,
-            meta: { graphId: String(dbGraph._id) }
+            meta: { graphId: String(graphIdForViews) }
           });
         } catch (viewErr) {
           console.error('Failed to save graph view:', viewErr);
           await recordUserActivity({
-            sessionObjectId: sessionId,
-            sessionUuid: fileData.metadata.sessionId,
+            sessionObjectId: sessionIdObj,
+            sessionUuid,
             action: 'GRAPH_VIEW_RECORD',
             status: 'FAILURE',
             summary: `Graph view not persisted for ${filename}`,
@@ -455,7 +427,8 @@ router.get('/graphs/:filename', async (req, res) => {
     console.error('Error loading graph:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to load graph'
+      error: 'Failed to load graph',
+      code: 'LOAD_FAILED',
     });
   }
 });

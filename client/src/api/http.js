@@ -107,7 +107,15 @@ export async function apiRequest(path, options = {}) {
       (typeof data === 'object' && data._raw) ||
       `HTTP ${response.status}`;
     const msg =
-      typeof detail === 'string' ? detail : String(detail);
+      typeof detail === 'string'
+        ? detail
+        : (() => {
+          try {
+            return JSON.stringify(detail);
+          } catch {
+            return String(detail);
+          }
+        })();
     throw new ApiError(msg, {
       status: response.status,
       code: typeof data === 'object' && data?.code,

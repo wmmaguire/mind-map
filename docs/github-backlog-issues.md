@@ -31,7 +31,44 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #40 | NF—Polish | Dynamic UI / UX epic |
 | #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library layout / flex vs old header pixel constant — partly addressed by **#33** graph title in banner); post–**#26**: **#54** (server docs: file delete API + CORS); post–**#28**: **#55** (optional **`.library-graph-mount`** CSS audit); post–**#29**: **#56** (optional graph Actions accordion / focus polish); post–**#30**: **#57** (D3 canvas / node screen-reader a11y); post–**#32**: **#33** (client shell + headers; server **`userId`** on upload still backlog), **#46** (**`metadata/`** vs Mongo drift under scoped-only listing); post–**#33**: real **OAuth / session tokens**, **#24** (E2E for banner + **`LibraryUiContext`**), z-index polish **#52**; post–**#34**–**#35**: **#24** (audio E2E incl. **#58** verbose UI), **#59** (speaker diarization), **#60** (transcribe HTTP integration tests), **#61** (optional persist/export). Post–**#58**: **#24**, **#59**, **#60**, **#61**; merged time+speaker contract (**#59**) — see **`server/READEME.md`** §2b follow-ups. |
 
-**Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency), **#45** (`UserActivity` ops: volume / retention / indexes).
+**Note (Apr 2026 — Mongo graph snapshots + library disk hygiene):** Saved graphs are **Mongo-authoritative** (`Graph.payload`, `metadata.filename`); **`POST /api/graphs/save`** does **not** write **`server/graphs/*.json`**. **`GET /api/graphs`** / **`GET /api/graphs/:filename`** read Mongo only. **One-off import:** `server/scripts/migrate-graphs-to-mongo.js` (requires **`MONGODB_URI`**). Scoped **`GET /api/files`** hides **`File`** rows whose bytes are missing on disk (ephemeral PaaS); **`GET /api/files/:filename`** uses string **`details`** + **`FILE_MISSING_ON_DISK`**. Client: **`apiRequest`** stringifies object errors; **`LibraryVisualize`** sets **`currentSource`** after save for **SHARE**; **`GuestIdentityBanner`** z-index vs graph FAB + **SHARE** label. Docs: **`server/READEME.md`**, **`docs/status.md`**.
+
+**Follow-ups outside this change (add or extend GitHub issues; post suggested comments on refs below):**
+
+1. **Durable uploads on PaaS** — `uploads/` is still local disk; redeploys can strand **`File`** rows without bytes. Options: object storage (S3/R2), GridFS, or Render **persistent disk**. Relates to **#20**, **#46**.
+2. **Reconcile `File` collection** — background or admin job to delete or mark **`File`** docs when **`path`** is **`ENOENT`** (complements list-only filter).
+3. **#44 update** — Orphan **`graphs/*.json`** scenario is **legacy**; new failure mode is Mongo-only (document failed or partial). Refresh **#44** description / acceptance.
+4. **`Graph` schema indexes** — Mongoose may warn on duplicate index defs (`metadata.sessionUuid`, `metadata.userId`, `nodes.id`); dedupe **`server/models/graph.js`** vs **`schema.index()`**.
+5. **JWT-verified `X-Mindmap-User-Id`** — still **#64**; header trust for listing/share/upload paths.
+
+**Suggested GitHub comments (paste on issue):**
+
+- **#20** — *Apr 2026: Graph snapshots moved to Mongo (`Graph.payload`); uploads + metadata still on disk—ephemeral hosts remain a risk; see `docs/github-backlog-issues.md` ops note.*
+- **#32** — *Scoped file listing now skips rows missing on disk; stale `File` docs may still exist until reconcile (backlog).*
+- **#39** — *Share mint/load unchanged by filename id; token persisted on `Graph` in Mongo only (no disk write for share rotation).*
+- **#44** — *New saves: no `graphs/` write; orphan JSON only from legacy. Track Mongo save failures separately.*
+- **#46** — *File list vs disk: API hides missing files; full reconciliation with Mongo is still open.*
+- **#52** — *GuestIdentityBanner stacking raised (z-index 1195) above graph Actions FAB (1190), below Library mobile sidebar (1200).*
+
+### Backlog: PaaS upload durability + `File` reconcile (suggested new issue if not merged into #20 / #46)
+
+**Title:** `Backlog: Durable upload bytes + reconcile Mongo File docs when disk is ephemeral`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026)
+Graph snapshots are Mongo-only (`Graph.payload`). **Uploads** still use local `uploads/` + `File` rows. Scoped `GET /api/files` hides rows whose file is missing on disk, but **orphan `File` documents** can remain after redeploys.
+
+## Scope
+1. **Product / infra:** object storage (S3/R2), GridFS, or persistent volume for raw bytes.
+2. **Data hygiene:** job or admin path to delete/mark `File` docs when `path` is gone (complements list filter).
+3. **Docs:** update `server/READEME.md` hybrid table when implemented.
+
+Refs: #20 #46 #32 #64
+```
+
+**Note:** Server **#16** (database-backed user activity / `UserActivity` audit) is implemented in `server/models/userActivity.js`, `server/lib/recordUserActivity.js`, and **`server/READEME.md`** (persistence matrix). Follow-ups filed separately: **#44** (graph snapshot disk vs Mongo consistency — **partially superseded** by Mongo-only graph saves; see note above), **#45** (`UserActivity` ops: volume / retention / indexes).
 
 **Note:** Server **#20** (hybrid persistence / source of truth) is documented in **`server/READEME.md`** → *Data consistency (hybrid persistence)*. Optional API follow-up: **#46** (align `GET /api/files` with Mongo `File` or reconciliation).
 

@@ -545,9 +545,25 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
 
       if (data.success) {
         fetchSavedGraphs();
+        const savedName = graphName.trim();
+        const savedDescription = graphDescription.trim();
         setShowSaveDialog(false);
         setGraphName('');
         setGraphDescription('');
+        if (data.filename && userId) {
+          setCurrentSource((prev) => ({
+            ...(prev || {}),
+            name: savedName,
+            description: savedDescription,
+            sourceFile: data.filename,
+            userId,
+            sessionId,
+            generatedAt: metadata.generatedAt,
+            nodeCount: committedGraph.nodes.length,
+            edgeCount: committedGraph.links.length,
+            sourceFiles: metadata.sourceFiles,
+          }));
+        }
       } else {
         throw new Error(data.error || 'Failed to save graph');
       }
@@ -593,7 +609,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       committedGraph &&
       currentSource?.sourceFile &&
       !shareViewerMode &&
-      String(currentSource?.userId || '') === String(userId)
+      String(currentSource?.userId ?? '').trim() === String(userId).trim()
   );
 
   const handleCopyShareReadLink = useCallback(async () => {
@@ -734,6 +750,20 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
       const times = getSortedUniquePlaybackTimes(cloned);
       setPlaybackStepIndex(times.length > 0 ? times.length - 1 : 0);
 
+      if (userId) {
+        const label = fileResults
+          .map(
+            (r) =>
+              r.file.customName ||
+              r.filename.replace(/\.[^/.]+$/, '')
+          )
+          .join(' + ');
+        setCurrentSource((prev) => ({
+          ...(prev || {}),
+          name: label || prev?.name,
+          userId,
+        }));
+      }
     } catch (error) {
       console.error('Analysis error:', error);
       setError(`Failed to analyze files: ${getApiErrorMessage(error)}`);

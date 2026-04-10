@@ -137,9 +137,29 @@ router.get('/files', async (req, res) => {
 
     if (userId) {
       const docs = await File.find({ userId }).sort({ uploadTime: -1 }).lean();
+      const existing = [];
+      const missing = [];
+      for (const doc of docs) {
+        const p = doc?.path;
+        if (!p) continue;
+        try {
+          await fs.access(p);
+          existing.push(doc);
+        } catch {
+          missing.push(path.basename(p));
+        }
+      }
+      if (missing.length) {
+        console.warn('Omitting library files missing on disk:', {
+          scope: 'userId',
+          userId,
+          missingCount: missing.length,
+          missing: missing.slice(0, 25),
+        });
+      }
       res.setHeader('Content-Type', 'application/json');
       return res.json({
-        files: docs.map(fileDocToListItem),
+        files: existing.map(fileDocToListItem),
         listingScope: 'userId',
       });
     }
@@ -148,9 +168,29 @@ router.get('/files', async (req, res) => {
       const docs = await File.find(sessionScopedGuestFilesQuery(sessionId))
         .sort({ uploadTime: -1 })
         .lean();
+      const existing = [];
+      const missing = [];
+      for (const doc of docs) {
+        const p = doc?.path;
+        if (!p) continue;
+        try {
+          await fs.access(p);
+          existing.push(doc);
+        } catch {
+          missing.push(path.basename(p));
+        }
+      }
+      if (missing.length) {
+        console.warn('Omitting library files missing on disk:', {
+          scope: 'sessionId',
+          sessionId,
+          missingCount: missing.length,
+          missing: missing.slice(0, 25),
+        });
+      }
       res.setHeader('Content-Type', 'application/json');
       return res.json({
-        files: docs.map(fileDocToListItem),
+        files: existing.map(fileDocToListItem),
         listingScope: 'sessionId',
       });
     }
@@ -326,11 +366,13 @@ router.get('/files/:filename', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'File not found',
-        details: {
+        details: `Requested "${filename}" was not found on disk.`,
+        debug: {
           requested: filename,
           path: filePath,
-          availableFiles: files
-        }
+          availableFiles: files,
+        },
+        code: 'FILE_MISSING_ON_DISK',
       });
     }
 

@@ -1,13 +1,13 @@
 ## Project status (MindMap / talk-graph)
 
-Last updated: 2026-04-09 — **#39** slice (read-only share, hardened Apr 2026): **`POST /api/graphs/:filename/share-read-token`**, **`GET /api/graphs/:filename?shareToken=`** with **`evaluateOwnedGraphRead`** / **`redactGraphMetadataForResponse`** in **`server/lib/graphShareRead.js`**; client **`/visualize?shareGraph=&shareToken=`**, **`LibraryVisualize` `shareViewerMode`**, **`GraphVisualization` `readOnly`**; **`POST /api/graphs/save`** rejects any **`?shareToken=`** (**`SHARE_READ_ONLY`**) and **strips `metadata.shareReadToken`** from save bodies so secrets are **only** minted via share-read-token. HTTP integration test: **`server/routes/graphs.share.integration.test.mjs`** (isolated **`DATA_DIR`**). Docs: **`server/READEME.md`** §6 (share + **future comments/collaboration** permission sketch), **`client/README.md`** (share E2E notes), **`docs/github-backlog-issues.md`** (#39 note + **#74** backlog). **#36** replay: **timestamp-based** playback (**`graphPlayback.js`**, per-entity **`createdAt`** / legacy **`timestamp`**), second shell strip **`GraphPlaybackBanner`** (save + scrubber + speed + share), **`GraphHistoryUiContext`** (`history` / `share` / `save` payloads); identity banner is **title-only**; graph title **blank** when unnamed; **`graphHistory.js`** reducer retained for tests/normalize only; spike **`docs/graph-time-travel-spike.md`**; backlog **#70** + **`docs/github-backlog-issues.md`**. **#62** client polish: Generate modal **Apply**, inline validation, **auto-close** on submit, on-canvas **`graph-edit-mode-chip`** with **progress bar** (indeterminate / per-cycle determinate) + **Stop after this cycle** on the chip; docs in **`client/README.md`**, **`docs/github-backlog-issues.md`**. Still: **#37** **`dryRun`** / budget **Preview** not exposed in the Generate UI (server API unchanged). Earlier same day: **#37** server slice, **#63** auth docs, **#58** follow-ups in **`server/READEME.md`** §2b.
+Last updated: 2026-04-10 — **Production persistence / library UX (Apr 2026):** saved graphs are **Mongo-authoritative** (`Graph.payload`, `metadata.filename`, `metadata.sessionUuid`); **`POST /api/graphs/save`** no longer writes **`server/graphs/*.json`**; **`GET /api/graphs`** / **`GET /api/graphs/:filename`** use Mongo only (no disk fallback). **One-off import:** **`server/scripts/migrate-graphs-to-mongo.js`**. Scoped **`GET /api/files`** omits **`File`** rows whose upload path is missing on disk; **`GET /api/files/:filename`** returns clearer JSON errors (**`FILE_MISSING_ON_DISK`**). Client **`apiRequest`** stringifies object-shaped **`details`**; **`LibraryVisualize`** updates **`currentSource`** after save so banner **SHARE** works; **`GuestIdentityBanner`** z-index above graph Actions FAB, **SHARE** label. Docs: **`server/READEME.md`** (hybrid table + §6), **`docs/github-backlog-issues.md`** (ops note + follow-ups). Prior **#39** slice (read-only share, hardened Apr 2026): **`POST /api/graphs/:filename/share-read-token`**, **`GET /api/graphs/:filename?shareToken=`** with **`evaluateOwnedGraphRead`** / **`redactGraphMetadataForResponse`** in **`server/lib/graphShareRead.js`**; client **`/visualize?shareGraph=&shareToken=`**, **`LibraryVisualize` `shareViewerMode`**, **`GraphVisualization` `readOnly`**; **`POST /api/graphs/save`** rejects any **`?shareToken=`** (**`SHARE_READ_ONLY`**) and **strips `metadata.shareReadToken`** from save bodies so secrets are **only** minted via share-read-token. HTTP integration test: **`server/routes/graphs.share.integration.test.mjs`** (isolated **`DATA_DIR`**). Docs: **`server/READEME.md`** §6 (share + **future comments/collaboration** permission sketch), **`client/README.md`** (share E2E notes), **`docs/github-backlog-issues.md`** (#39 note + **#74** backlog). **#36** replay: **timestamp-based** playback (**`graphPlayback.js`**, per-entity **`createdAt`** / legacy **`timestamp`**), second shell strip **`GraphPlaybackBanner`** (save + scrubber + speed + share), **`GraphHistoryUiContext`** (`history` / `share` / `save` payloads); identity banner is **title-only**; graph title **blank** when unnamed; **`graphHistory.js`** reducer retained for tests/normalize only; spike **`docs/graph-time-travel-spike.md`**; backlog **#70** + **`docs/github-backlog-issues.md`**. **#62** client polish: Generate modal **Apply**, inline validation, **auto-close** on submit, on-canvas **`graph-edit-mode-chip`** with **progress bar** (indeterminate / per-cycle determinate) + **Stop after this cycle** on the chip; docs in **`client/README.md`**, **`docs/github-backlog-issues.md`**. Still: **#37** **`dryRun`** / budget **Preview** not exposed in the Generate UI (server API unchanged). Earlier same day: **#37** server slice, **#63** auth docs, **#58** follow-ups in **`server/READEME.md`** §2b.
 
 ### Summary
 This repo implements a full-stack web app that turns uploaded text/markdown into an interactive “mind map” graph. The architecture is:
 - **React (Create React App)** frontend for uploading, selecting files, and visualizing/editing graphs with D3
 - **Node.js / Express** backend for file upload, content retrieval, graph generation via OpenAI, and persistence
 - **MongoDB (Mongoose)** for sessions, metadata, transforms, graphs, feedback, telemetry, and a **`UserActivity`** audit collection for cross-cutting session/upload/analyze/graph/feedback outcomes (see **`server/READEME.md`**, GitHub **#16**)
-- **Filesystem persistence** as a parallel/backup store for uploads + metadata + saved graphs; **which store is authoritative per feature** is summarized under **`server/READEME.md`** → *Data consistency (hybrid persistence)* (GitHub **#20**)
+- **Filesystem persistence** for uploads + metadata sidecars; **saved graph JSON on disk is legacy** (new saves: Mongo **`Graph.payload`** only). **Which store is authoritative per feature** is summarized under **`server/READEME.md`** → *Data consistency (hybrid persistence)* (GitHub **#20**)
 - **Client multi-file library flow:** per-file `POST /api/analyze` plus **`mergeGraphs`** namespaced union in **`client/src/utils/`** (GitHub **#21**); roadmap for connected fusion / splitting in **#47**
 
 The README describes the stack correctly but there is some naming drift: the repo is `mind-map`, while package/app names and production URL references still use `talk-graph`.
@@ -19,7 +19,7 @@ The README describes the stack correctly but there is some naming drift: the rep
 - `server/`: Express API, Mongoose models, routers, and runtime storage directories:
   - `server/uploads/`: uploaded source files
   - `server/metadata/`: per-upload JSON metadata
-  - `server/graphs/`: saved graphs as JSON snapshots
+  - `server/graphs/`: **legacy** on-disk graph snapshots (optional; import via **`server/scripts/migrate-graphs-to-mongo.js`**)
 
 Root `package.json` provides convenience scripts to run both sides in dev.
 
@@ -81,7 +81,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
   - **Filesystem**
     - Raw uploads saved to `server/uploads/`
     - JSON metadata saved to `server/metadata/`
-    - Saved graphs written to `server/graphs/`
+    - **Saved graphs:** Mongo **`Graph`** documents only (legacy **`graphs/`** files may exist from older deploys)
   - **MongoDB**
     - Used for sessions/user metadata, files, transforms, graphs, feedback, and telemetry.
     - Some flows intentionally “do not fail” if DB writes fail (e.g., upload logs DB error but returns success).
@@ -99,9 +99,9 @@ Root `package.json` provides convenience scripts to run both sides in dev.
   - Writes metadata JSON file
   - Attempts to store a `File` record in Mongo
 - `GET /api/files`
-  - With **`?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`**, lists from MongoDB **`File`** (GitHub **#32**); otherwise legacy scan of **`server/metadata/*.json`**
+  - With **`?sessionId=`** or **`?userId=`** / **`X-Mindmap-User-Id`**, lists from MongoDB **`File`** (GitHub **#32**) and **drops entries whose file is missing on disk**; otherwise legacy scan of **`server/metadata/*.json`**
 - `GET /api/files/:filename`
-  - Reads the uploaded file content from `server/uploads/`
+  - Reads the uploaded file content from `server/uploads/` (**404** + **`FILE_MISSING_ON_DISK`** when absent)
 
 #### Sessions
 - `POST /api/sessions`
@@ -124,15 +124,12 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 #### Graph persistence + analytics
 - `POST /api/graphs/save`
-  - Saves a graph snapshot:
-    - Writes JSON to filesystem (`server/graphs/graph_<timestamp>.json`)
-    - Saves a Graph document in Mongo
-  - **#39:** rejects **`?shareToken=`** (**403** / **`SHARE_READ_ONLY`**); strips **`metadata.shareReadToken`** from the body (tokens only via **`POST …/share-read-token`**).
+  - Saves a graph snapshot to Mongo (**`Graph`**, including **`payload`** and **`metadata.filename`** = `graph_<timestamp>.json`). **#39:** rejects **`?shareToken=`** (**403** / **`SHARE_READ_ONLY`**); strips **`metadata.shareReadToken`** from the body (tokens only via **`POST …/share-read-token`**).
 - `GET /api/graphs`
-  - Lists saved graph JSON files; filtered by **`metadata.sessionId`** or **`metadata.userId`** when query/header provided (**#32**), else lists all (legacy)
+  - Lists **`Graph`** documents; filtered by **`metadata.sessionUuid`** or **`metadata.userId`** when query/header provided (**#32**), else lists all (legacy)
 - `GET /api/graphs/:filename`
-  - Loads a saved graph from filesystem (**#39:** account-owned graphs need owner header or valid **`?shareToken=`**; response redacts secrets / **`dbId`** for share viewers)
-  - Optionally merges extra Mongo metadata and records a `GraphView`
+  - Loads by **`metadata.filename`** from Mongo (**#39:** account-owned graphs need owner header or valid **`?shareToken=`**; response redacts secrets / **`dbId`** for share viewers)
+  - Records a `GraphView` when applicable
 - `GET /api/graphs/:graphId/views`
   - Returns view statistics for a graph (Mongo)
 
@@ -156,7 +153,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 - `GraphTransform` (`server/models/graphTransform.js`)
   - tracks analysis jobs (status/result), references `Session` and `File`s
 - `Graph` (`server/models/graph.js`)
-  - persisted graphs with embedded nodes and links
+  - persisted graphs: canonical **`payload`** `{ nodes, links }`, **`metadata.filename`**, **`metadata.sessionUuid`**, optional **`metadata.userId`**, share token (**#39**); legacy **`nodes`** / **`links`** subschemas retained for older documents
 - `Feedback` (`server/models/feedback.js`)
 - `GraphOperation`, `GraphView`
   - analytics/telemetry

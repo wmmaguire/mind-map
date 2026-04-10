@@ -1,10 +1,13 @@
 /**
  * HTTP-level checks for read-only share links (#39). Uses an isolated DATA_DIR
  * so the suite does not touch repo server/graphs/.
+ *
+ * Graph snapshots are now Mongo-backed; this suite stubs the Graph model so it
+ * does not require a live database.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'fs/promises';
+import { mkdtemp, rm } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import http from 'http';
@@ -48,26 +51,30 @@ test('graphs #39: save rejects ?shareToken=; GET enforces token; responses redac
   process.env.DATA_DIR = tmp;
   let server;
   try {
-    await mkdir(path.join(tmp, 'graphs'), { recursive: true });
+    const { default: graphsRouter } = await import('./graphs.js');
+    const { default: Graph } = await import('../models/graph.js');
 
-    const fixture = {
-      graph: { nodes: [], links: [] },
+    // Stub Mongo reads so GET /api/graphs/:filename can run without a DB.
+    const fixtureDoc = {
+      _id: '64b2f3e7f9c24c5c2b4a1111',
       metadata: {
+        filename: SHARE_FIXTURE,
         name: 'ShareFixture',
-        sessionId: SESSION_UUID,
+        sessionUuid: SESSION_UUID,
+        sessionId: '000000000000000000000000',
         userId: 'owner1',
-        generatedAt: '2020-01-01T00:00:00.000Z',
+        generatedAt: new Date('2020-01-01T00:00:00.000Z'),
         sourceFiles: [],
         shareReadToken: SHARE_SECRET,
       },
+      payload: { nodes: [], links: [] },
     };
-    await writeFile(
-      path.join(tmp, 'graphs', SHARE_FIXTURE),
-      JSON.stringify(fixture),
-      'utf8'
-    );
 
-    const { default: graphsRouter } = await import('./graphs.js');
+    const origFindOne = Graph.findOne.bind(Graph);
+    Graph.findOne = (query) => ({
+      lean: async () =>
+        query && query['metadata.filename'] === SHARE_FIXTURE ? fixtureDoc : null,
+    });
     const app = express();
     app.use(express.json());
     app.use('/api', graphsRouter);
@@ -101,6 +108,8 @@ test('graphs #39: save rejects ?shareToken=; GET enforces token; responses redac
     assert.equal(good.json?.success, true);
     assert.equal('shareReadToken' in (good.json?.data?.metadata || {}), false);
     assert.equal('dbId' in (good.json?.data?.metadata || {}), false);
+
+    Graph.findOne = origFindOne;
   } finally {
     if (server) {
       try {
