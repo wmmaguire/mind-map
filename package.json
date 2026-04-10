@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cd server && node server.js",
     "build": "cd client && npm install && npm run build && cd ../server && npm install",
-    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm start\"",
+    "dev": "NODE_OPTIONS=--max-http-header-size=65536 concurrently \"cd server && npm run dev\" \"cd client && npm start\"",
     "install-all": "npm install && cd client && npm install && cd ../server && npm install",
     "lint": "npm run lint:client && npm run lint:server",
     "lint:client": "cd client && npm run lint",

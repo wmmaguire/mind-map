@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
@@ -121,6 +121,22 @@ app.use(express.urlencoded({ extended: true }));
 // Parse cookies for auth (GitHub #63).
 installAuthCookieParsing(app);
 
+const healthJson = () => ({
+  status: 'ok',
+  message: 'Server is running',
+  env: process.env.NODE_ENV,
+  timestamp: new Date().toISOString()
+});
+
+/** Registered before other `/api` routers so health checks always work. */
+app.get('/health', (req, res) => {
+  res.json(healthJson());
+});
+
+app.get('/api/test', (req, res) => {
+  res.json(healthJson());
+});
+
 // Add this middleware to log all incoming requests
 app.use((req, res, next) => {
   const isAuthRoute = req.path?.startsWith('/api/auth');
@@ -149,20 +165,6 @@ app.use('/api', graphsRouter);
 app.use('/api', graphOperationsRouter);
 app.use('/api', createTranscribeRouter(openai));
 app.use('/api/auth', createAuthRouter());
-
-app.get('/api/test', (req, res) => {
-  try {
-    res.json({ 
-      status: 'ok',
-      message: 'Server is running',
-      env: process.env.NODE_ENV,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Test endpoint error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Error handling
 app.use((err, req, res, _next) => {
@@ -879,13 +881,15 @@ app.post('/api/generate-node', async (req, res) => {
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/feedback', feedbackRoutes);
 
-// Start server
+// Start server (raise header limit — default ~16KB can trigger HTTP 431 with large cookies)
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+const maxHeaderSize = parseInt(process.env.HTTP_MAX_HEADER_SIZE || '', 10) || 65536;
+const server = http.createServer({ maxHeaderSize }, app);
+server.listen(PORT, () => {
   console.log('=================================');
   console.log(`Server running on port ${PORT}`);
   console.log(`http://localhost:${PORT}`);
-  console.log(`Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`Health: http://localhost:${PORT}/health  or  http://localhost:${PORT}/api/test`);
   console.log(`Files endpoint: http://localhost:${PORT}/api/files`);
   console.log('OpenAI configured:', !!openai);
   console.log('CORS enabled, origins:', allowedOrigins);
@@ -893,6 +897,7 @@ app.listen(PORT, () => {
   console.log('Directories:');
   console.log(`- Uploads: ${uploadsDir}`);
   console.log(`- Metadata: ${metadataDir}`);
+  console.log(`HTTP max header size (bytes): ${maxHeaderSize}`);
   console.log('=================================');
 });
 

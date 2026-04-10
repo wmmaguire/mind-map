@@ -69,6 +69,24 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const requestPasswordReset = useCallback(async ({ email }) => {
+    return apiRequest('/api/auth/forgot-password', {
+      method: 'POST',
+      json: { email },
+    });
+  }, []);
+
+  const completePasswordReset = useCallback(async ({ token, password }) => {
+    const data = await apiRequest('/api/auth/reset-password', {
+      method: 'POST',
+      json: { token, password },
+    });
+    if (data?.success && data.user) {
+      setAuthState({ status: 'authenticated', user: data.user });
+    }
+    return data;
+  }, []);
+
   const value = useMemo(() => ({
     status: authState.status,
     user: authState.user,
@@ -78,7 +96,19 @@ export function AuthProvider({ children }) {
     login,
     logout,
     updateProfile,
-  }), [authState.status, authState.user, refreshMe, register, login, logout, updateProfile]);
+    requestPasswordReset,
+    completePasswordReset,
+  }), [
+    authState.status,
+    authState.user,
+    refreshMe,
+    register,
+    login,
+    logout,
+    updateProfile,
+    requestPasswordReset,
+    completePasswordReset,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,7 +1,20 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import User from '../models/user.js';
-import { loginWithStore, registerWithStore, signAuthToken, verifyAuthToken } from '../lib/authService.js';
+import {
+  createPasswordResetPlainToken,
+  hashPassword,
+  hashPasswordResetToken,
+  loginWithStore,
+  PASSWORD_RESET_TTL_MS,
+  registerWithStore,
+  resolvePublicAppOrigin,
+  signAuthToken,
+  validateEmail,
+  validatePassword,
+  verifyAuthToken,
+} from '../lib/authService.js';
+import { hasMailTransport, sendPasswordResetEmail } from '../lib/passwordResetMail.js';
 
 const COOKIE_NAME = 'mindmap_auth';
 
@@ -123,6 +136,96 @@ export default function createAuthRouter() {
       await result.user.save();
     }
     return res.json({ success: true, user: userPublicJson(result.user) });
+  });
+
+  const forgotPasswordResponse = {
+    success: true,
+    message:
+      'If an account exists for that email, we sent a reset link. It expires in one hour.',
+  };
+
+  router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body || {};
+    const emailLower = String(email || '').trim().toLowerCase();
+    if (!validateEmail(emailLower)) {
+      return res.status(400).json({ success: false, error: 'Invalid email', code: 'INVALID_EMAIL' });
+    }
+    const user = await User.findOne({ emailLower });
+    if (!user) {
+      return res.json(forgotPasswordResponse);
+    }
+    const publicOrigin = resolvePublicAppOrigin();
+    if (!publicOrigin) {
+      console.error(
+        '[auth] Password reset skipped: set APP_PUBLIC_ORIGIN to your SPA origin (e.g. https://app.example.com)'
+      );
+      return res.json(forgotPasswordResponse);
+    }
+    if (process.env.NODE_ENV === 'production' && !hasMailTransport()) {
+      console.error(
+        '[auth] Password reset skipped: set SMTP_URL or SMTP_HOST so reset emails can be sent'
+      );
+      return res.json(forgotPasswordResponse);
+    }
+    const plainToken = createPasswordResetPlainToken();
+    user.passwordResetTokenHash = hashPasswordResetToken(plainToken);
+    user.passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    await user.save();
+    const resetUrl = `${publicOrigin}/reset-password?token=${encodeURIComponent(plainToken)}`;
+    try {
+      await sendPasswordResetEmail({ to: emailLower, resetUrl });
+    } catch (e) {
+      console.error('[auth] Password reset email failed', e);
+      user.passwordResetTokenHash = null;
+      user.passwordResetExpiresAt = null;
+      await user.save();
+    }
+    return res.json(forgotPasswordResponse);
+  });
+
+  router.post('/reset-password', async (req, res) => {
+    const { token, password } = req.body || {};
+    if (typeof token !== 'string' || token.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Reset token is required',
+        code: 'TOKEN_REQUIRED',
+      });
+    }
+    if (!validatePassword(password)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters',
+        code: 'INVALID_PASSWORD',
+      });
+    }
+    const tokenHash = hashPasswordResetToken(token.trim());
+    if (!tokenHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired reset link',
+        code: 'INVALID_RESET_TOKEN',
+      });
+    }
+    const now = new Date();
+    const user = await User.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: now },
+    });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired reset link',
+        code: 'INVALID_RESET_TOKEN',
+      });
+    }
+    user.passwordHash = await hashPassword(password);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    await user.save();
+    const jwt = signAuthToken({ sub: String(user._id) });
+    res.cookie(COOKIE_NAME, jwt, cookieOptions());
+    return res.json({ success: true, user: userPublicJson(user) });
   });
 
   return router;

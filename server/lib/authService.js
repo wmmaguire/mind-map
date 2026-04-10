@@ -1,7 +1,35 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 days
+
+/** One-time password reset link lifetime (email link). */
+export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+
+export function createPasswordResetPlainToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+export function hashPasswordResetToken(plainToken) {
+  if (typeof plainToken !== 'string' || plainToken.length < 16) {
+    return '';
+  }
+  return crypto.createHash('sha256').update(plainToken, 'utf8').digest('hex');
+}
+
+/**
+ * Public SPA origin for links in outbound email (no trailing slash).
+ * Set **APP_PUBLIC_ORIGIN** in production (e.g. `https://mindmap.example.com`).
+ */
+export function resolvePublicAppOrigin(env = process.env) {
+  const raw = (env.APP_PUBLIC_ORIGIN || '').trim().replace(/\/$/, '');
+  if (raw) return raw;
+  if (env.NODE_ENV !== 'production') {
+    return 'http://localhost:3000';
+  }
+  return '';
+}
 
 export function getAuthConfig(env = process.env) {
   const secret = (env.AUTH_JWT_SECRET || '').trim();

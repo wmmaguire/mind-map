@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loginWithStore, registerWithStore } from './authService.js';
+import {
+  hashPasswordResetToken,
+  loginWithStore,
+  registerWithStore,
+  resolvePublicAppOrigin,
+} from './authService.js';
 
 function makeStore() {
   const byEmail = new Map();
@@ -47,5 +52,30 @@ test('loginWithStore validates credentials', async () => {
   const bad = await loginWithStore(store, { email: 'a@b.com', password: 'wrong' });
   assert.equal(bad.ok, false);
   assert.equal(bad.code, 'INVALID_CREDENTIALS');
+});
+
+test('hashPasswordResetToken is stable for the same plain token', () => {
+  const t = 'test-token-value-12345';
+  assert.equal(hashPasswordResetToken(t), hashPasswordResetToken(t));
+  assert.notEqual(hashPasswordResetToken(t), hashPasswordResetToken(`${t}x`));
+});
+
+test('hashPasswordResetToken rejects short input', () => {
+  assert.equal(hashPasswordResetToken('short'), '');
+});
+
+test('resolvePublicAppOrigin uses APP_PUBLIC_ORIGIN in production', () => {
+  assert.equal(
+    resolvePublicAppOrigin({ NODE_ENV: 'production', APP_PUBLIC_ORIGIN: 'https://x.com/' }),
+    'https://x.com'
+  );
+  assert.equal(resolvePublicAppOrigin({ NODE_ENV: 'production', APP_PUBLIC_ORIGIN: '' }), '');
+});
+
+test('resolvePublicAppOrigin defaults in development', () => {
+  assert.equal(
+    resolvePublicAppOrigin({ NODE_ENV: 'development', APP_PUBLIC_ORIGIN: '' }),
+    'http://localhost:3000'
+  );
 });
 

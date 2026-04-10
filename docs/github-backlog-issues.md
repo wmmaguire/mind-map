@@ -31,6 +31,33 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #40 | NF—Polish | Dynamic UI / UX epic |
 | #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library layout / flex vs old header pixel constant — partly addressed by **#33** graph title in banner); post–**#26**: **#54** (server docs: file delete API + CORS); post–**#28**: **#55** (optional **`.library-graph-mount`** CSS audit); post–**#29**: **#56** (optional graph Actions accordion / focus polish); post–**#30**: **#57** (D3 canvas / node screen-reader a11y); post–**#32**: **#33** (client shell + headers; server **`userId`** on upload still backlog), **#46** (**`metadata/`** vs Mongo drift under scoped-only listing); post–**#33**: real **OAuth / session tokens**, **#24** (E2E for banner + **`LibraryUiContext`**), z-index polish **#52**; post–**#34**–**#35**: **#24** (audio E2E incl. **#58** verbose UI), **#59** (speaker diarization), **#60** (transcribe HTTP integration tests), **#61** (optional persist/export). Post–**#58**: **#24**, **#59**, **#60**, **#61**; merged time+speaker contract (**#59**) — see **`server/READEME.md`** §2b follow-ups. |
 
+### Password reset (Apr 2026) — shipped slice + follow-ups (outside this ticket)
+
+**Shipped:** `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` (1h token, hashed on `User`); **`GuestIdentityBanner`** forgot flow; **`/reset-password`** page; **nodemailer** + SMTP env; **`APP_PUBLIC_ORIGIN`** for email links; **`SMTP_URL`** must be `smtp(s):` or host-based vars are used; **`GET /health`** / **`GET /api/test`**; HTTP **`maxHeaderSize`**; client **`PORT=3000`** in **`npm start`**.
+
+**Follow-ups (add comments on open issues below; file new GitHub issues if missing):**
+
+1. **Rate limiting / abuse** — throttle **`POST /api/auth/forgot-password`** per IP / email (e.g. express-rate-limit, Redis). Relates to **#64** (auth hardening).
+2. **Tests** — HTTP integration tests for forgot/reset routes (mock mail); client RTL for **`PasswordResetPage`** / banner flow (**#24** E2E).
+3. **Email product** — HTML templates, i18n, branded From; align **`SMTP_FROM`** with provider **#74** link-policy work (trusted sender domain).
+4. **Audit** — **`UserActivity`** or security log for **`PASSWORD_RESET_REQUESTED`** / **`PASSWORD_RESET_COMPLETED`** (**#16**).
+5. **Windows dev** — **`cross-env`** for **`PORT=3000`** in **`client/package.json`** if shell env syntax is a problem.
+6. **Dependency noise** — **`[DEP0060] util._extend`** from CRA/webpack stack; upgrade path when **`react-scripts`** allows.
+7. **Optional** — allow password reset without **OpenAI** for local dev (split “minimal API” vs full server) — low priority; server still **exits** without **`OPENAI_API_KEY`** today.
+
+**Suggested GitHub comments (paste on issue):**
+
+- **#31** — *Apr 2026: Password reset shipped — forgot-password email + `/reset-password` page + `AuthContext` helpers; see `server/READEME.md` auth section and `docs/status.md`. Epic remainder (profiles, OAuth, BYO LLM) still open.*
+- **#63** — *Apr 2026: Extended `/api/auth` with `forgot-password` and `reset-password`; nodemailer + `APP_PUBLIC_ORIGIN` + SMTP env; `User` reset fields. Follow-ups: rate limits, audit, integration tests — `docs/github-backlog-issues.md` (Password reset section).*
+- **#74** — *Apr 2026: Account password reset is separate from read-only **graph** share links (#39). Optional future: align “link expiry / password” story for **share** links with account reset UX; this slice is email + JWT session only.*
+- **#64** — *Apr 2026: Forgot-password adds another unauthenticated POST — prioritize rate limiting + JWT verification work for `X-Mindmap-User-Id` as previously planned.*
+- **#24** — *Apr 2026: Backlog — E2E password reset (sign in → forgot → mail mock or staging SMTP → reset form).*
+- **#16** — *Apr 2026: Backlog — optional `UserActivity` rows for password reset request/complete (privacy-preserving summaries).*
+
+### Backlog: Password reset — rate limits + tests + mail polish — GitHub **#78**
+
+Tracked as **`https://github.com/wmmaguire/mind-map/issues/78`** (create manually if duplicate; do not re-file).
+
 **Note (Apr 2026 — Mongo graph snapshots + library disk hygiene):** Saved graphs are **Mongo-authoritative** (`Graph.payload`, `metadata.filename`); **`POST /api/graphs/save`** does **not** write **`server/graphs/*.json`**. **`GET /api/graphs`** / **`GET /api/graphs/:filename`** read Mongo only. **One-off import:** `server/scripts/migrate-graphs-to-mongo.js` (requires **`MONGODB_URI`**). Scoped **`GET /api/files`** hides **`File`** rows whose bytes are missing on disk (ephemeral PaaS); **`GET /api/files/:filename`** uses string **`details`** + **`FILE_MISSING_ON_DISK`**. Client: **`apiRequest`** stringifies object errors; **`LibraryVisualize`** sets **`currentSource`** after save for **SHARE**; **`GuestIdentityBanner`** z-index vs graph FAB + **SHARE** label. Docs: **`server/READEME.md`**, **`docs/status.md`**.
 
 **Follow-ups outside this change (add or extend GitHub issues; post suggested comments on refs below):**

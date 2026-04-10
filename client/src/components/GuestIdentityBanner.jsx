@@ -35,6 +35,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
     register,
     logout,
     updateProfile,
+    requestPasswordReset,
   } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { openMobileLibrary } = useLibraryUi();
@@ -90,12 +91,19 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
   const menuWrapRef = useRef(null);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // login | register
+  const [authMode, setAuthMode] = useState('login'); // login | register | forgot-password
   const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [forgotEmailSent, setForgotEmailSent] = useState(false);
+
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+    setForgotEmailSent(false);
+    setAuthError('');
+  };
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsName, setSettingsName] = useState('');
@@ -280,6 +288,8 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                 className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
                 onClick={() => {
                   setAuthMode('login');
+                  setForgotEmailSent(false);
+                  setAuthError('');
                   setAuthModalOpen(true);
                 }}
               >
@@ -297,109 +307,210 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
           <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account">
             <div className="guest-identity-banner__auth-modal">
               <div className="guest-identity-banner__auth-header">
-                <strong>{authMode === 'login' ? 'Sign in' : 'Create account'}</strong>
+                <strong>
+                  {authMode === 'forgot-password'
+                    ? 'Reset password'
+                    : authMode === 'login'
+                      ? 'Sign in'
+                      : 'Create account'}
+                </strong>
                 <button
                   type="button"
                   className="guest-identity-banner__auth-close"
-                  onClick={() => setAuthModalOpen(false)}
+                  onClick={closeAuthModal}
                   aria-label="Close"
                 >
                   ×
                 </button>
               </div>
-              <div className="guest-identity-banner__auth-tabs" role="tablist" aria-label="Auth mode">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={authMode === 'login'}
-                  className={`guest-identity-banner__auth-tab ${authMode === 'login' ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setAuthMode('login');
-                    setAuthError('');
-                  }}
-                >
-                  Sign in
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={authMode === 'register'}
-                  className={`guest-identity-banner__auth-tab ${authMode === 'register' ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setAuthMode('register');
-                    setAuthError('');
-                  }}
-                >
-                  Create account
-                </button>
-              </div>
-              <form
-                className="guest-identity-banner__auth-form"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setAuthBusy(true);
-                  setAuthError('');
-                  try {
-                    if (authMode === 'login') {
-                      await login({ email: authEmail, password: authPassword });
-                    } else {
-                      await register({
-                        name: authName,
-                        email: authEmail,
-                        password: authPassword
-                      });
-                    }
-                    setAuthModalOpen(false);
-                  } catch (err) {
-                    setAuthError(err?.message || 'Auth failed');
-                  } finally {
-                    setAuthBusy(false);
-                  }
-                }}
-              >
-                {authMode === 'register' ? (
-                  <label className="guest-identity-banner__auth-field">
-                    Name
-                    <input
-                      type="text"
-                      value={authName}
-                      onChange={(e) => setAuthName(e.target.value)}
-                      autoComplete="name"
-                      placeholder="e.g. Max"
-                    />
-                  </label>
-                ) : null}
-                <label className="guest-identity-banner__auth-field">
-                  Email
-                  <input
-                    type="email"
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                  />
-                </label>
-                <label className="guest-identity-banner__auth-field">
-                  Password
-                  <input
-                    type="password"
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
-                    required
-                  />
-                </label>
-                {authError ? (
-                  <div className="guest-identity-banner__auth-error" role="alert">
-                    {authError}
-                  </div>
-                ) : null}
-                <div className="guest-identity-banner__auth-actions">
-                  <button type="submit" disabled={authBusy}>
-                    {authBusy ? 'Working…' : authMode === 'login' ? 'Sign in' : 'Create account'}
+              {authMode === 'login' || authMode === 'register' ? (
+                <div className="guest-identity-banner__auth-tabs" role="tablist" aria-label="Auth mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={authMode === 'login'}
+                    className={`guest-identity-banner__auth-tab ${authMode === 'login' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setAuthMode('login');
+                      setAuthError('');
+                    }}
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={authMode === 'register'}
+                    className={`guest-identity-banner__auth-tab ${authMode === 'register' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setAuthMode('register');
+                      setAuthError('');
+                    }}
+                  >
+                    Create account
                   </button>
                 </div>
-              </form>
+              ) : (
+                <div className="guest-identity-banner__auth-forgot-toolbar">
+                  <button
+                    type="button"
+                    className="guest-identity-banner__auth-back"
+                    onClick={() => {
+                      setAuthMode('login');
+                      setAuthError('');
+                      setForgotEmailSent(false);
+                    }}
+                  >
+                    ← Sign in
+                  </button>
+                </div>
+              )}
+              {authMode === 'forgot-password' && forgotEmailSent ? (
+                <div className="guest-identity-banner__auth-success" role="status">
+                  <p>
+                    If that email is registered, you will receive a link shortly. It expires in one
+                    hour.
+                  </p>
+                  <div className="guest-identity-banner__auth-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setForgotEmailSent(false);
+                      }}
+                    >
+                      Back to sign in
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {authMode === 'forgot-password' && !forgotEmailSent ? (
+                <form
+                  className="guest-identity-banner__auth-form"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthBusy(true);
+                    setAuthError('');
+                    try {
+                      await requestPasswordReset({ email: authEmail });
+                      setForgotEmailSent(true);
+                    } catch (err) {
+                      setAuthError(err?.message || 'Request failed');
+                    } finally {
+                      setAuthBusy(false);
+                    }
+                  }}
+                >
+                  <p className="guest-identity-banner__auth-hint">
+                    Enter your email and we will send a one-time link to set a new password (valid for
+                    1 hour).
+                  </p>
+                  <label className="guest-identity-banner__auth-field">
+                    Email
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      autoComplete="email"
+                      required
+                    />
+                  </label>
+                  {authError ? (
+                    <div className="guest-identity-banner__auth-error" role="alert">
+                      {authError}
+                    </div>
+                  ) : null}
+                  <div className="guest-identity-banner__auth-actions">
+                    <button type="submit" disabled={authBusy}>
+                      {authBusy ? 'Sending…' : 'Send reset link'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+              {authMode === 'login' || authMode === 'register' ? (
+                <form
+                  className="guest-identity-banner__auth-form"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthBusy(true);
+                    setAuthError('');
+                    try {
+                      if (authMode === 'login') {
+                        await login({ email: authEmail, password: authPassword });
+                      } else {
+                        await register({
+                          name: authName,
+                          email: authEmail,
+                          password: authPassword
+                        });
+                      }
+                      closeAuthModal();
+                    } catch (err) {
+                      setAuthError(err?.message || 'Auth failed');
+                    } finally {
+                      setAuthBusy(false);
+                    }
+                  }}
+                >
+                  {authMode === 'register' ? (
+                    <label className="guest-identity-banner__auth-field">
+                      Name
+                      <input
+                        type="text"
+                        value={authName}
+                        onChange={(e) => setAuthName(e.target.value)}
+                        autoComplete="name"
+                        placeholder="e.g. Max"
+                      />
+                    </label>
+                  ) : null}
+                  <label className="guest-identity-banner__auth-field">
+                    Email
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      autoComplete="email"
+                      required
+                    />
+                  </label>
+                  <label className="guest-identity-banner__auth-field">
+                    Password
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                      required
+                    />
+                  </label>
+                  {authMode === 'login' ? (
+                    <div className="guest-identity-banner__auth-forgot-row">
+                      <button
+                        type="button"
+                        className="guest-identity-banner__auth-forgot-link"
+                        onClick={() => {
+                          setAuthMode('forgot-password');
+                          setAuthError('');
+                          setForgotEmailSent(false);
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  ) : null}
+                  {authError ? (
+                    <div className="guest-identity-banner__auth-error" role="alert">
+                      {authError}
+                    </div>
+                  ) : null}
+                  <div className="guest-identity-banner__auth-actions">
+                    <button type="submit" disabled={authBusy}>
+                      {authBusy ? 'Working…' : authMode === 'login' ? 'Sign in' : 'Create account'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
             </div>
           </div>
         ) : null}

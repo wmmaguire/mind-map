@@ -71,7 +71,7 @@ export async function apiRequest(path, options = {}) {
   } catch (e) {
     const msg =
       e?.message === 'Failed to fetch' || e?.name === 'TypeError'
-        ? 'Cannot reach the API server. Check that it is running (e.g. port 5001 in development).'
+        ? 'Cannot reach the API server. Start it on port 5001 (from the repo root: `npm run dev`, or `cd server && npm run dev`). Open the app at http://localhost:3000.'
         : e?.message || 'Network error';
     throw new ApiError(msg, { status: 0, cause: e });
   }

@@ -8,7 +8,8 @@ Server runtime and tooling are defined in `server/package.json`.
 
 - **express**: HTTP server + routing (`server/server.js`)
 - **cors**: CORS policy enforcement (allowlist from env; see `CORS_ORIGINS` below)
-- **dotenv**: loads environment variables from `.env` at startup
+- **dotenv**: loads environment variables from `.env` at startup (path is relative to **process cwd**, typically `server/` when using `cd server && …`)
+- **nodemailer**: optional outbound email for **password reset** (`server/lib/passwordResetMail.js`; requires SMTP env — see optional vars below)
 - **mongoose**: MongoDB ODM, schema definitions under `server/models/`
 - **multer**: `multipart/form-data` file uploads to disk
 - **openai**: calls OpenAI Chat Completions for graph generation
@@ -49,6 +50,10 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
 - **`OPENAI_RELATIONSHIP_SYNTHESIS_MODEL`**: optional; model id for that second pass only (default **`gpt-4o-mini`**). The first generate pass still uses **`OPENAI_ANALYZE_MODEL`**.
 
 - **`OPENAI_TRANSCRIBE_MODEL`**: optional; Whisper model id for `POST /api/transcribe` (default **`whisper-1`**). Same **`OPENAI_API_KEY`** as other OpenAI calls (GitHub **#34**).
+
+- **Password reset email (optional — required in production to send mail):** **`APP_PUBLIC_ORIGIN`** — public SPA origin for links in emails (no trailing slash), e.g. `https://your-app.onrender.com`. In development, code may default reset links to `http://localhost:3000` when unset. **`SMTP_URL`** (**`smtp://`…** or **`smtps://`…** only) **or** discrete **`SMTP_HOST`**, **`SMTP_PORT`**, **`SMTP_SECURE`**, **`SMTP_USER`**, **`SMTP_PASS`**; **`MAIL_FROM`** / **`SMTP_FROM`**. If **`SMTP_URL`** is set to a non-SMTP URL (e.g. `https://…`), it is ignored and host-based vars are used. Production: forgot-password **skips** storing a token if **`APP_PUBLIC_ORIGIN`** or SMTP is not configured (same generic JSON response as unknown email).
+
+- **`HTTP_MAX_HEADER_SIZE`**: optional; max request header size in bytes for the Node HTTP server (default **65536**). Helps avoid **HTTP 431** when cookies/headers are large.
 
 **Billing:** A working [API quickstart](https://developers.openai.com/api/docs/quickstart) proves your key and code can reach OpenAI; it does **not** mean unlimited free usage. If OpenAI returns **429**, add credits or a payment method under [Billing](https://platform.openai.com/account/billing) (or you may be on a rate limit—retry later).
 
@@ -101,9 +106,9 @@ The server intentionally stores some data **on disk** and related metadata **in 
 ## Project layout (server/)
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
-- `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below
+- `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below; **`GET /health`** and **`GET /api/test`** (JSON health) are registered **early** (before other `/api` routers); HTTP server uses **`http.createServer`** with configurable **`maxHeaderSize`**
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
-- `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`/api/auth/me`**, **`PATCH /api/auth/me`** (JWT **`mindmap_auth`** httpOnly cookie; GitHub **#63**)
+- `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`GET /api/auth/me`**, **`PATCH /api/auth/me`**, **`POST /api/auth/forgot-password`**, **`POST /api/auth/reset-password`** (JWT **`mindmap_auth`** httpOnly cookie; password reset uses one-time token, **1h** expiry, hashed at rest — GitHub **#63** / **#31**)
 - `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats, read-only share token — **#39**)
 - `routes/`: other modules (sessions, feedback, graph operations)
 - `models/`: Mongoose schemas (Session, File, Graph, GraphTransform, UserActivity, etc.)
@@ -199,9 +204,9 @@ Relevant code:
 - `GET /api/files/:filename` — reads from `server/uploads/`. If the **`File`** row or metadata JSON has **`userId`**, the request must send **`X-Mindmap-User-Id`** with the **same** value or the server returns **403** (`FORBIDDEN`).
 - `DELETE /api/files/:filename?sessionId=` — **Guest-only** files: metadata **`sessionId`** must match. **Account-owned** files: only the matching **`X-Mindmap-User-Id`** may delete (session match alone is insufficient), so a guest cannot delete another user’s file in the same session.
 
-**Auth registration / profile (GitHub #63):** **`POST /api/auth/register`**, **`POST /api/auth/login`** set a **`mindmap_auth`** httpOnly cookie; **`GET /api/auth/me`** and **`PATCH /api/auth/me`** read/update the current user. Request bodies for auth routes are **redacted** in the default request logger.
+**Auth registration / profile / password reset (GitHub #63, #31):** **`POST /api/auth/register`**, **`POST /api/auth/login`** set a **`mindmap_auth`** httpOnly cookie; **`GET /api/auth/me`** and **`PATCH /api/auth/me`** read/update the current user. **`POST /api/auth/forgot-password`** (`{ email }`) stores a one-time reset token (**1 hour**, hashed) and sends mail when SMTP + **`APP_PUBLIC_ORIGIN`** are configured (generic success body to avoid email enumeration). **`POST /api/auth/reset-password`** (`{ token, password }`) sets a new password, clears reset fields, and sets the session cookie. Request bodies for auth routes are **redacted** in the default request logger.
 
-**Follow-ups (outside current scope):** Verify **`X-Mindmap-User-Id`** against the JWT cookie server-side (do not rely on the client header alone); authorize **`POST /api/analyze`** against owned files; retire or gate legacy unscoped **`GET /api/files`** in production — see GitHub issues linked from **`docs/github-backlog-issues.md`**.
+**Follow-ups (outside current scope):** Verify **`X-Mindmap-User-Id`** against the JWT cookie server-side (do not rely on the client header alone); authorize **`POST /api/analyze`** against owned files; retire or gate legacy unscoped **`GET /api/files`** in production — see GitHub issues linked from **`docs/github-backlog-issues.md`**. Password-reset **rate limiting**, **audit events**, **E2E**, and **HTML mail** are backlog — see **`docs/github-backlog-issues.md`** (*Password reset — follow-ups*).
 
 Relevant code:
 

@@ -498,6 +498,65 @@
   line-height: 1.35;
 }
 
+.guest-identity-banner__auth-forgot-toolbar {
+  margin-bottom: 12px;
+}
+
+.guest-identity-banner__auth-back {
+  border: none;
+  background: transparent;
+  color: #38bdf8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.guest-identity-banner__auth-back:hover {
+  text-decoration: underline;
+}
+
+.guest-identity-banner__auth-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.guest-identity-banner__auth-success {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guest-identity-banner__auth-success p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.guest-identity-banner__auth-forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 0;
+}
+
+.guest-identity-banner__auth-forgot-link {
+  border: none;
+  background: transparent;
+  color: #38bdf8;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.guest-identity-banner__auth-forgot-link:hover {
+  color: #7dd3fc;
+}
+
 .guest-identity-banner__auth-error {
   border: 1px solid rgba(248, 113, 113, 0.5);
   background: rgba(248, 113, 113, 0.12);

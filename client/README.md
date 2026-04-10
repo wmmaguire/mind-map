@@ -187,7 +187,7 @@ All API requests go through **`apiRequest()`**, which builds URLs with **`apiUrl
 
 | Environment | Default behavior |
 |---------------|------------------|
-| **Development** (`npm start`) | Uses `http://localhost:5001` (matches `proxy` in `client/package.json`). |
+| **Development** (`npm start`) | Defaults to **`http://localhost:5001`** (direct; CORS allows the CRA origin). Override with **`REACT_APP_API_URL`**. |
 | **Production** (`npm run build`) | If **`REACT_APP_API_URL`** is **not** set, requests use **relative** URLs (`/api/...`), i.e. same origin as the static app. |
 
 Set **`REACT_APP_API_URL`** in `.env` or your host’s build settings when the API lives on a different origin (no trailing slash), for example:

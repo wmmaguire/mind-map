@@ -5,6 +5,7 @@ import LibraryVisualize from './components/LibraryVisualize';
 import GiveFeedbackControl from './components/GiveFeedbackControl';
 import GuestIdentityBanner from './components/GuestIdentityBanner';
 import GraphPlaybackBanner from './components/GraphPlaybackBanner';
+import PasswordResetPage from './components/PasswordResetPage';
 import './App.css';
 
 function App() {
@@ -61,6 +62,7 @@ function App() {
             </div>
           )}
         />
+        <Route path="/reset-password" element={<PasswordResetPage />} />
       </Routes>
     </div>
   );

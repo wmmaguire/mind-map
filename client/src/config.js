@@ -5,7 +5,9 @@
  *   same-origin as the built app (no trailing slash), e.g. `https://api.example.com`.
  * - If unset in production builds, the empty origin yields **relative** URLs
  *   (`/api/...`), which match a co-hosted API.
- * - In development, defaults to `http://localhost:5001` (see `client/package.json` `proxy`).
+ * - In development (`npm start`), defaults to **`http://localhost:5001`** (direct to the
+ *   API; CORS allows `http://localhost:3000`). The `proxy` field in `package.json` is a
+ *   fallback only. Override with **`REACT_APP_API_URL`** if needed.
  */
 export function getApiOrigin() {
   const fromEnv = process.env.REACT_APP_API_URL;
