@@ -489,8 +489,8 @@
 /* Actions FAB: top-right of .graph-canvas-wrap (SVG area), below discovery bar (#38) */
 .library-visualize .library-graph-mount .graph-actions-fab--library-graph-mount {
   position: absolute;
-  top: max(8px, env(safe-area-inset-top, 0px));
-  right: max(8px, env(safe-area-inset-right, 0px));
+  top: max(6px, env(safe-area-inset-top, 0px));
+  right: max(6px, env(safe-area-inset-right, 0px));
   left: auto;
   bottom: auto;
   z-index: 1190;

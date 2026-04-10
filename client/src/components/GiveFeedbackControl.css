@@ -2,22 +2,22 @@
 .give-feedback-fab {
   position: fixed;
   z-index: 1000;
-  right: max(1rem, env(safe-area-inset-right, 0px));
-  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  right: max(0.65rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  min-height: 48px;
-  min-width: 48px;
+  gap: 0.35rem;
+  padding: 0.45rem 0.65rem;
+  min-height: 34px;
+  min-width: 34px;
   border: none;
   border-radius: 9999px;
   background: #4299e1;
   color: white;
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(66, 153, 225, 0.45);
+  box-shadow: 0 3px 10px rgba(66, 153, 225, 0.4);
   transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
@@ -40,7 +40,7 @@
 }
 
 .give-feedback-fab__icon {
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 
@@ -58,7 +58,7 @@
   }
 
   .give-feedback-fab {
-    padding: 0.75rem;
+    padding: 0.45rem;
     border-radius: 50%;
   }
 }
