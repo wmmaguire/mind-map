@@ -955,6 +955,7 @@ function LibraryVisualize({ onOpenUpload, fileRefreshToken }) {
                 : handleGraphDataUpdate
             }
             readOnly={shareViewerMode || !playbackAtEnd}
+            emptyStateVariant={shareViewerMode ? 'default' : 'library'}
             width={graphViewportWidth}
             height={graphViewportHeight}
           />

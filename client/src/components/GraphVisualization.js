@@ -25,6 +25,8 @@ function GraphVisualization({
   actionsFabPlacement = 'fixedViewport',
   /** When true (shared read-only link, #39): no Actions menu, no canvas edits that call the server. */
   readOnly = false,
+  /** #40: richer copy when mounted inside the library visualize layout. */
+  emptyStateVariant = 'default',
 }) {
   const svgRef = useRef();
   const graphCanvasWrapRef = useRef(null);
@@ -2032,6 +2034,19 @@ function GraphVisualization({
     </button>
   );
 
+  const nodeCount = (data?.nodes ?? []).length;
+  const emptyStateBlockedByModal =
+    showGenerateForm ||
+    showAddForm ||
+    relationshipForm.show ||
+    Boolean(connectNewNodeLinksForm) ||
+    isGenerating ||
+    showGraphActionsHelp;
+  const showEditableEmptyGuide =
+    !readOnly && nodeCount === 0 && !emptyStateBlockedByModal;
+  const showReadOnlyEmpty =
+    readOnly && nodeCount === 0 && !emptyStateBlockedByModal;
+
   let activeGraphEditBanner = null;
   if (isGenerating) {
     const baseHint =
@@ -2713,6 +2728,43 @@ function GraphVisualization({
 
       <div className="graph-canvas-wrap" ref={graphCanvasWrapRef}>
         <svg ref={svgRef} className="graph-visualization" data-testid="graph-main-svg" />
+        {showEditableEmptyGuide && (
+          <div
+            className="graph-empty-state graph-empty-state--editable"
+            role="region"
+            aria-label="Getting started with an empty graph"
+          >
+            <div className="graph-empty-state__inner">
+              <h2 className="graph-empty-state__title">No concepts yet</h2>
+              {emptyStateVariant === 'library' ? (
+                <ol className="graph-empty-state__steps">
+                  <li>
+                    Select files in the library sidebar, then choose{' '}
+                    <strong>Analyze</strong> to build a graph from your sources.
+                  </li>
+                  <li>
+                    Or open a <strong>saved graph</strong> from the sidebar.
+                  </li>
+                  <li>
+                    Or tap <strong>Actions</strong> (top-right) to add a concept by hand.
+                  </li>
+                </ol>
+              ) : (
+                <p className="graph-empty-state__lead">
+                  Open the <strong>Actions</strong> menu (top-right) to add a concept or run AI
+                  generation.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        {showReadOnlyEmpty && (
+          <div className="graph-empty-state graph-empty-state--readonly" role="status" aria-live="polite">
+            <div className="graph-empty-state__inner">
+              <p>This graph has no concepts to display.</p>
+            </div>
+          </div>
+        )}
         <svg
           ref={minimapSvgRef}
           className="graph-minimap"
@@ -2766,10 +2818,12 @@ GraphVisualization.propTypes = {
   height: PropTypes.number,
   actionsFabPlacement: PropTypes.oneOf(['fixedViewport', 'libraryGraphMount']),
   readOnly: PropTypes.bool,
+  emptyStateVariant: PropTypes.oneOf(['default', 'library']),
 };
 
 GraphVisualization.defaultProps = {
   readOnly: false,
+  emptyStateVariant: 'default',
 };
 
 export default GraphVisualization; 

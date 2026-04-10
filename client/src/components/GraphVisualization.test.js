@@ -14,6 +14,8 @@ const minimalData = {
   links: [],
 };
 
+const emptyGraphData = { nodes: [], links: [] };
+
 describe('GraphVisualization graph action menu', () => {
   it('moves focus to Close when the Actions menu opens (#30)', async () => {
     render(
@@ -234,6 +236,81 @@ describe('GraphVisualization graph action menu', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(
       screen.queryByRole('heading', { name: /Add New Concept/i })
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('GraphVisualization empty graph guidance (#40)', () => {
+  it('shows library empty state when variant is library', () => {
+    render(
+      <GraphVisualization
+        data={emptyGraphData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        emptyStateVariant="library"
+      />
+    );
+
+    expect(
+      screen.getByRole('region', { name: /Getting started with an empty graph/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /No concepts yet/i })).toBeInTheDocument();
+    expect(screen.getByText(/Analyze/i)).toBeInTheDocument();
+    expect(screen.getByText(/saved graph/i)).toBeInTheDocument();
+  });
+
+  it('shows default empty hint when variant is default', () => {
+    render(
+      <GraphVisualization
+        data={emptyGraphData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        emptyStateVariant="default"
+      />
+    );
+
+    expect(
+      screen.getByRole('region', { name: /Getting started with an empty graph/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Open the/i)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
+  it('shows read-only status when empty and readOnly', () => {
+    render(
+      <GraphVisualization
+        data={emptyGraphData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        readOnly
+        emptyStateVariant="library"
+      />
+    );
+
+    expect(
+      screen.queryByRole('region', { name: /Getting started with an empty graph/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/This graph has no concepts to display/i)
+    ).toBeInTheDocument();
+  });
+
+  it('hides editable empty overlay when the graph has nodes', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        emptyStateVariant="library"
+      />
+    );
+
+    expect(
+      screen.queryByRole('region', { name: /Getting started with an empty graph/i })
     ).not.toBeInTheDocument();
   });
 });
