@@ -612,6 +612,14 @@
   max-width: 18ch;
 }
 
+/* Registered trigger: name/id is the only visible label (no “Signed in” row). */
+.guest-identity-banner__account-control-id--trigger {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f8fafc;
+  max-width: 22ch;
+}
+
 .guest-identity-banner__account-control-chevron {
   font-size: 0.55rem;
   color: #86efac;

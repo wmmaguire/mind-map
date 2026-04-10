@@ -419,16 +419,18 @@ export default function GuestIdentityBanner() {
             className="guest-identity-banner__account-control guest-identity-banner__account-control--registered-trigger"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
+            aria-label={
+              accountSubtitle || displayId
+                ? `Open account menu (${accountSubtitle || displayId})`
+                : 'Open account menu'
+            }
             onClick={() => {
               setViewMenuOpen(false);
               setMenuOpen((o) => !o);
             }}
           >
-            <span className="guest-identity-banner__account-control-primary">
-              Signed in
-            </span>
             <span
-              className="guest-identity-banner__account-control-id"
+              className="guest-identity-banner__account-control-id guest-identity-banner__account-control-id--trigger"
               title={authUser?.name?.trim() ? authUser.name : userId || ''}
             >
               {accountSubtitle || '—'}

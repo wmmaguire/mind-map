@@ -50,7 +50,9 @@ describe('GuestIdentityBanner', () => {
         </AuthProvider>
       </MemoryRouter>
     );
-    expect(screen.getByText(/Signed in/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /open account menu.*acct-test-1/i })
+    ).toBeInTheDocument();
     expect(screen.getByText('acct-test-1')).toBeInTheDocument();
   });
 
