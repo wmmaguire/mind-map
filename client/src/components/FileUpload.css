@@ -380,8 +380,36 @@
     cursor: pointer;
   }
 
+  .file-upload-verbose-label--inline {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0 !important;
+    font-size: 0.88rem;
+  }
+
+  .file-upload-verbose-label--inline input {
+    margin-top: 0;
+  }
+
+  .modal-content label.file-upload-verbose-label--inline {
+    color: #444 !important;
+    font-weight: 400 !important;
+  }
+
   .file-upload-verbose-label input {
     margin-top: 0.2rem;
+  }
+
+  .file-upload-record-start-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+
+  .file-upload-record-start-row .upload-button {
+    margin-top: 0;
   }
 
   .file-upload-segments {
@@ -472,10 +500,29 @@
     gap: 0.75rem;
   }
 
+  .file-upload-record-indicator-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .file-upload-record-timer {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #c62828;
+    letter-spacing: 0.04em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
   .file-upload-record-indicator {
     margin: 0;
     font-weight: 600;
     color: #c62828;
+    flex: 1;
+    min-width: 0;
   }
 
   .file-upload-record-preview {
@@ -492,6 +539,11 @@
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .file-upload-record-actions .upload-button {
+    margin-top: 0;
   }
 
   .upload-button--danger {

@@ -10,6 +10,19 @@ import {
 import './Modal.css';
 import './FileUpload.css';
 
+/** @param {number} ms */
+function formatRecordingDuration(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const m2 = m % 60;
+    return `${h}:${String(m2).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function FileUpload({ onClose, onUploadSuccess }) {
   const { sessionId } = useSession();
   const { userId } = useIdentity();
@@ -33,11 +46,13 @@ function FileUpload({ onClose, onUploadSuccess }) {
 
   const [recState, setRecState] = useState('idle');
   const [recordPreviewUrl, setRecordPreviewUrl] = useState(null);
+  const [recordElapsedMs, setRecordElapsedMs] = useState(0);
 
   const streamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const skipRecorderOnStopRef = useRef(false);
+  const recordingStartTimeRef = useRef(null);
 
   const revokeRecordPreview = useCallback(() => {
     setRecordPreviewUrl((prev) => {
@@ -85,6 +100,20 @@ function FileUpload({ onClose, onUploadSuccess }) {
       revokeRecordPreview();
     };
   }, [abortActiveRecording, revokeRecordPreview]);
+
+  useEffect(() => {
+    if (recState !== 'recording' || recordingStartTimeRef.current == null) {
+      setRecordElapsedMs(0);
+      return undefined;
+    }
+    const start = recordingStartTimeRef.current;
+    const tick = () => {
+      setRecordElapsedMs(Date.now() - start);
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [recState]);
 
   const uploadFileToServer = async (uploadFile, name) => {
     if (!sessionId) {
@@ -284,6 +313,7 @@ function FileUpload({ onClose, onUploadSuccess }) {
       };
 
       mr.onstop = () => {
+        recordingStartTimeRef.current = null;
         if (skipRecorderOnStopRef.current) {
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((t) => t.stop());
@@ -320,6 +350,7 @@ function FileUpload({ onClose, onUploadSuccess }) {
         setUploadStatus('Recording ready — preview below, then Transcribe.');
       };
 
+      recordingStartTimeRef.current = Date.now();
       mr.start(250);
       setRecState('recording');
     } catch (err) {
@@ -357,6 +388,9 @@ function FileUpload({ onClose, onUploadSuccess }) {
     }
     abortActiveRecording();
     revokeRecordPreview();
+    if (tab === 'upload') {
+      setRequestVerboseSegments(false);
+    }
     setAudioSubTab(tab);
     setAudioFile(null);
     setTranscript('');
@@ -365,6 +399,20 @@ function FileUpload({ onClose, onUploadSuccess }) {
     setRecState('idle');
     setUploadStatus('');
   };
+
+  const renderVerboseCheckbox = () => (
+    <label
+      className="file-upload-verbose-label file-upload-verbose-label--inline"
+      title="Whisper verbose: includes per-segment start/end times in the response"
+    >
+      <input
+        type="checkbox"
+        checked={requestVerboseSegments}
+        onChange={(e) => setRequestVerboseSegments(e.target.checked)}
+      />
+      Segment timestamps
+    </label>
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -539,16 +587,28 @@ function FileUpload({ onClose, onUploadSuccess }) {
               <div className="file-upload-record-panel">
                 {recState === 'recording' ? (
                   <div className="file-upload-record-active">
-                    <p className="file-upload-record-indicator" role="status">
-                      Recording… speak now.
-                    </p>
-                    <button
-                      type="button"
-                      className="upload-button upload-button--danger"
-                      onClick={stopRecording}
-                    >
-                      Stop
-                    </button>
+                    <div className="file-upload-record-indicator-row">
+                      <p className="file-upload-record-indicator" role="status">
+                        Recording… speak now.
+                      </p>
+                      <time
+                        className="file-upload-record-timer"
+                        dateTime={`PT${Math.floor(recordElapsedMs / 1000)}S`}
+                        aria-label={`Elapsed recording time ${formatRecordingDuration(recordElapsedMs)}`}
+                      >
+                        {formatRecordingDuration(recordElapsedMs)}
+                      </time>
+                    </div>
+                    <div className="file-upload-record-start-row">
+                      <button
+                        type="button"
+                        className="upload-button upload-button--danger"
+                        onClick={stopRecording}
+                      >
+                        Stop
+                      </button>
+                      {renderVerboseCheckbox()}
+                    </div>
                   </div>
                 ) : recState === 'stopped' && recordPreviewUrl ? (
                   <div className="file-upload-record-preview">
@@ -573,30 +633,23 @@ function FileUpload({ onClose, onUploadSuccess }) {
                       >
                         Record again
                       </button>
+                      {renderVerboseCheckbox()}
                     </div>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="upload-button"
-                    onClick={startRecording}
-                  >
-                    Start recording
-                  </button>
+                  <div className="file-upload-record-start-row">
+                    <button
+                      type="button"
+                      className="upload-button"
+                      onClick={startRecording}
+                    >
+                      Start recording
+                    </button>
+                    {renderVerboseCheckbox()}
+                  </div>
                 )}
               </div>
             )}
-
-            <div className="form-group file-upload-verbose-option">
-              <label className="file-upload-verbose-label">
-                <input
-                  type="checkbox"
-                  checked={requestVerboseSegments}
-                  onChange={(e) => setRequestVerboseSegments(e.target.checked)}
-                />{' '}
-                Request segment timestamps (Whisper verbose)
-              </label>
-            </div>
             <div className="modal-actions modal-actions--split">
               <button
                 type="button"

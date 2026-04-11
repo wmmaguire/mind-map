@@ -183,7 +183,7 @@ Relevant code:
 
 No audio bytes are persisted as library **`File`** rows on this route — only audit metadata. The client saves text through the normal upload API.
 
-**Default response** uses the compact transcription shape (**`transcript`** only). **Segment timestamps** are opt-in via **`verbose`** (**#58**). **Speaker labels** are not returned by **`whisper-1`**; see **`gpt-4o-transcribe-diarize`** / **`diarized_json`** — GitHub **#59**.
+**Default response** uses the compact transcription shape (**`transcript`** only). **Segment timestamps** are opt-in via **`verbose`** (**#58**). The **web** **`FileUpload`** modal exposes the **`verbose`** checkbox only on the **Record** sub-tab; **`POST /api/transcribe`** still accepts **`verbose`** from any client. **Speaker labels** are not returned by **`whisper-1`**; see **`gpt-4o-transcribe-diarize`** / **`diarized_json`** — GitHub **#59**.
 
 **Follow-ups (outside #58 scope):** HTTP-level tests with a stubbed OpenAI client (**#60**). Browser E2E for the verbose checkbox and segment UI — **#24**. Optional **word-level** timing, **subtitle export** (SRT/VTT), or **persisting `segments`** with uploads — **#61**. Combining **#58** segment timing with **#59** speaker labels will need a merged response contract when both land.
 

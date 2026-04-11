@@ -52,7 +52,7 @@ Root `package.json` provides convenience scripts to run both sides in dev.
 
 - **Core UI flows**
   - **Upload**: `client/src/components/FileUpload.js`
-    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34 / #35 / #58):** sub-tabs **Upload file** or **Record** → `POST /api/transcribe` (`audio`, `sessionId`; optional **`verbose`** for segment timestamps), then `.txt` via **`POST /api/upload`** (plain text only; timings are UI-only unless persisted in a future ticket).
+    - **Text:** `multipart/form-data` to `POST /api/upload` (`file`, `customName`, `sessionId`). **Audio → transcript (#34 / #35 / #58):** sub-tabs **Upload file** or **Record** → `POST /api/transcribe` (`audio`, `sessionId`; optional **`verbose`** for segment timestamps). **`verbose`** is exposed in the UI only on the **Record** sub-tab (**Segment timestamps**); **elapsed `m:ss` timer** while recording; switching to **Upload file** clears verbose client state. Then `.txt` via **`POST /api/upload`** (plain text only; timings are UI-only unless persisted in a future ticket).
   - **Library + analyze**: `LibraryVisualize.js` + **`LibrarySidebar`**, **`LibrarySourcesPanel`**
     - Lists files (`GET /api/files`)
     - Reads file content (`GET /api/files/:filename`)

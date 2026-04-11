@@ -98,28 +98,75 @@ test('transcribe with verbose sends verbose=1 and shows segment timings', async 
     segments: [{ start: 0, end: 0.5, text: 'hello' }, { start: 0.5, end: 1, text: ' world' }]
   });
 
-  renderModal();
-  await user.click(screen.getByRole('tab', { name: /Audio → transcript/i }));
-
-  const audioInput = screen.getByLabelText(/Audio file/i);
-  const file = new File([new ArrayBuffer(8)], 'clip.webm', {
-    type: 'audio/webm'
-  });
-  await user.upload(audioInput, file);
-
-  await user.click(
-    screen.getByRole('checkbox', { name: /Request segment timestamps/i })
-  );
-  await user.click(screen.getByRole('button', { name: /^Transcribe$/i }));
-
-  await waitFor(() => {
-    expect(apiRequest).toHaveBeenCalled();
+  const prevMD = global.navigator.mediaDevices;
+  const mockStream = {
+    getTracks: () => [{ stop: jest.fn() }]
+  };
+  const getUserMedia = jest.fn().mockResolvedValue(mockStream);
+  Object.defineProperty(global.navigator, 'mediaDevices', {
+    value: { getUserMedia },
+    configurable: true
   });
 
-  const [, opts] = apiRequest.mock.calls[0];
-  expect(opts.body).toBeInstanceOf(FormData);
-  expect(opts.body.get('verbose')).toBe('1');
+  const OrigMR = global.MediaRecorder;
+  function MockMediaRecorder() {
+    this.mimeType = 'audio/webm';
+    this.start = jest.fn(() => {
+      this.ondataavailable?.({
+        data: new Blob([new Uint8Array(200)], { type: 'audio/webm' })
+      });
+    });
+    this.stop = jest.fn(() => {
+      queueMicrotask(() => this.onstop?.());
+    });
+    this.ondataavailable = null;
+    this.onstop = null;
+  }
+  MockMediaRecorder.isTypeSupported = () => true;
+  global.MediaRecorder = MockMediaRecorder;
 
-  expect(screen.getByText(/Segment timings \(2\)/)).toBeInTheDocument();
-  expect(screen.getByText(/0\.00s/)).toBeInTheDocument();
+  const origCreateObjectURL = URL.createObjectURL;
+  const origRevokeObjectURL = URL.revokeObjectURL;
+  URL.createObjectURL = jest.fn(() => 'blob:mock-preview');
+  URL.revokeObjectURL = jest.fn();
+
+  try {
+    renderModal();
+    await user.click(screen.getByRole('tab', { name: /Audio → transcript/i }));
+    await user.click(screen.getByRole('tab', { name: /^Record$/i }));
+
+    await user.click(screen.getByRole('checkbox', { name: /Segment timestamps/i }));
+    await user.click(screen.getByRole('button', { name: /Start recording/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Stop$/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^Stop$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Transcribe$/i })).not.toBeDisabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^Transcribe$/i }));
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalled();
+    });
+
+    const [, opts] = apiRequest.mock.calls[0];
+    expect(opts.body).toBeInstanceOf(FormData);
+    expect(opts.body.get('verbose')).toBe('1');
+
+    expect(screen.getByText(/Segment timings \(2\)/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.00s/)).toBeInTheDocument();
+  } finally {
+    global.MediaRecorder = OrigMR;
+    Object.defineProperty(global.navigator, 'mediaDevices', {
+      value: prevMD,
+      configurable: true
+    });
+    URL.createObjectURL = origCreateObjectURL;
+    URL.revokeObjectURL = origRevokeObjectURL;
+  }
 });
