@@ -1218,8 +1218,10 @@ function LibraryVisualize({ fileRefreshToken }) {
                 disabled={analyzing}
                 helpText={
                   <>
-                    Applies when analyzing your files into a graph. Presets send fixed
-                    instructions; Custom uses your text. Max 2000 characters for custom.
+                    Applies when analyzing your files into a graph: which concepts are
+                    included (when the text allows several) and how descriptions and edges
+                    are phrased. Presets send fixed instructions; Custom uses your text. Max
+                    2000 characters for custom.
                   </>
                 }
               />

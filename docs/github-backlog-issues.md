@@ -540,7 +540,63 @@ Paste into GitHub as needed:
 Refs: #40 #50 #33
 ```
 
+### GitHub **#75** + guidance presets (Apr 2026)
+
+**Branch:** `issue-75-node-thumbnails`
+
+#### Shipped in this slice
+
+- **Wikipedia lead thumbnails:** **`enrichGraphNodesWithThumbnails`** + **`fetchWikipediaThumbnailUrl`** (REST **page/summary** `thumbnail.source`, no HTML scraping) on **`POST /api/analyze`** and **`POST /api/generate-node`**; persisted via **`POST /api/graphs/save`** when present.
+- **Load parity:** **`GET /api/graphs/:filename`** runs the same enrichment so Mongo loads get **`thumbnailUrl`** even when older **`Graph.payload`** rows omitted it (sequential fetches; first load of a large graph may be slower).
+- **Client D3:** **`updateVisualization()`** + **`updateHighlighting()`** once per effect so single-node communities render **SVG `image`** thumbs on first paint and when the library viewport resizes (not only after zoom merge/split). **`<image>`** **`error`** handler falls back to **`graph-node-disc`** (network / bad URL). **`graph-node-hit`** full-disc click target; **`safeThumbnailUrl.js`** allowlist.
+- **Guidance:** Presets in **`client/src/utils/generationGuidance.js`** — **Awe**, **Funny**, **Happy**, **Nostalgia**, **Profound**, **Sexy**, **Shock**, **Weird** — each describes **writing voice** and **which kinds of concepts to prefer**. **`server/server.js`** frames **`context`** / **`generationContext`** as **USER GUIDANCE — TONE, VOICE, AND CONCEPT CHOICES** for **`/api/analyze`** and **`/api/generate-node`**.
+
+#### Follow-ups outside this ticket (address on referenced issues or new backlog)
+
+| Topic | Where to track |
+|--------|----------------|
+| **Caching / rate limits** for sequential Wikipedia fetches on **`GET /api/graphs/:filename`** (large graphs); optional **persist enriched `thumbnailUrl` back to Mongo** on read to avoid repeat work | New backlog issue (below); **#37** if preview/`dryRun` interacts |
+| **SVG `<image>`** `error` event gaps (some CORS cases); optional **timeout** fallback | **#75** or new backlog |
+| **Browser E2E** for load → thumb visible, guidance preset → API payload | **#24** |
+| **Relationship synthesis** (`synthesizeLinkRelationships`) still emphasizes wording; topic choice is step 1 only — align copy if product wants tone on step 2 | **#62** / small task |
+| **i18n** / copy for new preset labels | Future UX |
+| **Telemetry** on preset usage / thumb load failures | Product |
+
+#### Suggested GitHub issue comments (#75 implementation — paste as needed)
+
+**On #75 — comment body:**
+
+```markdown
+**Shipped (Apr 2026, branch `issue-75-node-thumbnails`):** REST **thumbnail.source** hydration on analyze + generate-node + **GET `/api/graphs/:filename`**; D3 community path on mount/resize; SVG thumb + solid-disc fallback on image error; full-disc hit target. Docs: `client/README.md`, `server/READEME.md`, this file. Remaining backlog: caching/persist on load, E2E—see *Follow-ups* in `docs/github-backlog-issues.md` § *GitHub #75 + guidance presets*.
+```
+
+**On #37 — comment body:**
+
+```markdown
+**Update (Apr 2026):** **`GET /api/graphs/:filename`** now calls **`enrichGraphNodesWithThumbnails`** (same as analyze). If **`dryRun`** / preview ever simulates graph load, ensure it does not trigger unbounded Wikipedia traffic—consider caching or skipping enrichment in preview paths.
+```
+
+**On #21 — comment body:**
+
+```markdown
+**Update (Apr 2026):** **`mergeAnalyzedGraphs`** should preserve **`thumbnailUrl`** from per-file analyze responses when present; server-side enrichment already runs per **`POST /api/analyze`**.
+```
+
+**On #48 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Per-file analyze still all-or-nothing. Thumbnail enrichment failures are non-fatal per node (logged); batch behavior unchanged.
+```
+
+**On #66 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Analyze **`context`** and generate-node **`generationContext`** now explicitly bias **concept selection** (among valid Wikipedia choices) as well as **tone**—see `server/server.js` prompt blocks and `client/src/utils/generationGuidance.js`.
+```
+
 ### Backlog: Node image / Wikipedia thumbnail — follow-up issue (create manually)
+
+**Status (Apr 2026):** Core **#75** items (payload field, REST resolution, canvas disc, load enrich, guidance-aware prompts) are **shipped** — see *GitHub #75 + guidance presets* above. Remaining items below target **tooltip `<img>`**, alternative **MediaWiki** APIs, **caching**, and **non-Wiki** images.
 
 **Title:** `Backlog: Optional node thumbnail (Wikipedia + graph payload + tooltip / canvas)`
 

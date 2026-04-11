@@ -73,6 +73,16 @@ svg {
   background: #f1f5f9;
 }
 
+/* #75: Wikipedia lead image clipped to the node circle (replaces solid fill when thumbnailUrl is set) */
+svg .graph-node-thumb {
+  pointer-events: none;
+}
+
+/* Invisible full-disc target so clicks reach the node (image is non-interactive; ring is stroke-only). */
+svg .graph-node-hit {
+  pointer-events: all;
+}
+
 .link-group .link-line {
   transition: all 0.3s ease;
 }

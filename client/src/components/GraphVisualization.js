@@ -10,7 +10,7 @@ import {
   nodesMatchingLabelQuery,
   createFocusZoomTransform,
 } from '../utils/graphDiscovery';
-import { tooltipThumbnailMarkup } from '../utils/safeThumbnailUrl';
+import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -820,7 +820,6 @@ function GraphVisualization({
             
             tooltipContent = `
               <strong>${nodeLabel}</strong><br/>
-              ${tooltipThumbnailMarkup(selectedNode.thumbnailUrl, nodeLabel)}
               ${nodeDescription ? `${nodeDescription}<br/>` : ''}
               ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
             `;
@@ -1013,7 +1012,6 @@ function GraphVisualization({
           const showLabel = nodeToShow.label || 'Unnamed Node';
           tooltipContent = `
             <strong>${showLabel}</strong><br/>
-            ${tooltipThumbnailMarkup(nodeToShow.thumbnailUrl, showLabel)}
             ${nodeToShow.description ? `${nodeToShow.description}<br/>` : ''}
             ${nodeToShow.wikiUrl ? `<a href="${nodeToShow.wikiUrl}" target="_blank">Learn more</a><br/>` : ''}
           `;
@@ -1157,40 +1155,75 @@ function GraphVisualization({
 
     updateMinimapRef.current = renderMinimap;
 
+    /** Matches unselected radii used before first `updateHighlighting` pass. */
+    function initialCommunityRadius(d) {
+      if (!d || !d.nodes) return 20;
+      if (d.nodes.length > 1) {
+        return Math.min(200, Math.max(40, 20 + 3 * d.nodes.length));
+      }
+      return 20;
+    }
+
     function updateHighlighting() {
       const matchIds = getSearchMatchIds();
 
-      g.selectAll('.node circle')
+      const radiusForNode = d => {
+        if (selectedNodeIds.current.has(d.id)) return 25;
+        const mergedR =
+          d && d.nodes && d.nodes.length > 1
+            ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length))
+            : 20;
+        const bigMergedR =
+          d && d.nodes && d.nodes.length > 1
+            ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length))
+            : 20;
+        if (datumMatchesSearch(d, matchIds)) {
+          return Math.min((d && d.nodes && d.nodes.length > 1 ? mergedR : 20) + 3, 45);
+        }
+        return d && d.nodes && d.nodes.length > 1 ? bigMergedR : 20;
+      };
+
+      const strokeForNode = d => {
+        if (selectedNodeIds.current.has(d.id)) return '#f1c40f';
+        if (datumMatchesSearch(d, matchIds)) return searchHighlightStroke;
+        return '#fff';
+      };
+
+      const strokeWidthForNode = d => {
+        if (selectedNodeIds.current.has(d.id)) return 4;
+        if (datumMatchesSearch(d, matchIds)) return 3;
+        return 2;
+      };
+
+      g.selectAll('.node circle.graph-node-disc')
         .style('fill', d => {
           if (selectedNodeIds.current.has(d.id)) return highlightedColor;
           if (datumMatchesSearch(d, matchIds)) return searchHighlightFill;
           return d.color || defaultNodeColor;
         })
-        .style('stroke', d => {
-          if (selectedNodeIds.current.has(d.id)) return '#f1c40f';
-          if (datumMatchesSearch(d, matchIds)) return searchHighlightStroke;
-          return '#fff';
-        })
-        .style('stroke-width', d => {
-          if (selectedNodeIds.current.has(d.id)) return 4;
-          if (datumMatchesSearch(d, matchIds)) return 3;
-          return 2;
-        })
-        .style('r', d => {
-          if (selectedNodeIds.current.has(d.id)) return 25;
-          const mergedR =
-            d && d.nodes && d.nodes.length > 1
-              ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length))
-              : 20;
-          const bigMergedR =
-            d && d.nodes && d.nodes.length > 1
-              ? Math.min(200, Math.max(40, 20 + 3 * d.nodes.length))
-              : 20;
-          if (datumMatchesSearch(d, matchIds)) {
-            return Math.min((d && d.nodes && d.nodes.length > 1 ? mergedR : 20) + 3, 45);
-          }
-          return d && d.nodes && d.nodes.length > 1 ? bigMergedR : 20;
-        });
+        .style('stroke', strokeForNode)
+        .style('stroke-width', strokeWidthForNode)
+        .style('r', radiusForNode);
+
+      g.selectAll('.node circle.graph-node-ring')
+        .style('fill', 'none')
+        .style('stroke', strokeForNode)
+        .style('stroke-width', strokeWidthForNode)
+        .style('r', radiusForNode);
+
+      g.selectAll('.node').each(function forEachThumbNode(d) {
+        const nodeG = d3.select(this);
+        if (nodeG.select('image.graph-node-thumb').empty()) return;
+        const r = radiusForNode(d);
+        nodeG.select('defs clipPath circle').attr('r', r);
+        nodeG.select('circle.graph-node-hit').attr('r', r);
+        nodeG
+          .select('image.graph-node-thumb')
+          .attr('x', -r)
+          .attr('y', -r)
+          .attr('width', r * 2)
+          .attr('height', r * 2);
+      });
 
       const applyLinkStyle = (sel) => {
         sel
@@ -1224,8 +1257,7 @@ function GraphVisualization({
           });
       };
 
-      applyLinkStyle(linkGroups.selectAll('.link-line'));
-      applyLinkStyle(g.selectAll('.link'));
+      applyLinkStyle(g.selectAll('.link, .link-line'));
     }
 
     updateHighlightingRef.current = updateHighlighting;
@@ -1429,7 +1461,6 @@ function GraphVisualization({
               
               tooltipContent = `
                 <strong>${nodeLabel}</strong><br/>
-                ${tooltipThumbnailMarkup(selectedNode.thumbnailUrl, nodeLabel)}
                 ${nodeDescription ? `${nodeDescription}<br/>` : ''}
                 ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
               `;
@@ -1470,17 +1501,94 @@ function GraphVisualization({
           scheduleTooltipPosition(event.currentTarget);
         });
 
-      // Add circles with proper sizing and coloring using colorScale
-      nodes.append('circle')
-        .attr('r', d => {
-          if (!d || !d.nodes) return 20;
-          return d.nodes.length > 1 
-            ? Math.min(100, Math.max(30, 20 * Math.sqrt(d.nodes.length)))
-            : 20;
-        })
-        .attr('fill', d => d.nodes.length > 1 ? d.color : defaultNodeColor)
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 1.5);
+      // Circles or clipped Wikipedia thumbnails (single-node communities only, #75)
+      nodes.each(function renderNodeDiscOrThumb(d) {
+        const nodeG = d3.select(this);
+        const r0 = initialCommunityRadius(d);
+        const single = d.nodes?.length === 1 ? d.nodes[0] : null;
+        const thumbUrl =
+          single &&
+          d.nodes.length === 1 &&
+          isSafeThumbnailUrlForTooltip(single.thumbnailUrl)
+            ? single.thumbnailUrl
+            : null;
+
+        if (thumbUrl) {
+          const clipId = `node-thumb-clip-${String(d.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+          nodeG
+            .append('defs')
+            .append('clipPath')
+            .attr('id', clipId)
+            .append('circle')
+            .attr('cx', 0)
+            .attr('cy', 0)
+            .attr('r', r0);
+
+          // Full-disc hit target: ring has fill none (only stroke hits) and image uses
+          // pointer-events none — without this, only the stroke perimeter was clickable.
+          nodeG
+            .append('circle')
+            .attr('class', 'graph-node-hit')
+            .attr('r', r0)
+            .attr('fill', 'rgba(0,0,0,0)')
+            .attr('stroke', 'none')
+            .attr('pointer-events', 'all');
+
+          nodeG
+            .append('image')
+            .attr('class', 'graph-node-thumb')
+            .attr('href', thumbUrl)
+            .attr('x', -r0)
+            .attr('y', -r0)
+            .attr('width', r0 * 2)
+            .attr('height', r0 * 2)
+            .attr('clip-path', `url(#${clipId})`)
+            .attr('preserveAspectRatio', 'xMidYMid slice')
+            .attr('pointer-events', 'none')
+            .on('error', function onThumbImageError() {
+              d3.select(this).on('error', null);
+              const parent = d3.select(this.parentNode);
+              parent.select('defs').remove();
+              parent.select('circle.graph-node-hit').remove();
+              parent.select('circle.graph-node-ring').remove();
+              d3.select(this).remove();
+              const dd = parent.datum();
+              const rr = initialCommunityRadius(dd);
+              const fill =
+                dd.nodes && dd.nodes.length > 1 ? dd.color : defaultNodeColor;
+              if (parent.select('circle.graph-node-disc').empty()) {
+                const before =
+                  parent.select('text').empty() ? null : 'text';
+                const disc = before
+                  ? parent.insert('circle', before)
+                  : parent.append('circle');
+                disc
+                  .attr('class', 'graph-node-disc')
+                  .attr('r', rr)
+                  .attr('fill', fill)
+                  .attr('stroke', '#fff')
+                  .attr('stroke-width', 1.5);
+              }
+              updateHighlightingRef.current?.();
+            });
+
+          nodeG
+            .append('circle')
+            .attr('class', 'graph-node-ring')
+            .attr('r', r0)
+            .attr('fill', 'none')
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 2);
+        } else {
+          nodeG
+            .append('circle')
+            .attr('class', 'graph-node-disc')
+            .attr('r', r0)
+            .attr('fill', d.nodes.length > 1 ? d.color : defaultNodeColor)
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 1.5);
+        }
+      });
 
       // Add labels with proper text
       nodes.append('text')
@@ -1505,6 +1613,12 @@ function GraphVisualization({
         .force('link', d3.forceLink(processedLinks)
           .id(d => d.id))
         .on('tick', () => {
+          if (!minimapRafRef.current) {
+            minimapRafRef.current = requestAnimationFrame(() => {
+              minimapRafRef.current = null;
+              updateMinimapRef.current?.();
+            });
+          }
           links
             .attr('x1', d => d.source.x || 0)
             .attr('y1', d => d.source.y || 0)
@@ -1596,6 +1710,12 @@ function GraphVisualization({
     }
 
     resetCanvasViewRef.current = resetCanvasToFullView;
+
+    // First paint must use the same community DOM as merge/split (thumbnails + tick), not
+    // only the legacy circle pass above—otherwise thumbnails appear only after zoom, and
+    // reopening the library (width/height) cleared them until zoom again.
+    updateVisualization();
+    updateHighlighting();
 
     // Cleanup
     return () => {
@@ -2676,9 +2796,10 @@ function GraphVisualization({
                 disabled={isGenerating}
                 helpText={
                   <>
-                    Applies to both the node-generation step and relationship wording.
-                    Presets send fixed instructions; Custom uses your text. Max 2000
-                    characters for custom. Must not override required links or node IDs.
+                    Applies to which concepts are chosen (among valid Wikipedia topics) and
+                    to relationship wording. Presets send fixed instructions; Custom uses your
+                    text (tone and/or topic preferences). Max 2000 characters for custom. Must
+                    not override required links or node IDs.
                   </>
                 }
               />

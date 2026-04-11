@@ -275,15 +275,15 @@ app.post('/api/analyze', async (req, res) => {
 
     const analyzeGuidanceBlock = hasAnalyzeGuidance
       ? `
-      USER GUIDANCE — TONE AND VOICE (apply to every node's description and every relationship string; keep claims grounded in the source text—do not invent facts):
+      USER GUIDANCE — TONE, VOICE, AND CONCEPT CHOICES (apply to which ideas become nodes as well as every description and relationship string; keep claims grounded in the source text—do not invent facts):
       ${context.trim()}
 
-      Reflect this guidance in how you write: descriptions and relationship labels should match the requested tone when applicable. Avoid generic neutral wording when a different voice is requested.
+      Reflect this guidance when selecting concepts from the content: among ideas the text supports, prefer nodes that fit the spirit of the guidance. Reflect it in writing too: descriptions and relationship labels should match the requested tone when applicable.
       `
       : '';
 
     const analyzeGuidanceBullet = hasAnalyzeGuidance
-      ? `- USER GUIDANCE is active: make tone visible in every "description" and every "relationship" field where it fits (still factual; do not invent information).\n      `
+      ? `- USER GUIDANCE is active: choose concepts from the text that fit the guidance when several are possible, and make tone visible in every "description" and every "relationship" field where it fits (still factual; do not invent information).\n      `
       : '';
 
     const prompt = `
@@ -322,7 +322,7 @@ Rules:
 3. Prefer meaningful English Wikipedia URLs (https://en.wikipedia.org/wiki/...) that match each node's label.${
       hasAnalyzeGuidance
         ? `
-4. If the user message includes USER GUIDANCE, apply it to the tone and phrasing of every node description and every relationship string while staying factual.`
+4. If the user message includes USER GUIDANCE, apply it to which concepts you include from the text and to the tone and phrasing of every node description and every relationship string while staying factual.`
         : ''
     }`;
 
@@ -544,15 +544,15 @@ app.post('/api/generate-node', async (req, res) => {
 
     const generationGuidanceBlock = hasGuidance
       ? `
-      USER GUIDANCE — TONE AND VOICE (apply to every new node's description and every relationship string; keep facts accurate and grounded in Wikipedia/summaries—do not invent claims):
+      USER GUIDANCE — TONE, VOICE, AND CONCEPT CHOICES (apply to which new concepts you pick as well as every new node's description and every relationship string; keep facts accurate and grounded in Wikipedia/summaries—do not invent claims):
       ${validated.generationContext.trim()}
 
-      Reflect this guidance in how you write: descriptions and relationship labels must visibly match the requested tone, not only the concept choices. Avoid generic neutral encyclopedia wording when a different voice is requested.
+      Reflect this guidance when selecting topics: prefer new nodes whose subjects fit the spirit of the guidance among valid extensions of the anchors. Reflect it in writing: descriptions and relationship labels must visibly match the requested tone. Avoid generic neutral encyclopedia wording when a different voice is requested.
       `
       : '';
 
     const guidanceImportantBullet = hasGuidance
-      ? `- USER GUIDANCE is active: every "description" and every "relationship" string must clearly show that tone in its wording (still factual; do not invent information).\n      `
+      ? `- USER GUIDANCE is active: prefer new concepts that align with the guidance among Wikipedia-suitable choices, and make every "description" and every "relationship" string clearly show that tone in its wording (still factual; do not invent information).\n      `
       : '';
 
     const anchorWikiBlock =
@@ -674,7 +674,7 @@ app.post('/api/generate-node', async (req, res) => {
           7. When Wikipedia summaries are provided for anchors, use them to justify relationships${
             hasGuidance
               ? `
-          8. If the user message includes USER GUIDANCE, apply it to the tone and phrasing of every new node's description and every relationship string. Facts must remain accurate and grounded in Wikipedia material.`
+          8. If the user message includes USER GUIDANCE, apply it to which new concepts you choose and to the tone and phrasing of every new node's description and every relationship string. Facts must remain accurate and grounded in Wikipedia material.`
               : ''
           }`
         },

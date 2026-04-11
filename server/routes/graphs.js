@@ -12,6 +12,7 @@ import {
   redactGraphMetadataForResponse,
   stripShareSecretFromSaveMetadata,
 } from '../lib/graphShareRead.js';
+import { enrichGraphNodesWithThumbnails } from '../lib/enrichGraphNodesWithThumbnails.js';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -415,6 +416,16 @@ router.get('/graphs/:filename', async (req, res) => {
       }))
     });
 
+    let graphForResponse = fileData.graph;
+    try {
+      graphForResponse = await enrichGraphNodesWithThumbnails(
+        fileData.graph,
+        globalThis.fetch
+      );
+    } catch (thumbErr) {
+      console.error('enrichGraphNodesWithThumbnails (load graph) failed:', thumbErr);
+    }
+
     const safeMeta = redactGraphMetadataForResponse(fileData.metadata, {
       shareViewer: viaShare,
     });
@@ -423,6 +434,7 @@ router.get('/graphs/:filename', async (req, res) => {
       success: true,
       data: {
         ...fileData,
+        graph: graphForResponse,
         metadata: safeMeta,
       },
     });

@@ -38,11 +38,14 @@ function GenerationGuidanceFields({
         aria-describedby={helpId}
       >
         <option value="none">None</option>
+        <option value="awe">Awe</option>
         <option value="funny">Funny</option>
         <option value="happy">Happy</option>
+        <option value="nostalgia">Nostalgia</option>
         <option value="profound">Profound</option>
-        <option value="weird">Weird</option>
         <option value="sexy">Sexy</option>
+        <option value="shock">Shock</option>
+        <option value="weird">Weird</option>
         <option value="custom">Custom</option>
       </select>
       {preset === 'custom' && (
@@ -53,7 +56,7 @@ function GenerationGuidanceFields({
           maxLength={2000}
           value={customText}
           onChange={e => onCustomTextChange(e.target.value)}
-          placeholder="e.g. Prefer short relationship labels; focus on causal links; use chemistry terminology."
+          placeholder="e.g. Prefer causal links and chemistry terms; favor playful topics when several fit the anchors."
           disabled={disabled}
           aria-describedby={helpId}
         />
