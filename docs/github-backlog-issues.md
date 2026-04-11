@@ -31,6 +31,26 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 | #40 | NF—Polish | Dynamic UI / UX epic |
 | #41+ | — | Later items include repo hygiene/chore tickets (e.g. **#41**), Mongo index migration (**#42**), multi-file client UX (**#43**) — see GitHub **Issues** for current titles. Post–**#22** client follow-ups: **#49**–**#51**; post–**#23**: **#52** (FAB stacking); post–**#25**: **#53** (Library layout / flex vs old header pixel constant — partly addressed by **#33** graph title in banner); post–**#26**: **#54** (server docs: file delete API + CORS); post–**#28**: **#55** (optional **`.library-graph-mount`** CSS audit); post–**#29**: **#56** (optional graph Actions accordion / focus polish); post–**#30**: **#57** (D3 canvas / node screen-reader a11y); post–**#32**: **#33** (client shell + headers; server **`userId`** on upload still backlog), **#46** (**`metadata/`** vs Mongo drift under scoped-only listing); post–**#33**: real **OAuth / session tokens**, **#24** (E2E for banner + **`LibraryUiContext`**), z-index polish **#52**; post–**#34**–**#35**: **#24** (audio E2E incl. **#58** verbose UI), **#59** (speaker diarization), **#60** (transcribe HTTP integration tests), **#61** (optional persist/export). Post–**#58**: **#24**, **#59**, **#60**, **#61**; merged time+speaker contract (**#59**) — see **`server/READEME.md`** §2b follow-ups. |
 
+### Landing + guest shell (Apr 2026) — shipped slice + follow-ups (outside this ticket)
+
+**Shipped:** **`LandingPage`** in **`client/src/App.js`**: **How it works** (three numbered steps: add sources → analyze → explore), then **Get Started** → **`/visualize`** via **`useNavigate`**. Primary button uses **`landing-cta-primary--dynamic`** (soft pulse via **`@keyframes landing-cta-pulse`**; **`prefers-reduced-motion: reduce`** disables animation). Styles: **`client/src/App.css`**. **`GuestIdentityBanner`**: guest **Sign in** chip aligned to library rail dimensions (**`--auth-sign-in`**), single-line **Sign in** label; **Create account** secondary line removed from the banner (registration remains in auth modal tabs). **`max-width: 36rem`**: icon-only shell rails, tighter grid, sign-in shows **🔐** when the text label is hidden; loading state keeps **Checking…** visible. Tests: **`App.test.js`**, **`GuestIdentityBanner.test.jsx`**.
+
+**Follow-ups (add comments on open issues below; extend GitHub #76 instead of duplicating):**
+
+1. **E2E / RTL** — From **`/`**, assert **Get Started** navigates to **`/visualize`** and the library shell mounts (**#24**).
+2. **Product copy** — Confirm users still discover **Create account** after removing the banner line (**#31** / onboarding).
+3. **Visual QA** — Real devices at **~36rem** width: rail overlap, sign-in icon-only mode, animated landing CTA (**#40**).
+4. **Landing polish** — Optional hero illustration, screenshot, A/B copy, analytics — tracked on **#76** (*optional value-prop cards or hero*); partial overlap now that the value loop + CTA shipped.
+5. **Dev-only** — **Guest / Preview** account chip dimensions vs real **Sign in** chip (parity polish, low priority).
+
+**Suggested GitHub comments (paste on issue):**
+
+- **#31** — *Apr 2026: Guest Sign in banner chip restyled (`--auth-sign-in`); Create account line removed from banner (modal only). Narrow: icon-only rails + lock icon for sign-in. See `client/README.md` + this doc section.*
+- **#33** — *Apr 2026: Same guest shell / narrow-layout work as #31; graph title + library rails unchanged.*
+- **#40** — *Apr 2026: Landing `/` adds How it works + Get Started CTA (pulse animation, respects reduced motion). Second entry point alongside banner Visualize.*
+- **#24** — *Apr 2026: Backlog — E2E/RTL: landing Get Started → `/visualize`.*
+- **#76** — *Apr 2026: Value loop + Get Started CTA shipped in App. Remaining: optional illustration/screenshot, richer hero, A/B copy, analytics per original scope.*
+
 ### Password reset (Apr 2026) — shipped slice + follow-ups (outside this ticket)
 
 **Shipped:** `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` (1h token, hashed on `User`); **`GuestIdentityBanner`** forgot flow; **`/reset-password`** page; **nodemailer** + SMTP env; **`APP_PUBLIC_ORIGIN`** for email links; **`SMTP_URL`** must be `smtp(s):` or host-based vars are used; **`GET /health`** / **`GET /api/test`**; HTTP **`maxHeaderSize`**; client **`PORT=3000`** in **`npm start`**.

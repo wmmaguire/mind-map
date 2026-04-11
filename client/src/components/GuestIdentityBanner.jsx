@@ -285,7 +285,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
             ) : (
               <button
                 type="button"
-                className="guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview"
+                className={`guest-identity-banner__account-control guest-identity-banner__account-control--guest-preview guest-identity-banner__account-control--auth-sign-in${authStatus === 'loading' ? ' guest-identity-banner__account-control--loading' : ''}`}
                 onClick={() => {
                   setAuthMode('login');
                   setForgotEmailSent(false);
@@ -293,11 +293,11 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                   setAuthModalOpen(true);
                 }}
               >
+                <span className="guest-identity-banner__account-control-icon" aria-hidden>
+                  🔐
+                </span>
                 <span className="guest-identity-banner__account-control-primary">
                   {authStatus === 'loading' ? 'Checking…' : 'Sign in'}
-                </span>
-                <span className="guest-identity-banner__account-control-secondary">
-                  Create account
                 </span>
               </button>
             )}

@@ -36,6 +36,8 @@ test('renders app title', () => {
     </BrowserRouter>
   );
   expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /^How it works$/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^get started$/i })).toBeInTheDocument();
 });
 
 test('shows guest identity banner', async () => {

@@ -42,7 +42,6 @@ describe('GuestIdentityBanner', () => {
   it('shows sign-in control when unauthenticated (no redundant Guest label)', async () => {
     render(wrap(<GuestIdentityBanner />));
     expect(screen.getByRole('status', { name: /account mode/i })).toBeInTheDocument();
-    expect(screen.getByText(/Create account/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText(/Sign in/i)).toBeInTheDocument();
     });
