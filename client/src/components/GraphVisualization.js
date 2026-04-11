@@ -10,6 +10,7 @@ import {
   nodesMatchingLabelQuery,
   createFocusZoomTransform,
 } from '../utils/graphDiscovery';
+import { tooltipThumbnailMarkup } from '../utils/safeThumbnailUrl';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -348,6 +349,7 @@ function GraphVisualization({
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
+          thumbnailUrl: node.thumbnailUrl,
           color: defaultNodeColor // All initial nodes should be blue
         });
       });
@@ -818,6 +820,7 @@ function GraphVisualization({
             
             tooltipContent = `
               <strong>${nodeLabel}</strong><br/>
+              ${tooltipThumbnailMarkup(selectedNode.thumbnailUrl, nodeLabel)}
               ${nodeDescription ? `${nodeDescription}<br/>` : ''}
               ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
             `;
@@ -1007,8 +1010,10 @@ function GraphVisualization({
         } else {
           // For single nodes
           const nodeToShow = node.nodes ? node.nodes[0] : node;
+          const showLabel = nodeToShow.label || 'Unnamed Node';
           tooltipContent = `
-            <strong>${nodeToShow.label || 'Unnamed Node'}</strong><br/>
+            <strong>${showLabel}</strong><br/>
+            ${tooltipThumbnailMarkup(nodeToShow.thumbnailUrl, showLabel)}
             ${nodeToShow.description ? `${nodeToShow.description}<br/>` : ''}
             ${nodeToShow.wikiUrl ? `<a href="${nodeToShow.wikiUrl}" target="_blank">Learn more</a><br/>` : ''}
           `;
@@ -1350,6 +1355,7 @@ function GraphVisualization({
               label: d.label,
               description: d.description,
               wikiUrl: d.wikiUrl,
+              thumbnailUrl: d.thumbnailUrl,
               color: defaultNodeColor
             };
           }
@@ -1423,6 +1429,7 @@ function GraphVisualization({
               
               tooltipContent = `
                 <strong>${nodeLabel}</strong><br/>
+                ${tooltipThumbnailMarkup(selectedNode.thumbnailUrl, nodeLabel)}
                 ${nodeDescription ? `${nodeDescription}<br/>` : ''}
                 ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
               `;
@@ -2834,6 +2841,7 @@ GraphVisualization.propTypes = {
         label: PropTypes.string.isRequired,
         description: PropTypes.string,
         wikiUrl: PropTypes.string,
+        thumbnailUrl: PropTypes.string,
         createdAt: PropTypes.number,
         timestamp: PropTypes.number,
         x: PropTypes.number,

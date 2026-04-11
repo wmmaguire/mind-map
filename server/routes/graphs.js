@@ -71,6 +71,9 @@ router.post('/graphs/save', async (req, res) => {
       size: node.size || 20,
       color: node.color || '#4a90e2',
       ...(node.timestamp != null ? { timestamp: node.timestamp } : {}),
+      ...(typeof node.thumbnailUrl === 'string' && node.thumbnailUrl.trim()
+        ? { thumbnailUrl: node.thumbnailUrl.trim() }
+        : {}),
     }));
 
     const processedLinks = graph.links.map((link) => ({

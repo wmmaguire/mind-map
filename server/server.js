@@ -34,6 +34,7 @@ import {
 } from './lib/relationshipSynthesisConfig.js';
 import { normalizeManualExpansionLinks } from './lib/manualExpansionLinks.js';
 import { repairAnalyzeGraphWikiUrls } from './lib/repairAnalyzeGraphWikiUrls.js';
+import { enrichGraphNodesWithThumbnails } from './lib/enrichGraphNodesWithThumbnails.js';
 import {
   dataDir,
   uploadsDir,
@@ -347,6 +348,11 @@ Rules:
       graphData = await repairAnalyzeGraphWikiUrls(graphData, globalThis.fetch);
     } catch (repairErr) {
       console.error('repairAnalyzeGraphWikiUrls failed:', repairErr);
+    }
+    try {
+      graphData = await enrichGraphNodesWithThumbnails(graphData, globalThis.fetch);
+    } catch (thumbErr) {
+      console.error('enrichGraphNodesWithThumbnails failed:', thumbErr);
     }
     console.log('Analysis completed successfully');
 
@@ -842,6 +848,12 @@ app.post('/api/generate-node', async (req, res) => {
         totalLinks: newData.links.length,
         connectionsPerNode: selectedNodeIds.size
       });
+    }
+
+    try {
+      newData = await enrichGraphNodesWithThumbnails(newData, globalThis.fetch);
+    } catch (thumbErr) {
+      console.error('enrichGraphNodesWithThumbnails (generate-node) failed:', thumbErr);
     }
 
     return res.json({
