@@ -555,7 +555,7 @@ Refs: #40 #50 #33
 
 | Topic | Where to track |
 |--------|----------------|
-| **Caching / rate limits** for sequential Wikipedia fetches on **`GET /api/graphs/:filename`** (large graphs); optional **persist enriched `thumbnailUrl` back to Mongo** on read to avoid repeat work | New backlog issue (below); **#37** if preview/`dryRun` interacts |
+| **Caching / rate limits** for sequential Wikipedia fetches on **`GET /api/graphs/:filename`** (large graphs); optional **persist enriched `thumbnailUrl` back to Mongo** on read to avoid repeat work | **#79**; **#37** if preview/`dryRun` interacts |
 | **SVG `<image>`** `error` event gaps (some CORS cases); optional **timeout** fallback | **#75** or new backlog |
 | **Browser E2E** for load → thumb visible, guidance preset → API payload | **#24** |
 | **Relationship synthesis** (`synthesizeLinkRelationships`) still emphasizes wording; topic choice is step 1 only — align copy if product wants tone on step 2 | **#62** / small task |
