@@ -282,6 +282,7 @@ Relevant code:
 
 - `POST /api/graphs/save`
   - stores a **`Graph`** document in Mongo (**`payload`**, **`metadata.filename`** = `graph_<timestamp>.json`, **`metadata.sessionUuid`**, optional **`metadata.userId`**, etc.). **Does not** write **`server/graphs/*.json`**.
+  - Playback metadata: `payload.nodes[]` / `payload.links[]` may include `createdAt`/legacy `timestamp` and optional `deletedAt` (client “Pop”) so history ordering and deletions persist after save.
 - `GET /api/graphs`
   - lists from the **`Graph`** collection. **#32:** pass **`?userId=`** / **`X-Mindmap-User-Id`** for **`metadata.userId`**, or **`?sessionId=`** for guest session graphs **excluding** account-owned rows. Omitting both returns **all** graphs (**legacy**). Response may include **`listingScope`**.
 - `POST /api/graphs/save` — **`metadata.userId`** is taken from **`X-Mindmap-User-Id`** when present, else from the request body (header wins).
