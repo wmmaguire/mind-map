@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
@@ -174,6 +175,8 @@ function LibraryVisualize({ fileRefreshToken }) {
   /** GitHub #39: opened via ?shareGraph=&shareToken= */
   const [shareViewerMode, setShareViewerMode] = useState(false);
   const [shareLinkToast, setShareLinkToast] = useState(null);
+  const [shareLinkDialog, setShareLinkDialog] = useState(null);
+  const shareLinkTextAreaRef = useRef(null);
 
   /** Stable noop so GraphVisualization is not handed a new callback every render in share mode. */
   const noopGraphDataUpdate = useCallback(() => {}, []);
@@ -732,12 +735,45 @@ function LibraryVisualize({ fileRefreshToken }) {
       const { shareReadToken: token } = data;
       const u = new URL(window.location.href);
       const shareUrl = `${u.origin}/visualize?shareGraph=${encodeURIComponent(fn)}&shareToken=${encodeURIComponent(token)}`;
-      await navigator.clipboard.writeText(shareUrl);
-      setShareLinkToast({
-        type: 'success',
-        message:
-          'Read-only link copied. Recipients can view this graph but cannot save or use graph actions here.',
-      });
+      // iOS Safari / embedded browsers can deny clipboard writes after an async hop.
+      // Best-effort: try to copy; if denied, show a modal with the link so the user
+      // can copy/share from a fresh user gesture.
+      const tryCopyText = async (text) => {
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === 'function'
+        ) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+        return false;
+      };
+
+      try {
+        const copied = await tryCopyText(shareUrl);
+        if (copied) {
+          setShareLinkToast({
+            type: 'success',
+            message:
+              'Read-only link copied. Recipients can view this graph but cannot save or use graph actions here.',
+          });
+        } else {
+          setShareLinkDialog({ url: shareUrl });
+          setShareLinkToast({
+            type: 'success',
+            message:
+              'Read-only link ready. Your browser does not support auto-copy here.',
+          });
+        }
+      } catch (clipboardErr) {
+        setShareLinkDialog({ url: shareUrl });
+        setShareLinkToast({
+          type: 'success',
+          message:
+            'Read-only link ready. Your device blocked auto-copy—use the dialog to copy or share it.',
+        });
+      }
     } catch (e) {
       setShareLinkToast({
         type: 'error',
@@ -745,6 +781,70 @@ function LibraryVisualize({ fileRefreshToken }) {
       });
     }
   }, [currentSource?.sourceFile, userId, listingAuth]);
+
+  const closeShareLinkDialog = useCallback(() => {
+    setShareLinkDialog(null);
+  }, []);
+
+  const handleCopyShareLinkFromDialog = useCallback(async () => {
+    const url = shareLinkDialog?.url;
+    if (!url) return;
+
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
+        await navigator.clipboard.writeText(url);
+        setShareLinkToast({ type: 'success', message: 'Copied share link.' });
+        return;
+      }
+    } catch (e) {
+      // Fall through to selection-based copy
+    }
+
+    const el = shareLinkTextAreaRef.current;
+    if (el && typeof el.select === 'function') {
+      el.focus();
+      el.select();
+      try {
+        const ok = document.execCommand && document.execCommand('copy');
+        if (ok) {
+          setShareLinkToast({ type: 'success', message: 'Copied share link.' });
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    setShareLinkToast({
+      type: 'error',
+      message:
+        'Could not copy automatically. Please press and hold the link and copy manually.',
+    });
+  }, [shareLinkDialog?.url]);
+
+  const handleNativeShareFromDialog = useCallback(async () => {
+    const url = shareLinkDialog?.url;
+    if (!url) return;
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({ url, title: 'MindMap graph' });
+        setShareLinkToast({ type: 'success', message: 'Share sheet opened.' });
+      } else {
+        setShareLinkToast({
+          type: 'error',
+          message: 'Sharing is not supported on this device/browser.',
+        });
+      }
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      if (msg && /abort|cancel/i.test(msg)) return;
+      setShareLinkToast({ type: 'error', message: msg || 'Could not open share sheet.' });
+    }
+  }, [shareLinkDialog?.url]);
 
   const libraryShareBannerPayload = useMemo(() => {
     if (!canMintShareReadLink) return null;
@@ -1254,6 +1354,79 @@ function LibraryVisualize({ fileRefreshToken }) {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shareLinkDialog && (
+        <div className="modal-overlay" onClick={closeShareLinkDialog}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Share link</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeShareLinkDialog}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{ marginTop: 0 }}>
+              This link is <strong>read-only</strong>. Recipients can view this graph but
+              cannot save or use graph actions.
+            </p>
+
+            <label htmlFor="shareLinkUrl" style={{ display: 'block', marginBottom: 8 }}>
+              Read-only URL
+            </label>
+            <textarea
+              id="shareLinkUrl"
+              ref={shareLinkTextAreaRef}
+              readOnly
+              value={shareLinkDialog.url}
+              rows={3}
+              style={{ width: '100%', resize: 'none' }}
+              onFocus={(e) => e.target.select()}
+            />
+
+            <div
+              className="modal-actions modal-actions--split"
+              style={{ marginTop: 16 }}
+            >
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleCopyShareLinkFromDialog}
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleNativeShareFromDialog}
+                disabled={
+                  typeof navigator === 'undefined' ||
+                  typeof navigator.share !== 'function'
+                }
+              >
+                Share…
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeShareLinkDialog}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
