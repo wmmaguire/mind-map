@@ -2085,8 +2085,23 @@ function GraphVisualization({
         : 'This node has no connected relationships.');
 
   
-    if (window.confirm(confirmMessage)) {
-      // Mark the node and its incident relationships as deleted (tombstone) so
+    if (!window.confirm(confirmMessage)) return;
+
+    const purge = window.confirm(
+      'Purge permanently?\n\n' +
+        '- OK: Purge (remove from the graph with no playback memory)\n' +
+        '- Cancel: Delete (tombstone with deletedAt so playback can show removals)'
+    );
+
+    if (purge) {
+      // Purge: remove the node and its incident relationships entirely.
+      const newNodes = data.nodes.filter((n) => n.id !== node.id);
+      const newLinks = data.links.filter(
+        (l) => l.source.id !== node.id && l.target.id !== node.id
+      );
+      onDataUpdate({ nodes: newNodes, links: newLinks });
+    } else {
+      // Tombstone: mark the node and its incident relationships as deleted so
       // playback/history can represent deletions as events.
       const deletedAt = Date.now();
       const newNodes = data.nodes.map((n) =>
@@ -2097,36 +2112,48 @@ function GraphVisualization({
           ? { ...l, deletedAt: l.deletedAt ?? deletedAt }
           : l
       );
-
-      onDataUpdate({
-        nodes: newNodes,
-        links: newLinks
-      });
-      
-      // Clear any selections
-      selectedNodeIds.current.clear();
-      selectedNodeId.current = null;
+      onDataUpdate({ nodes: newNodes, links: newLinks });
     }
+
+    // Clear any selections
+    selectedNodeIds.current.clear();
+    selectedNodeId.current = null;
   };
 
   const handleDeleteLink = (link) => {
-    if (window.confirm(`Are you sure you want to delete the relationship "${link.relationship}" between "${link.source.label}" and "${link.target.label}"?`)) {
-      const deletedAt = Date.now();
-      const newLinks = data.links.map((l) => {
-        const match =
-          l.source.id === link.source.id &&
-          l.target.id === link.target.id &&
-          String(l.relationship ?? '') === String(link.relationship ?? '');
-        if (!match) return l;
-        if (l.deletedAt != null) return l;
-        return { ...l, deletedAt };
-      });
-      
-      onDataUpdate({
-        nodes: [...data.nodes],
-        links: newLinks
-      });
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the relationship "${link.relationship}" between "${link.source.label}" and "${link.target.label}"?`
+      )
+    ) {
+      return;
     }
+
+    const purge = window.confirm(
+      'Purge permanently?\n\n' +
+        '- OK: Purge (remove from the graph with no playback memory)\n' +
+        '- Cancel: Delete (tombstone with deletedAt so playback can show removals)'
+    );
+
+    const match = (l) =>
+      l.source.id === link.source.id &&
+      l.target.id === link.target.id &&
+      String(l.relationship ?? '') === String(link.relationship ?? '');
+
+    if (purge) {
+      const newLinks = data.links.filter((l) => !match(l));
+      onDataUpdate({ nodes: [...data.nodes], links: newLinks });
+      return;
+    }
+
+    const deletedAt = Date.now();
+    const newLinks = data.links.map((l) => {
+      if (!match(l)) return l;
+      if (l.deletedAt != null) return l;
+      return { ...l, deletedAt };
+    });
+
+    onDataUpdate({ nodes: [...data.nodes], links: newLinks });
   };
 
   const onMenuPickGenerate = () => {
