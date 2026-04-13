@@ -332,7 +332,21 @@ function GraphVisualization({
     if (!data || !data.nodes || !data.links) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove(); // Clear existing elements
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const FADE_MS = reduceMotion ? 0 : 220;
+
+    // Fade out the previous render root instead of hard-clearing the SVG.
+    const prevRoot = svg.select('g.graph-root');
+    if (!prevRoot.empty()) {
+      if (FADE_MS > 0) {
+        prevRoot.transition().duration(FADE_MS).style('opacity', 0).remove();
+      } else {
+        prevRoot.remove();
+      }
+    }
 
     // Initialize hierarchical communities with individual nodes
     const initializeCommunities = () => {
@@ -491,9 +505,6 @@ function GraphVisualization({
       communitiesRef.current = initializeCommunities();
     }
 
-    // Clear any existing SVG content
-    d3.select(svgRef.current).selectAll('*').remove();
-
     // Set up the SVG dimensions
     svg.attr('width', width);
     svg.attr('height', height);
@@ -501,7 +512,10 @@ function GraphVisualization({
     communitiesRef.current = initializeCommunities();
 
     // Modify the zoom behavior
-    const g = svg.append('g');
+    const g = svg
+      .append('g')
+      .attr('class', 'graph-root')
+      .style('opacity', FADE_MS > 0 ? 0 : 1);
     graphTransformRef.current = d3.zoomIdentity;
 
     const zoom = d3.zoom()
@@ -608,6 +622,10 @@ function GraphVisualization({
 
     svg.call(zoom);
     zoomBehaviorRef.current = zoom;
+
+    if (FADE_MS > 0) {
+      g.transition().duration(FADE_MS).style('opacity', 1);
+    }
 
     // Create a map of nodes for reference
     const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
