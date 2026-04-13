@@ -2110,7 +2110,7 @@ function GraphVisualization({
           (l) => l.source.id !== nodeId && l.target.id !== nodeId
         );
         onDataUpdate({ nodes: newNodes, links: newLinks });
-      } else if (mode === 'tombstone') {
+      } else if (mode === 'pop') {
         const deletedAt = Date.now();
         const newNodes = data.nodes.map((n) =>
           n.id === nodeId ? { ...n, deletedAt } : n
@@ -2135,7 +2135,7 @@ function GraphVisualization({
       if (mode === 'purge') {
         const newLinks = data.links.filter((l) => !match(l));
         onDataUpdate({ nodes: [...data.nodes], links: newLinks });
-      } else if (mode === 'tombstone') {
+      } else if (mode === 'pop') {
         const deletedAt = Date.now();
         const newLinks = data.links.map((l) => {
           if (!match(l)) return l;
@@ -2763,9 +2763,9 @@ function GraphVisualization({
                 <button
                   type="button"
                   className="delete-button"
-                  onClick={() => applyDeleteDecision('tombstone')}
+                  onClick={() => applyDeleteDecision('pop')}
                 >
-                  Tombstone (playback)
+                  Pop (playback)
                 </button>
                 <button type="button" onClick={closeDeleteDecision}>
                   Cancel
