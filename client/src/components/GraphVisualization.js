@@ -2086,15 +2086,18 @@ function GraphVisualization({
 
   
     if (window.confirm(confirmMessage)) {
-      // Remove the node
-      const newNodes = data.nodes.filter(n => n.id !== node.id);
-      
-      // Remove all connected relationships
-      const newLinks = data.links.filter(l => 
-        l.source.id !== node.id && l.target.id !== node.id
+      // Mark the node and its incident relationships as deleted (tombstone) so
+      // playback/history can represent deletions as events.
+      const deletedAt = Date.now();
+      const newNodes = data.nodes.map((n) =>
+        n.id === node.id ? { ...n, deletedAt } : n
+      );
+      const newLinks = data.links.map((l) =>
+        l.source.id === node.id || l.target.id === node.id
+          ? { ...l, deletedAt: l.deletedAt ?? deletedAt }
+          : l
       );
 
-      // Update the data
       onDataUpdate({
         nodes: newNodes,
         links: newLinks
@@ -2108,9 +2111,16 @@ function GraphVisualization({
 
   const handleDeleteLink = (link) => {
     if (window.confirm(`Are you sure you want to delete the relationship "${link.relationship}" between "${link.source.label}" and "${link.target.label}"?`)) {
-      const newLinks = data.links.filter(l => 
-        !(l.source.id === link.source.id && l.target.id === link.target.id)
-      );
+      const deletedAt = Date.now();
+      const newLinks = data.links.map((l) => {
+        const match =
+          l.source.id === link.source.id &&
+          l.target.id === link.target.id &&
+          String(l.relationship ?? '') === String(link.relationship ?? '');
+        if (!match) return l;
+        if (l.deletedAt != null) return l;
+        return { ...l, deletedAt };
+      });
       
       onDataUpdate({
         nodes: [...data.nodes],

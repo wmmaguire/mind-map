@@ -71,7 +71,9 @@ router.post('/graphs/save', async (req, res) => {
       wikiUrl: node.wikiUrl || node.wikipediaUrl || '',
       size: node.size || 20,
       color: node.color || '#4a90e2',
+      ...(node.createdAt != null ? { createdAt: node.createdAt } : {}),
       ...(node.timestamp != null ? { timestamp: node.timestamp } : {}),
+      ...(node.deletedAt != null ? { deletedAt: node.deletedAt } : {}),
       ...(typeof node.thumbnailUrl === 'string' && node.thumbnailUrl.trim()
         ? { thumbnailUrl: node.thumbnailUrl.trim() }
         : {}),
@@ -81,7 +83,9 @@ router.post('/graphs/save', async (req, res) => {
       source: String(typeof link.source === 'object' ? link.source.id : link.source),
       target: String(typeof link.target === 'object' ? link.target.id : link.target),
       relationship: link.relationship || '',
+      ...(link.createdAt != null ? { createdAt: link.createdAt } : {}),
       ...(link.timestamp != null ? { timestamp: link.timestamp } : {}),
+      ...(link.deletedAt != null ? { deletedAt: link.deletedAt } : {}),
     }));
 
     const sourceFiles = [];

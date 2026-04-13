@@ -15,6 +15,27 @@ export function getPlaybackTime(entity) {
   return undefined;
 }
 
+/** @param {object} entity */
+export function getDeletedTime(entity) {
+  if (!entity || typeof entity !== 'object') return undefined;
+  const v = entity.deletedAt ?? entity.deletedTimestamp;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Date.parse(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return undefined;
+}
+
+/** @param {object} entity */
+function isEntityPresentAtTime(entity, cutoffTime) {
+  const created = getPlaybackTime(entity);
+  if (created == null || created > cutoffTime) return false;
+  const deleted = getDeletedTime(entity);
+  if (deleted == null) return true;
+  return cutoffTime < deleted;
+}
+
 function linkEndpointId(x) {
   if (x == null) return '';
   return typeof x === 'object' ? String(x.id) : String(x);
@@ -50,11 +71,15 @@ function maxPlaybackTime(graph) {
   let m = -Infinity;
   for (const n of graph?.nodes || []) {
     const t = getPlaybackTime(n);
+    const dt = getDeletedTime(n);
     if (t != null) m = Math.max(m, t);
+    if (dt != null) m = Math.max(m, dt);
   }
   for (const l of graph?.links || []) {
     const t = getPlaybackTime(l);
+    const dt = getDeletedTime(l);
     if (t != null) m = Math.max(m, t);
+    if (dt != null) m = Math.max(m, dt);
   }
   return Number.isFinite(m) ? m : null;
 }
@@ -115,10 +140,14 @@ export function getSortedUniquePlaybackTimes(graph) {
   for (const n of graph.nodes) {
     const t = getPlaybackTime(n);
     if (t != null) s.add(t);
+    const dt = getDeletedTime(n);
+    if (dt != null) s.add(dt);
   }
   for (const l of graph.links || []) {
     const t = getPlaybackTime(l);
     if (t != null) s.add(t);
+    const dt = getDeletedTime(l);
+    if (dt != null) s.add(dt);
   }
   return [...s].sort((a, b) => a - b);
 }
@@ -132,14 +161,12 @@ export function getSortedUniquePlaybackTimes(graph) {
 export function buildGraphAtPlaybackTime(graph, cutoffTime) {
   if (!graph?.nodes) return { nodes: [], links: [] };
   const nodes = graph.nodes.filter((n) => {
-    const t = getPlaybackTime(n);
-    return t != null && t <= cutoffTime;
+    return isEntityPresentAtTime(n, cutoffTime);
   });
   const nodeMap = new Map(nodes.map((n) => [String(n.id), n]));
   const links = [];
   for (const l of graph.links || []) {
-    const lt = getPlaybackTime(l);
-    if (lt == null || lt > cutoffTime) continue;
+    if (!isEntityPresentAtTime(l, cutoffTime)) continue;
     const sid = linkEndpointId(l.source);
     const tid = linkEndpointId(l.target);
     const s = nodeMap.get(sid);
@@ -177,11 +204,22 @@ export function mergePlaybackTimesFromEdit(next, prev) {
     const id = String(n.id);
     const old = prevNodes.get(id);
     const existing = getPlaybackTime(n) ?? (old != null ? getPlaybackTime(old) : null);
+    const deleted = getDeletedTime(n) ?? (old != null ? getDeletedTime(old) : null);
     if (existing != null) {
-      return { ...n, createdAt: existing, timestamp: existing };
+      return {
+        ...n,
+        createdAt: existing,
+        timestamp: existing,
+        ...(deleted != null ? { deletedAt: deleted } : {}),
+      };
     }
     const nt = bump();
-    return { ...n, createdAt: nt, timestamp: nt };
+    return {
+      ...n,
+      createdAt: nt,
+      timestamp: nt,
+      ...(deleted != null ? { deletedAt: deleted } : {}),
+    };
   });
 
   const nodeMap = new Map(nodes.map((n) => [String(n.id), n]));
@@ -195,6 +233,7 @@ export function mergePlaybackTimesFromEdit(next, prev) {
       const key = linkKey({ ...l, source: sid, target: tid });
       const old = prevLinks.get(key);
       const existing = getPlaybackTime(l) ?? (old != null ? getPlaybackTime(old) : null);
+      const deleted = getDeletedTime(l) ?? (old != null ? getDeletedTime(old) : null);
       let lt;
       if (existing != null) {
         lt = existing;
@@ -207,6 +246,7 @@ export function mergePlaybackTimesFromEdit(next, prev) {
         target: tnode,
         createdAt: lt,
         timestamp: lt,
+        ...(deleted != null ? { deletedAt: deleted } : {}),
       };
     })
     .filter(Boolean);

@@ -1,5 +1,6 @@
 import {
   getPlaybackTime,
+  getDeletedTime,
   ensurePlaybackTimestamps,
   getSortedUniquePlaybackTimes,
   buildGraphAtPlaybackTime,
@@ -52,6 +53,26 @@ describe('graphPlayback', () => {
     const s2 = buildGraphAtPlaybackTime(g, 2);
     expect(s2.nodes).toHaveLength(2);
     expect(s2.links).toHaveLength(1);
+  });
+
+  test('deletedAt removes entities at and after its time', () => {
+    const g = cloneGraphForCommit({
+      nodes: [
+        { id: 'a', createdAt: 1, deletedAt: 3 },
+        { id: 'b', createdAt: 2 },
+      ],
+      links: [{ source: 'a', target: 'b', createdAt: 2, deletedAt: 3 }],
+    });
+    expect(getDeletedTime(g.nodes[0])).toBe(3);
+    expect(getSortedUniquePlaybackTimes(g)).toEqual([1, 2, 3]);
+
+    const s2 = buildGraphAtPlaybackTime(g, 2);
+    expect(s2.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(s2.links).toHaveLength(1);
+
+    const s3 = buildGraphAtPlaybackTime(g, 3);
+    expect(s3.nodes.map((n) => n.id)).toEqual(['b']);
+    expect(s3.links).toHaveLength(0);
   });
 
   test('mergePlaybackTimesFromEdit preserves existing ids', () => {
