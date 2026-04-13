@@ -72,6 +72,7 @@ function GraphVisualization({
     show: false,
     relationship: ''
   });
+  const [deleteDecision, setDeleteDecision] = useState(null);
   /** After Add Node, prompt for one relationship per highlighted id (see connectNewNodeToIdsRef). */
   const [connectNewNodeLinksForm, setConnectNewNodeLinksForm] = useState(null);
   /** Labels-only hint on Add Concept modal (ids of nodes the new concept will link to). */
@@ -2079,81 +2080,75 @@ function GraphVisualization({
       l.source.id === node.id || l.target.id === node.id
     );
   
-    const confirmMessage = `Are you sure you want to delete the node "${node.label}"?\n\n` + 
-      (connectedLinks.length > 0 
-        ? `This will also delete ${connectedLinks.length} connected relationship${connectedLinks.length === 1 ? '' : 's'}`
-        : 'This node has no connected relationships.');
-
-  
-    if (!window.confirm(confirmMessage)) return;
-
-    const purge = window.confirm(
-      'Purge permanently?\n\n' +
-        '- OK: Purge (remove from the graph with no playback memory)\n' +
-        '- Cancel: Delete (tombstone with deletedAt so playback can show removals)'
-    );
-
-    if (purge) {
-      // Purge: remove the node and its incident relationships entirely.
-      const newNodes = data.nodes.filter((n) => n.id !== node.id);
-      const newLinks = data.links.filter(
-        (l) => l.source.id !== node.id && l.target.id !== node.id
-      );
-      onDataUpdate({ nodes: newNodes, links: newLinks });
-    } else {
-      // Tombstone: mark the node and its incident relationships as deleted so
-      // playback/history can represent deletions as events.
-      const deletedAt = Date.now();
-      const newNodes = data.nodes.map((n) =>
-        n.id === node.id ? { ...n, deletedAt } : n
-      );
-      const newLinks = data.links.map((l) =>
-        l.source.id === node.id || l.target.id === node.id
-          ? { ...l, deletedAt: l.deletedAt ?? deletedAt }
-          : l
-      );
-      onDataUpdate({ nodes: newNodes, links: newLinks });
-    }
-
-    // Clear any selections
-    selectedNodeIds.current.clear();
-    selectedNodeId.current = null;
+    setDeleteDecision({
+      kind: 'node',
+      node,
+      connectedCount: connectedLinks.length,
+    });
   };
 
   const handleDeleteLink = (link) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the relationship "${link.relationship}" between "${link.source.label}" and "${link.target.label}"?`
-      )
-    ) {
-      return;
-    }
-
-    const purge = window.confirm(
-      'Purge permanently?\n\n' +
-        '- OK: Purge (remove from the graph with no playback memory)\n' +
-        '- Cancel: Delete (tombstone with deletedAt so playback can show removals)'
-    );
-
-    const match = (l) =>
-      l.source.id === link.source.id &&
-      l.target.id === link.target.id &&
-      String(l.relationship ?? '') === String(link.relationship ?? '');
-
-    if (purge) {
-      const newLinks = data.links.filter((l) => !match(l));
-      onDataUpdate({ nodes: [...data.nodes], links: newLinks });
-      return;
-    }
-
-    const deletedAt = Date.now();
-    const newLinks = data.links.map((l) => {
-      if (!match(l)) return l;
-      if (l.deletedAt != null) return l;
-      return { ...l, deletedAt };
+    setDeleteDecision({
+      kind: 'link',
+      link,
     });
+  };
 
-    onDataUpdate({ nodes: [...data.nodes], links: newLinks });
+  const closeDeleteDecision = () => setDeleteDecision(null);
+
+  const applyDeleteDecision = (mode) => {
+    if (!deleteDecision) return;
+    const { kind } = deleteDecision;
+
+    if (kind === 'node') {
+      const node = deleteDecision.node;
+      if (!node) return closeDeleteDecision();
+      const nodeId = node.id;
+      if (mode === 'purge') {
+        const newNodes = data.nodes.filter((n) => n.id !== nodeId);
+        const newLinks = data.links.filter(
+          (l) => l.source.id !== nodeId && l.target.id !== nodeId
+        );
+        onDataUpdate({ nodes: newNodes, links: newLinks });
+      } else if (mode === 'tombstone') {
+        const deletedAt = Date.now();
+        const newNodes = data.nodes.map((n) =>
+          n.id === nodeId ? { ...n, deletedAt } : n
+        );
+        const newLinks = data.links.map((l) =>
+          l.source.id === nodeId || l.target.id === nodeId
+            ? { ...l, deletedAt: l.deletedAt ?? deletedAt }
+            : l
+        );
+        onDataUpdate({ nodes: newNodes, links: newLinks });
+      }
+    }
+
+    if (kind === 'link') {
+      const link = deleteDecision.link;
+      if (!link) return closeDeleteDecision();
+      const match = (l) =>
+        l.source.id === link.source.id &&
+        l.target.id === link.target.id &&
+        String(l.relationship ?? '') === String(link.relationship ?? '');
+
+      if (mode === 'purge') {
+        const newLinks = data.links.filter((l) => !match(l));
+        onDataUpdate({ nodes: [...data.nodes], links: newLinks });
+      } else if (mode === 'tombstone') {
+        const deletedAt = Date.now();
+        const newLinks = data.links.map((l) => {
+          if (!match(l)) return l;
+          if (l.deletedAt != null) return l;
+          return { ...l, deletedAt };
+        });
+        onDataUpdate({ nodes: [...data.nodes], links: newLinks });
+      }
+    }
+
+    selectedNodeIds.current.clear();
+    selectedNodeId.current = null;
+    closeDeleteDecision();
   };
 
   const onMenuPickGenerate = () => {
@@ -2214,9 +2209,7 @@ function GraphVisualization({
       if (node) handleDeleteNode(node);
       return;
     }
-    window.alert(
-      'Select one node to delete it, or click a relationship line (or select both endpoints) to delete that relationship.'
-    );
+    setDeleteDecision({ kind: 'none' });
   };
 
   const actionsFabButton = readOnly ? null : (
@@ -2726,6 +2719,65 @@ function GraphVisualization({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteDecision && (
+        <div className="modal-overlay" onMouseDown={closeDeleteDecision}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-label="Delete graph element"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <h2>Delete</h2>
+            {deleteDecision.kind === 'none' ? (
+              <div className="form-group" role="status">
+                Select one node to delete it, or click a relationship line (or select both endpoints) to delete that relationship.
+              </div>
+            ) : deleteDecision.kind === 'node' ? (
+              <div className="form-group" role="status">
+                Delete node <strong>{deleteDecision.node?.label || '—'}</strong>
+                {typeof deleteDecision.connectedCount === 'number' && deleteDecision.connectedCount > 0
+                  ? ` and ${deleteDecision.connectedCount} connected relationship${deleteDecision.connectedCount === 1 ? '' : 's'}.`
+                  : '.'}
+              </div>
+            ) : (
+              <div className="form-group" role="status">
+                Delete relationship <strong>{deleteDecision.link?.relationship || '—'}</strong> between{' '}
+                <strong>{deleteDecision.link?.source?.label || '—'}</strong> and{' '}
+                <strong>{deleteDecision.link?.target?.label || '—'}</strong>.
+              </div>
+            )}
+
+            {deleteDecision.kind !== 'none' ? (
+              <div className="modal-buttons">
+                <button
+                  type="button"
+                  className="delete-button"
+                  onClick={() => applyDeleteDecision('purge')}
+                >
+                  Purge (no memory)
+                </button>
+                <button
+                  type="button"
+                  className="delete-button"
+                  onClick={() => applyDeleteDecision('tombstone')}
+                >
+                  Tombstone (playback)
+                </button>
+                <button type="button" onClick={closeDeleteDecision}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="modal-buttons">
+                <button type="button" onClick={closeDeleteDecision}>
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
