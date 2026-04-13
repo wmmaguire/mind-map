@@ -87,4 +87,25 @@ describe('graphPlayback', () => {
     const out = mergePlaybackTimesFromEdit(next, prev);
     expect(getPlaybackTime(out.nodes[0])).toBe(100);
   });
+
+  test('mergePlaybackTimesFromEdit preserves popped entities omitted from current snapshot', () => {
+    const prev = cloneGraphForCommit({
+      nodes: [
+        { id: 'a', createdAt: 1, deletedAt: 3, label: 'A' },
+        { id: 'b', createdAt: 2, label: 'B' },
+      ],
+      links: [{ source: 'a', target: 'b', relationship: 'r', createdAt: 2, deletedAt: 3 }],
+    });
+    // User is at "now" after pop, so visible snapshot no longer includes 'a' or the link.
+    const next = {
+      nodes: [{ id: 'b', label: 'B2' }, { id: 'c', label: 'C' }],
+      links: [{ source: 'b', target: 'c', relationship: 'x' }],
+    };
+    const out = mergePlaybackTimesFromEdit(next, prev);
+    const a = out.nodes.find((n) => n.id === 'a');
+    expect(a).toBeTruthy();
+    expect(getPlaybackTime(a)).toBe(1);
+    expect(getDeletedTime(a)).toBe(3);
+    expect(out.links.some((l) => String(l.relationship) === 'r')).toBe(true);
+  });
 });

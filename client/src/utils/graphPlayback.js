@@ -222,6 +222,24 @@ export function mergePlaybackTimesFromEdit(next, prev) {
     };
   });
 
+  // Preserve previously popped (deletedAt) entities that are not present in the
+  // current visible snapshot. This keeps playback history stable when edits
+  // happen at "now" (where popped entities are filtered out of the view).
+  const nextNodeIds = new Set(nodes.map((n) => String(n.id)));
+  for (const old of prev?.nodes || []) {
+    const id = String(old.id);
+    if (nextNodeIds.has(id)) continue;
+    const dt = getDeletedTime(old);
+    if (dt == null) continue;
+    const ct = getPlaybackTime(old);
+    nodes.push({
+      ...old,
+      ...(ct != null ? { createdAt: ct, timestamp: ct } : {}),
+      deletedAt: dt,
+    });
+    nextNodeIds.add(id);
+  }
+
   const nodeMap = new Map(nodes.map((n) => [String(n.id), n]));
   const links = (next.links || [])
     .map((l) => {
@@ -250,6 +268,28 @@ export function mergePlaybackTimesFromEdit(next, prev) {
       };
     })
     .filter(Boolean);
+
+  const nextLinkKeys = new Set(links.map((l) => linkKey(l)));
+  for (const old of prev?.links || []) {
+    const dt = getDeletedTime(old);
+    if (dt == null) continue;
+    const sid = linkEndpointId(old.source);
+    const tid = linkEndpointId(old.target);
+    const s = nodeMap.get(sid);
+    const tnode = nodeMap.get(tid);
+    if (!s || !tnode) continue;
+    const key = linkKey({ ...old, source: sid, target: tid });
+    if (nextLinkKeys.has(key)) continue;
+    const ct = getPlaybackTime(old);
+    links.push({
+      ...old,
+      source: s,
+      target: tnode,
+      ...(ct != null ? { createdAt: ct, timestamp: ct } : {}),
+      deletedAt: dt,
+    });
+    nextLinkKeys.add(key);
+  }
 
   return { nodes, links };
 }
