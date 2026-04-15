@@ -9,7 +9,8 @@ const payloadSchema = new mongoose.Schema(
 );
 
 export const nodeSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
+  /** Unique only within one graph document — not globally (multi-file namespaces reuse patterns). */
+  id: { type: String, required: true },
   label: String,
   description: String,
   wikiUrl: String,

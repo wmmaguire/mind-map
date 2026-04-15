@@ -946,6 +946,12 @@ const connectDB = async () => {
 
     await mongoose.connect(mongoURI, options);
     console.log('MongoDB Connected Successfully');
+    const { fixGraphNodesIdUniqueIndex } = await import(
+      './lib/fixGraphNodesIdIndex.js'
+    );
+    await fixGraphNodesIdUniqueIndex().catch((indexErr) => {
+      console.error('Graph index fix (nodes.id) failed:', indexErr);
+    });
   } catch (err) {
     console.error('MongoDB connection error:', {
       name: err.name,

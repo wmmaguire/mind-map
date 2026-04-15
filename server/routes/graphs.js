@@ -13,6 +13,7 @@ import {
   stripShareSecretFromSaveMetadata,
 } from '../lib/graphShareRead.js';
 import { enrichGraphNodesWithThumbnails } from '../lib/enrichGraphNodesWithThumbnails.js';
+import { duplicateNodeIdsInGraph } from '../lib/graphNodeIdValidation.js';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -78,6 +79,18 @@ router.post('/graphs/save', async (req, res) => {
         ? { thumbnailUrl: node.thumbnailUrl.trim() }
         : {}),
     }));
+
+    const dupIds = duplicateNodeIdsInGraph(processedNodes);
+    if (dupIds.length) {
+      const preview = dupIds.slice(0, 8).join(', ');
+      return res.status(400).json({
+        success: false,
+        error: `Graph has duplicate node id(s) within the same graph: ${preview}${
+          dupIds.length > 8 ? '…' : ''
+        }`,
+        code: 'DUPLICATE_NODE_IDS',
+      });
+    }
 
     const processedLinks = graph.links.map((link) => ({
       source: String(typeof link.source === 'object' ? link.source.id : link.source),
