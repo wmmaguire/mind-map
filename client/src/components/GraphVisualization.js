@@ -830,7 +830,6 @@ function GraphVisualization({
         'data-testid="graph-tooltip-explode-count" />' +
         `<span class="graph-tooltip-explode-count-value" data-testid="graph-tooltip-explode-count-value">${countVal}</span>` +
         '</div></div>' +
-        '<p class="graph-tooltip-explode-hint">Same presets as <strong>AI Generation</strong>; applies when you tap Explode.</p>' +
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
         `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +

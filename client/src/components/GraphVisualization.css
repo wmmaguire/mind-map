@@ -119,6 +119,7 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-top: 8px;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -134,13 +135,6 @@ svg {
 
 .graph-tooltip-explode-btn:hover {
   background: #fde68a;
-}
-
-.graph-tooltip-explode-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
-  line-height: 1.35;
-  color: #64748b;
 }
 
 .graph-tooltip-explode-note {
