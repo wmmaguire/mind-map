@@ -32,6 +32,7 @@ function readStoredGraphHistoryPlaySpeed() {
 
 export function GraphHistoryBannerControls() {
   const { payload, savePayload } = useGraphHistoryUi();
+  const { forceLayoutEnabled, setForceLayoutEnabled } = useGraphChromeUi();
   const [playing, setPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(readStoredGraphHistoryPlaySpeed);
 
@@ -152,6 +153,15 @@ export function GraphHistoryBannerControls() {
               </div>
             </>
           )}
+          <label className="guest-identity-banner__graph-physics-toggle">
+            <input
+              type="checkbox"
+              checked={forceLayoutEnabled}
+              onChange={(e) => setForceLayoutEnabled(e.target.checked)}
+              aria-label="Enable D3 force layout physics on the graph"
+            />
+            <span>Physics</span>
+          </label>
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import PropTypes from 'prop-types';
 
 const STORAGE_PLAYBACK = 'mindmap.chrome.playbackStripVisible';
 const STORAGE_SEARCH = 'mindmap.chrome.graphSearchBarVisible';
+const STORAGE_FORCE_LAYOUT = 'mindmap.chrome.forceLayoutEnabled';
 
 function readStoredVisible(key, defaultVisible) {
   try {
@@ -23,8 +24,9 @@ function readStoredVisible(key, defaultVisible) {
 const GraphChromeUiContext = createContext(null);
 
 /**
- * Visibility of Library visualize chrome: playback strip + graph search bar (#38).
- * Persisted in localStorage; toggled from {@link GuestIdentityBanner} View menu.
+ * Library visualize chrome: playback strip + graph search bar (#38) + D3 force layout toggle.
+ * Persisted in localStorage; strip/search toggled from {@link GuestIdentityBanner} View menu;
+ * force layout from {@link GraphPlaybackBanner}.
  */
 export function GraphChromeUiProvider({ children }) {
   const [playbackStripVisible, setPlaybackStripVisibleState] = useState(() =>
@@ -32,6 +34,9 @@ export function GraphChromeUiProvider({ children }) {
   );
   const [graphSearchBarVisible, setGraphSearchBarVisibleState] = useState(() =>
     readStoredVisible(STORAGE_SEARCH, true)
+  );
+  const [forceLayoutEnabled, setForceLayoutEnabledState] = useState(() =>
+    readStoredVisible(STORAGE_FORCE_LAYOUT, true)
   );
 
   const setPlaybackStripVisible = useCallback((visible) => {
@@ -76,22 +81,49 @@ export function GraphChromeUiProvider({ children }) {
     });
   }, []);
 
+  const setForceLayoutEnabled = useCallback((enabled) => {
+    setForceLayoutEnabledState(Boolean(enabled));
+    try {
+      localStorage.setItem(STORAGE_FORCE_LAYOUT, enabled ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleForceLayout = useCallback(() => {
+    setForceLayoutEnabledState((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(STORAGE_FORCE_LAYOUT, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       playbackStripVisible,
       graphSearchBarVisible,
+      forceLayoutEnabled,
       setPlaybackStripVisible,
       setGraphSearchBarVisible,
+      setForceLayoutEnabled,
       togglePlaybackStrip,
       toggleGraphSearchBar,
+      toggleForceLayout,
     }),
     [
       playbackStripVisible,
       graphSearchBarVisible,
+      forceLayoutEnabled,
       setPlaybackStripVisible,
       setGraphSearchBarVisible,
+      setForceLayoutEnabled,
       togglePlaybackStrip,
       toggleGraphSearchBar,
+      toggleForceLayout,
     ]
   );
 
@@ -112,10 +144,13 @@ export function useGraphChromeUi() {
     return {
       playbackStripVisible: true,
       graphSearchBarVisible: true,
+      forceLayoutEnabled: true,
       setPlaybackStripVisible: () => {},
       setGraphSearchBarVisible: () => {},
+      setForceLayoutEnabled: () => {},
       togglePlaybackStrip: () => {},
       toggleGraphSearchBar: () => {},
+      toggleForceLayout: () => {},
     };
   }
   return ctx;

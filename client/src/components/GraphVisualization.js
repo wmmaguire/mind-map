@@ -156,7 +156,7 @@ function GraphVisualization({
   const resetCanvasViewRef = useRef(null);
 
   const { sessionId } = useSession();
-  const { graphSearchBarVisible } = useGraphChromeUi();
+  const { graphSearchBarVisible, forceLayoutEnabled } = useGraphChromeUi();
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -581,6 +581,18 @@ function GraphVisualization({
       .attr('class', 'graph-root')
       .style('opacity', FADE_MS > 0 && !skipPlaybackRootCrossfade ? 0 : 1);
     graphTransformRef.current = d3.zoomIdentity;
+
+    function paintForceGraphPositions(rootG) {
+      rootG
+        .selectAll('.link')
+        .attr('x1', d => d.source.x || 0)
+        .attr('y1', d => d.source.y || 0)
+        .attr('x2', d => d.target.x || 0)
+        .attr('y2', d => d.target.y || 0);
+      rootG
+        .selectAll('.node')
+        .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+    }
 
     const zoom = d3.zoom()
       .extent([[0, 0], [width, height]])
@@ -1357,20 +1369,41 @@ function GraphVisualization({
 
     // Drag event handlers
     function dragstarted(event, d) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
+      if (forceLayoutEnabled && !event.active) {
+        simulation.alphaTarget(0.3).restart();
+      }
       d.fx = d.x;
       d.fy = d.y;
+      d._prevDragX = event.x;
+      d._prevDragY = event.y;
     }
 
     function dragged(event, d) {
       d.fx = event.x;
       d.fy = event.y;
+      if (!forceLayoutEnabled) {
+        const dx = event.x - d._prevDragX;
+        const dy = event.y - d._prevDragY;
+        d._prevDragX = event.x;
+        d._prevDragY = event.y;
+        d.x = (d.x ?? 0) + dx;
+        d.y = (d.y ?? 0) + dy;
+        (d.nodes || []).forEach(n => {
+          n.x = (n.x ?? 0) + dx;
+          n.y = (n.y ?? 0) + dy;
+        });
+        paintForceGraphPositions(g);
+      }
     }
 
     function dragended(event, d) {
-      if (!event.active) simulation.alphaTarget(0);
+      if (forceLayoutEnabled && !event.active) {
+        simulation.alphaTarget(0);
+      }
       d.fx = null;
       d.fy = null;
+      delete d._prevDragX;
+      delete d._prevDragY;
     }
 
     // Update positions on each tick
@@ -1693,28 +1726,36 @@ function GraphVisualization({
         });
 
       // Update simulation with proper handling of both single nodes and communities
+      const runLayoutTick = () => {
+        if (!minimapRafRef.current) {
+          minimapRafRef.current = requestAnimationFrame(() => {
+            minimapRafRef.current = null;
+            updateMinimapRef.current?.();
+          });
+        }
+        links
+          .attr('x1', d => d.source.x || 0)
+          .attr('y1', d => d.source.y || 0)
+          .attr('x2', d => d.target.x || 0)
+          .attr('y2', d => d.target.y || 0);
+
+        nodes
+          .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+      };
+
       simulation
         .nodes(visibleElements)
         .force('link', d3.forceLink(processedLinks)
           .id(d => d.id))
-        .on('tick', () => {
-          if (!minimapRafRef.current) {
-            minimapRafRef.current = requestAnimationFrame(() => {
-              minimapRafRef.current = null;
-              updateMinimapRef.current?.();
-            });
-          }
-          links
-            .attr('x1', d => d.source.x || 0)
-            .attr('y1', d => d.source.y || 0)
-            .attr('x2', d => d.target.x || 0)
-            .attr('y2', d => d.target.y || 0);
+        .on('tick', runLayoutTick);
 
-          nodes
-            .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
-        });
-
-      simulation.alpha(0.3).restart();
+      if (forceLayoutEnabled) {
+        simulation.alpha(0.3).restart();
+      } else {
+        simulation.stop();
+        simulation.alphaTarget(0);
+        runLayoutTick();
+      }
 
       playbackPrevCommunityIdsRef.current = buildCommunityIdSet(visibleElements);
       playbackPrevLinkKeysRef.current = new Set(
@@ -1872,7 +1913,7 @@ function GraphVisualization({
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken]);
+  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken, forceLayoutEnabled]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -2584,7 +2625,7 @@ function GraphVisualization({
         : showGenerateForm &&
           expansionAlgorithm === 'branchExtrapolation' &&
           !pathHasConsecutiveGraphLinks(generateFormAnchorIds, data.links)
-          ? 'Each consecutive highlighted pair must be linked on the graph. Click nodes in path order, then reopen Extrapolate branch.'
+          ? 'Each consecutive highlighted pair must be linked on the graph. Click nodes in path order, then reopen AI Generation with extrapolate branch selected.'
           : showGenerateForm &&
             expansionAlgorithm === 'randomizedGrowth' &&
             data.nodes.length < rgConnectionsPerNewNode
@@ -2783,21 +2824,6 @@ function GraphVisualization({
                   </select>
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="generate-button graph-action-menu__action"
-                  aria-label="Open Extrapolate branch form"
-                  onClick={() =>
-                    onMenuPickGenerateWithAlgorithm('branchExtrapolation')
-                  }
-                >
-                  <span className="graph-action-menu__action-icon" aria-hidden>
-                    🌿
-                  </span>
-                  <span className="graph-action-menu__action-label">
-                    Extrapolate branch…
                   </span>
                 </button>
               </div>
