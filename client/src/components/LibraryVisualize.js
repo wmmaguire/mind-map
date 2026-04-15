@@ -1320,14 +1320,7 @@ function LibraryVisualize({ fileRefreshToken }) {
                 customText={analysisGuidanceCustomText}
                 onCustomTextChange={setAnalysisGuidanceCustomText}
                 disabled={analyzing}
-                helpText={
-                  <>
-                    Applies when analyzing your files into a graph: which concepts are
-                    included (when the text allows several) and how descriptions and edges
-                    are phrased. Presets send fixed instructions; Custom uses your text. Max
-                    2000 characters for custom.
-                  </>
-                }
+                helpText="Biases which concepts and phrasing the model uses from your files. Presets use fixed copy; Custom is your text (max 2000 characters)."
               />
 
               <div className="graph-metadata">

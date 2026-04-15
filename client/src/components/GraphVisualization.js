@@ -69,7 +69,7 @@ function GraphVisualization({
       ? {
         title: 'Community evolution',
         description:
-          'Runs multiple cycles. Each cycle adds AI nodes with random links to the current graph. Use the strategy slider to bias attachment toward low- or high-degree nodes (when link data is sent), and optionally prune non-anchor nodes between cycles.'
+          'Each cycle asks the AI for new concepts, then wires them in with random edges to your existing graph. The strategy slider nudges those edges toward peripheral or hub-like neighbors (using your graph’s links). Optional pruning removes a few non-highlighted nodes per cycle—highlighted anchors are never deleted. One API request per cycle; stop between cycles from the on-canvas chip.'
       }
       : {
         title: 'Manual AI generate',
@@ -3102,14 +3102,7 @@ function GraphVisualization({
                   setGenerateSubmitError(null);
                 }}
                 disabled={isGenerating}
-                helpText={
-                  <>
-                    Applies to which concepts are chosen (among valid Wikipedia topics) and
-                    to relationship wording. Presets send fixed instructions; Custom uses your
-                    text (tone and/or topic preferences). Max 2000 characters for custom. Must
-                    not override required links or node IDs.
-                  </>
-                }
+                helpText="Biases concept fit and how relationships read. Presets use fixed copy; Custom is your text (max 2000 characters). Does not change required links or node IDs."
               />
               <div className="form-buttons">
                 <button
