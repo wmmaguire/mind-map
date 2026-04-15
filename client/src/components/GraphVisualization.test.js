@@ -218,7 +218,7 @@ describe('GraphVisualization graph action menu', () => {
     expect(explodeCount).toHaveAttribute('value', '4');
     expect(screen.getByTestId('graph-tooltip-explode-count-value')).toHaveTextContent('4');
     expect(
-      screen.getByRole('button', { name: /Explode subgraph from this concept/i })
+      screen.getByRole('button', { name: /^Explode$/i })
     ).toBeInTheDocument();
   });
 

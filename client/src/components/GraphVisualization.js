@@ -869,8 +869,8 @@ function GraphVisualization({
         '<div class="graph-tooltip-explode-wrap">' +
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
-        `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +
-        '💥 Explode subgraph</button>' +
+        `data-node-id="${safe}" aria-label="Explode">` +
+        'Explode</button>' +
         '<div class="graph-tooltip-explode-guidance">' +
         '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-preset">' +
         'Guidance (optional)</label>' +
