@@ -38,7 +38,22 @@ const COMMUNITY_SIM_CHARGE_EXPLODE = -52;
 const COMMUNITY_SIM_ALPHA_TARGET_EXPLODE = 0.055;
 const COMMUNITY_SIM_ALPHA_MIN_EXPLODE = 0.2;
 /** `forceX` / `forceY` strength toward `width/2` & `height/2` (default D3 is 0.1). */
-const COMMUNITY_SIM_XY_STRENGTH = 0.32;
+const COMMUNITY_SIM_XY_STRENGTH = 0.1;
+
+/**
+ * Layout coordinates for a node-like datum: missing, non-finite, or exactly (0,0) are unset.
+ * Library playback and some saved graphs use 0,0 as a placeholder; otherwise forces pin everything to the SVG corner until forceX/forceY ease them toward center.
+ */
+function effectiveGraphCoords(node, fallbackX, fallbackY) {
+  const x = node?.x;
+  const y = node?.y;
+  const xf = typeof x === 'number' && Number.isFinite(x);
+  const yf = typeof y === 'number' && Number.isFinite(y);
+  if (xf && yf && !(x === 0 && y === 0)) {
+    return { x, y };
+  }
+  return { x: fallbackX, y: fallbackY };
+}
 
 /** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
 function pathHasConsecutiveGraphLinks(pathIds, links) {
@@ -510,8 +525,7 @@ function GraphVisualization({
     if (!matches.length) return;
     const idx = discoveryFocusIndex % matches.length;
     const node = matches[idx];
-    const nx = node.x != null ? node.x : width / 2;
-    const ny = node.y != null ? node.y : height / 2;
+    const { x: nx, y: ny } = effectiveGraphCoords(node, width / 2, height / 2);
     const t = createFocusZoomTransform(nx, ny, width, height, 1.2);
     const svg = d3.select(svgRef.current);
     const zoom = zoomBehaviorRef.current;
@@ -547,6 +561,24 @@ function GraphVisualization({
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
 
+    const cx = width / 2;
+    const cy = height / 2;
+    /** Raw graph node / simulation datum coordinates (omit, NaN, and (0,0) → viewport center). */
+    const nodeXIn = (n) => effectiveGraphCoords(n, cx, cy).x;
+    const nodeYIn = (n) => effectiveGraphCoords(n, cx, cy).y;
+    const simX = (d) => effectiveGraphCoords(d, cx, cy).x;
+    const simY = (d) => effectiveGraphCoords(d, cx, cy).y;
+
+    for (const n of data.nodes) {
+      const { x: nx, y: ny } = effectiveGraphCoords(n, cx, cy);
+      if (n.x !== nx || n.y !== ny) {
+        n.x = nx;
+        n.y = ny;
+      }
+      if (typeof n.vx !== 'number' || !Number.isFinite(n.vx)) n.vx = 0;
+      if (typeof n.vy !== 'number' || !Number.isFinite(n.vy)) n.vy = 0;
+    }
+
     const svg = d3.select(svgRef.current);
     // Animations disabled (fade/ease/transition) — user preference.
 
@@ -580,8 +612,8 @@ function GraphVisualization({
           parent: null,
           children: [],
           level: 0,
-          x: node.x || width/2,
-          y: node.y || height/2,
+          x: nodeXIn(node),
+          y: nodeYIn(node),
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
@@ -614,12 +646,14 @@ function GraphVisualization({
           const community2 = communityArray[j];
           const distance = Math.sqrt(
             Math.pow(
-              d3.mean(community1.nodes, n => n.x || 0) - 
-              d3.mean(community2.nodes, n => n.x || 0), 2
+              d3.mean(community1.nodes, n => nodeXIn(n)) -
+              d3.mean(community2.nodes, n => nodeXIn(n)),
+              2
             ) +
             Math.pow(
-              d3.mean(community1.nodes, n => n.y || 0) - 
-              d3.mean(community2.nodes, n => n.y || 0), 2
+              d3.mean(community1.nodes, n => nodeYIn(n)) -
+              d3.mean(community2.nodes, n => nodeYIn(n)),
+              2
             )
           );
 
@@ -639,8 +673,8 @@ function GraphVisualization({
             parent: null,
             children: [community1, closestCommunity],
             level: Math.max(community1.level, closestCommunity.level) + 1,
-            x: d3.mean(mergedNodes, n => n.x || 0),
-            y: d3.mean(mergedNodes, n => n.y || 0),
+            x: d3.mean(mergedNodes, n => nodeXIn(n)),
+            y: d3.mean(mergedNodes, n => nodeYIn(n)),
             label: `Group ${i}`,
             description: `Contains ${mergedNodes.length} nodes: ${mergedNodes.map(n => n.label).join(', ')}`,
             color: colorScale(Math.random()) // Assign new unique color to merged community
@@ -688,6 +722,8 @@ function GraphVisualization({
 
       // Split the largest community back into original nodes
       largestCommunity.nodes.forEach(node => {
+        const commXY = effectiveGraphCoords(largestCommunity, cx, cy);
+        const splitPos = effectiveGraphCoords(node, commXY.x, commXY.y);
         // Ensure all node properties are preserved
         const restoredNode = {
           id: node.id,
@@ -700,8 +736,8 @@ function GraphVisualization({
           parent: null,
           children: [],
           level: 0,
-          x: node.x || largestCommunity.x || width/2,
-          y: node.y || largestCommunity.y || height/2,
+          x: splitPos.x,
+          y: splitPos.y,
           // Preserve original node properties
           label: node.label || 'Unnamed Node',
           description: node.description || '',
@@ -791,13 +827,15 @@ function GraphVisualization({
         // Update community positions
         visibleCommunities.forEach(community => {
           if (community.nodes.length > 1) {
-            const centerX = d3.mean(community.nodes, d => d.x);
-            const centerY = d3.mean(community.nodes, d => d.y);
+            const centerX = d3.mean(community.nodes, d => nodeXIn(d));
+            const centerY = d3.mean(community.nodes, d => nodeYIn(d));
             const strength = Math.min(0.95, Math.max(0, 1 - currentZoom));
             
             community.nodes.forEach(node => {
-              node.x = node.x * (1 - strength) + centerX * strength;
-              node.y = node.y * (1 - strength) + centerY * strength;
+              const px = nodeXIn(node);
+              const py = nodeYIn(node);
+              node.x = px * (1 - strength) + centerX * strength;
+              node.y = py * (1 - strength) + centerY * strength;
             });
           }
         });
@@ -843,8 +881,8 @@ function GraphVisualization({
     function focusOnNodeId(nodeId, k = 1.6) {
       const node = data.nodes.find((n) => String(n.id) === String(nodeId));
       if (!node) return;
-      const nx = node.x != null ? node.x : width / 2;
-      const ny = node.y != null ? node.y : height / 2;
+      const nx = nodeXIn(node);
+      const ny = nodeYIn(node);
       const t = createFocusZoomTransform(nx, ny, width, height, k);
       d3.select(svgRef.current).call(zoom.transform, t);
     }
@@ -1317,8 +1355,8 @@ function GraphVisualization({
           parent: null,
           children: [],
           level: 0,
-          x: node.x || width/2,
-          y: node.y || height/2,
+          x: nodeXIn(node),
+          y: nodeYIn(node),
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
@@ -1455,11 +1493,12 @@ function GraphVisualization({
       let maxX = -Infinity;
       let maxY = -Infinity;
       data.nodes.forEach(n => {
-        if (n.x == null || n.y == null) return;
-        minX = Math.min(minX, n.x);
-        minY = Math.min(minY, n.y);
-        maxX = Math.max(maxX, n.x);
-        maxY = Math.max(maxY, n.y);
+        const nx = nodeXIn(n);
+        const ny = nodeYIn(n);
+        minX = Math.min(minX, nx);
+        minY = Math.min(minY, ny);
+        maxX = Math.max(maxX, nx);
+        maxY = Math.max(maxY, ny);
       });
       if (!Number.isFinite(minX)) {
         minX = 0;
@@ -1482,11 +1521,10 @@ function GraphVisualization({
       svgMini.selectAll('*').remove();
       const root = svgMini.append('g').attr('class', 'graph-minimap-content');
       data.nodes.forEach(n => {
-        if (n.x == null || n.y == null) return;
         root
           .append('circle')
-          .attr('cx', sx(n.x))
-          .attr('cy', sy(n.y))
+          .attr('cx', sx(nodeXIn(n)))
+          .attr('cy', sy(nodeYIn(n)))
           .attr('r', 2)
           .attr('fill', '#4a90e2')
           .attr('opacity', 0.65);
@@ -1697,18 +1735,18 @@ function GraphVisualization({
       }
       // Update link positions
       linkGroups.selectAll('line')
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
+        .attr('x1', d => simX(d.source))
+        .attr('y1', d => simY(d.source))
+        .attr('x2', d => simX(d.target))
+        .attr('y2', d => simY(d.target));
 
       // Update link label positions
       linkLabels
-        .attr('x', d => (d.source.x + d.target.x) / 2)
-        .attr('y', d => (d.source.y + d.target.y) / 2);
+        .attr('x', d => (simX(d.source) + simX(d.target)) / 2)
+        .attr('y', d => (simY(d.source) + simY(d.target)) / 2);
 
       // Update node positions
-      node.attr('transform', d => `translate(${d.x},${d.y})`);
+      node.attr('transform', d => `translate(${simX(d)},${simY(d)})`);
     });
 
     // Update the visualization function to handle all node cases properly
@@ -2034,7 +2072,7 @@ function GraphVisualization({
           .enter()
           .append('g')
           .attr('class', 'cluster-thumb')
-          .attr('transform', (d) => `translate(${d.x || 0},${d.y || 0})`)
+          .attr('transform', (d) => `translate(${simX(d)},${simY(d)})`)
           .style('cursor', 'pointer')
           .on('click', (event, d) => {
             event.stopPropagation();
@@ -2116,14 +2154,14 @@ function GraphVisualization({
             });
           }
           links
-            .attr('x1', d => d.source.x || 0)
-            .attr('y1', d => d.source.y || 0)
-            .attr('x2', d => d.target.x || 0)
-            .attr('y2', d => d.target.y || 0);
+            .attr('x1', d => simX(d.source))
+            .attr('y1', d => simY(d.source))
+            .attr('x2', d => simX(d.target))
+            .attr('y2', d => simY(d.target));
 
           nodes.attr('transform', (d) => {
-            const tx = d.x || 0;
-            const ty = d.y || 0;
+            const tx = simX(d);
+            const ty = simY(d);
             const ex = explodeStretchRef.current;
             if (
               ex &&
@@ -2138,7 +2176,7 @@ function GraphVisualization({
 
           // Keep cluster chips anchored to the live community centroid as forces run.
           if (chips) {
-            chips.attr('transform', (d) => `translate(${d.x || 0},${d.y || 0})`);
+            chips.attr('transform', (d) => `translate(${simX(d)},${simY(d)})`);
           }
         });
 
