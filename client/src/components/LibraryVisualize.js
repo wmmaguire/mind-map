@@ -202,6 +202,9 @@ function LibraryVisualize({ fileRefreshToken }) {
     playbackTimes.length === 0 ||
     playbackStepIndex >= maxPlaybackIdx;
 
+  /** GitHub #86: synchronous scrub token for D3 (0 = live tail; step+1 while scrubbing). */
+  const playbackScrubToken = playbackAtEnd ? 0 : playbackStepIndex + 1;
+
   // Add responsive width calculation
   const [dimensions, setDimensions] = useState({
     width: window.innerWidth,
@@ -1191,6 +1194,7 @@ function LibraryVisualize({ fileRefreshToken }) {
             }
             readOnly={shareViewerMode || !playbackAtEnd}
             emptyStateVariant={shareViewerMode ? 'default' : 'library'}
+            playbackScrubToken={playbackScrubToken}
             width={graphViewportWidth}
             height={graphViewportHeight}
           />

@@ -11,6 +11,12 @@ import {
   createFocusZoomTransform,
 } from '../utils/graphDiscovery';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
+import {
+  buildCommunityIdSet,
+  newCommunityIdsForPlaybackTransition,
+  newLinkKeysForPlaybackTransition,
+  linkKeyForProcessedCommunityLink,
+} from '../utils/playbackGraphTransition';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -28,6 +34,11 @@ function GraphVisualization({
   readOnly = false,
   /** #40: richer copy when mounted inside the library visualize layout. */
   emptyStateVariant = 'default',
+  /**
+   * GitHub #86: library timeline scrub token. `0` = live graph / tail; `playbackStepIndex + 1`
+   * while scrubbing. Skips whole-SVG root crossfade and eases in newly visible communities/links.
+   */
+  playbackScrubToken = 0,
 }) {
   const svgRef = useRef();
   const graphCanvasWrapRef = useRef(null);
@@ -323,6 +334,12 @@ function GraphVisualization({
   const mergeThresholdRef = useRef(0.8);  // Initial merge threshold
   const splitThresholdRef = useRef(1.2);  // Initial split threshold (1/0.8)
 
+  /** GitHub #86: community-layer diff across playback scrubs (refs survive D3 effect re-runs). */
+  const playbackPrevCommunityIdsRef = useRef(null);
+  const playbackPrevLinkKeysRef = useRef(null);
+  const lastPlaybackFadeTokenRef = useRef(0);
+  const playbackEaseHighlightTimerRef = useRef(null);
+
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
   const searchHighlightFill = '#f39c12';
@@ -337,11 +354,20 @@ function GraphVisualization({
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const FADE_MS = reduceMotion ? 0 : 220;
+    /** Observable-style enter easing duration for new communities/links during scrub (#86). */
+    const EASE_SCRUB_MS = reduceMotion ? 0 : 280;
+    const skipPlaybackRootCrossfade = playbackScrubToken > 0;
+
+    if (playbackScrubToken === 0) {
+      lastPlaybackFadeTokenRef.current = 0;
+      playbackPrevCommunityIdsRef.current = null;
+      playbackPrevLinkKeysRef.current = null;
+    }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
     const prevRoot = svg.select('g.graph-root');
     if (!prevRoot.empty()) {
-      if (FADE_MS > 0) {
+      if (FADE_MS > 0 && !skipPlaybackRootCrossfade) {
         prevRoot.transition().duration(FADE_MS).style('opacity', 0).remove();
       } else {
         prevRoot.remove();
@@ -515,7 +541,7 @@ function GraphVisualization({
     const g = svg
       .append('g')
       .attr('class', 'graph-root')
-      .style('opacity', FADE_MS > 0 ? 0 : 1);
+      .style('opacity', FADE_MS > 0 && !skipPlaybackRootCrossfade ? 0 : 1);
     graphTransformRef.current = d3.zoomIdentity;
 
     const zoom = d3.zoom()
@@ -623,7 +649,7 @@ function GraphVisualization({
     svg.call(zoom);
     zoomBehaviorRef.current = zoom;
 
-    if (FADE_MS > 0) {
+    if (FADE_MS > 0 && !skipPlaybackRootCrossfade) {
       g.transition().duration(FADE_MS).style('opacity', 1);
     }
 
@@ -1338,6 +1364,8 @@ function GraphVisualization({
       // Get visible communities
       const visibleCommunities = communitiesRef.current;
       const visibleElements = Array.from(visibleCommunities.values());
+      const prevCommIds = playbackPrevCommunityIdsRef.current;
+      const prevLinkKeys = playbackPrevLinkKeysRef.current;
 
       // Stop the current simulation
       if (simulation) {
@@ -1649,6 +1677,56 @@ function GraphVisualization({
         });
 
       simulation.alpha(0.3).restart();
+
+      playbackPrevCommunityIdsRef.current = buildCommunityIdSet(visibleElements);
+      playbackPrevLinkKeysRef.current = new Set(
+        processedLinks.map(linkKeyForProcessedCommunityLink)
+      );
+
+      if (
+        playbackScrubToken > 0 &&
+        playbackScrubToken !== lastPlaybackFadeTokenRef.current
+      ) {
+        lastPlaybackFadeTokenRef.current = playbackScrubToken;
+        if (EASE_SCRUB_MS > 0) {
+          const newComm = newCommunityIdsForPlaybackTransition(
+            prevCommIds,
+            visibleElements
+          );
+          const newLk = newLinkKeysForPlaybackTransition(
+            prevLinkKeys,
+            processedLinks
+          );
+          if (newComm.size || newLk.size) {
+            nodes.each(function easeNewCommunity(d) {
+              if (!newComm.has(String(d.id))) return;
+              const el = d3.select(this);
+              el.style('opacity', 0);
+              el.transition()
+                .duration(EASE_SCRUB_MS)
+                .ease(d3.easeCubicOut)
+                .style('opacity', 1);
+            });
+            links.each(function easeNewLink(d) {
+              const k = linkKeyForProcessedCommunityLink(d);
+              if (!newLk.has(k)) return;
+              const el = d3.select(this);
+              el.style('opacity', 0);
+              el.transition()
+                .duration(EASE_SCRUB_MS)
+                .ease(d3.easeCubicOut)
+                .style('opacity', 1);
+            });
+            if (playbackEaseHighlightTimerRef.current) {
+              window.clearTimeout(playbackEaseHighlightTimerRef.current);
+            }
+            playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
+              playbackEaseHighlightTimerRef.current = null;
+              updateHighlighting();
+            }, EASE_SCRUB_MS + 24);
+          }
+        }
+      }
     };
 
     function resetCanvasToFullView() {
@@ -1738,6 +1816,10 @@ function GraphVisualization({
 
     // Cleanup
     return () => {
+      if (playbackEaseHighlightTimerRef.current) {
+        window.clearTimeout(playbackEaseHighlightTimerRef.current);
+        playbackEaseHighlightTimerRef.current = null;
+      }
       if (minimapRafRef.current) {
         cancelAnimationFrame(minimapRafRef.current);
         minimapRafRef.current = null;
@@ -1752,7 +1834,7 @@ function GraphVisualization({
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, width, height, readOnly]);
+  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -3101,11 +3183,13 @@ GraphVisualization.propTypes = {
   actionsFabPlacement: PropTypes.oneOf(['fixedViewport', 'libraryGraphMount']),
   readOnly: PropTypes.bool,
   emptyStateVariant: PropTypes.oneOf(['default', 'library']),
+  playbackScrubToken: PropTypes.number,
 };
 
 GraphVisualization.defaultProps = {
   readOnly: false,
   emptyStateVariant: 'default',
+  playbackScrubToken: 0,
 };
 
 export default GraphVisualization; 
