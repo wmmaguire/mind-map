@@ -410,6 +410,10 @@ function GraphVisualization({
       playbackStepHotLinkKeysRef.current = new Set();
     }
 
+    // Rapid playback scrubs can re-render before the prior fade-out completes.
+    // Ensure we don't accumulate multiple previous roots (which looks like a duplicated graph).
+    svg.selectAll('g.graph-root--prev').remove();
+
     // Fade out the previous render root instead of hard-clearing the SVG.
     // Keep it around during playback scrubs so we can highlight removals (last-step deltas).
     const prevRoot = svg.select('g.graph-root');
