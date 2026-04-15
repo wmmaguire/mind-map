@@ -361,7 +361,7 @@ function GraphVisualization({
     const svg = d3.select(svgRef.current);
     const zoom = zoomBehaviorRef.current;
     if (svg.node() && zoom) {
-      svg.transition().duration(400).call(zoom.transform, t);
+      svg.call(zoom.transform, t);
     }
     setDiscoveryFocusIndex((idx + 1) % matches.length);
   }, [discoveryQuery, discoveryFocusIndex, data, width, height]);
@@ -393,14 +393,7 @@ function GraphVisualization({
     if (!data || !data.nodes || !data.links) return;
 
     const svg = d3.select(svgRef.current);
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const FADE_MS = reduceMotion ? 0 : 220;
-    /** Observable-style enter easing duration for new communities/links during scrub (#86). */
-    const EASE_SCRUB_MS = reduceMotion ? 0 : 280;
-    const skipPlaybackRootCrossfade = playbackScrubToken > 0;
+    // Animations disabled (fade/ease/transition) — user preference.
 
     if (playbackScrubToken === 0) {
       lastPlaybackFadeTokenRef.current = 0;
@@ -418,17 +411,7 @@ function GraphVisualization({
     // Keep it around during playback scrubs so we can highlight removals (last-step deltas).
     const prevRoot = svg.select('g.graph-root');
     if (!prevRoot.empty()) {
-      if (FADE_MS > 0) {
-        // During playback scrubs, keep the previous root briefly so the transition is consistent
-        // across steps (including the final step) and we can highlight removals if any.
-        prevRoot.classed('graph-root--prev', true).style('pointer-events', 'none');
-        if (!skipPlaybackRootCrossfade) {
-          // Non-playback rerenders: fade out immediately.
-          prevRoot.transition().duration(FADE_MS).style('opacity', 0).remove();
-        }
-      } else {
-        prevRoot.remove();
-      }
+      prevRoot.remove();
     }
 
     // Initialize hierarchical communities with individual nodes
@@ -601,7 +584,7 @@ function GraphVisualization({
     const g = svg
       .append('g')
       .attr('class', 'graph-root')
-      .style('opacity', FADE_MS > 0 && !skipPlaybackRootCrossfade ? 0 : 1);
+      .style('opacity', 1);
     graphTransformRef.current = d3.zoomIdentity;
 
     const zoom = d3.zoom()
@@ -667,18 +650,14 @@ function GraphVisualization({
         // Update node sizes and appearance
         updateHighlighting();
 
-        // Update link visibility
+        // Update link visibility (no transitions)
         g.selectAll('.link')
-          .transition()
-          .duration(300)
           .style('opacity', Math.max(0.2, Math.min(0.6, currentZoom)))
           .attr('stroke-width', Math.max(1, 3 * (1 / currentZoom)));
 
           
-        // Update labels
+        // Update labels (no transitions)
         g.selectAll('.node text')
-          .transition()
-          .duration(300)
           .attr('y', d => {
             const community = Array.from(visibleCommunities.values())
               .find(c => c.nodes.some(n => n.id === d.id));
@@ -712,15 +691,13 @@ function GraphVisualization({
       const nx = node.x != null ? node.x : width / 2;
       const ny = node.y != null ? node.y : height / 2;
       const t = createFocusZoomTransform(nx, ny, width, height, k);
-      d3.select(svgRef.current).transition().duration(450).call(zoom.transform, t);
+      d3.select(svgRef.current).call(zoom.transform, t);
     }
 
     svg.call(zoom);
     zoomBehaviorRef.current = zoom;
 
-    if (FADE_MS > 0 && !skipPlaybackRootCrossfade) {
-      g.transition().duration(FADE_MS).style('opacity', 1);
-    }
+    // no fade-in
 
     // Create a map of nodes for reference
     const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
@@ -903,9 +880,7 @@ function GraphVisualization({
 
         // Show tooltip with node details
         const tooltip = d3.select('.tooltip');
-        tooltip.transition()
-          .duration(200)
-          .style('opacity', .9);
+        tooltip.style('opacity', 0.9);
 
         let tooltipContent = '';
         try {
@@ -1011,9 +986,7 @@ function GraphVisualization({
       }
 
       const tooltip = d3.select('.tooltip');
-      tooltip.transition()
-        .duration(200)
-        .style('opacity', .9);
+      tooltip.style('opacity', 0.9);
 
       const sourceLabel = sourceNode.label || 'Unnamed Node';
       const targetLabel = targetNode.label || 'Unnamed Node';
@@ -1033,8 +1006,6 @@ function GraphVisualization({
 
     function handleLinkMouseout() {
       d3.select('.tooltip')
-        .transition()
-        .duration(500)
         .style('opacity', 0);
     }
 
@@ -1083,10 +1054,7 @@ function GraphVisualization({
         <span style="opacity:0.85">Strength: ${strengthLabel}</span>
       `;
   
-      d3.select('.tooltip')
-        .transition()
-        .duration(200)
-        .style('opacity', 0.9);
+      d3.select('.tooltip').style('opacity', 0.9);
       tooltip.html(tooltipContent);
       scheduleTooltipPosition(event.currentTarget);
     }
@@ -1130,15 +1098,11 @@ function GraphVisualization({
         const tooltip = d3.select('.tooltip');
         
         if (!selectedNodeIds.current.has(wrappedNode.id)) {
-          tooltip.transition()
-            .duration(200)
-            .style('opacity', 0);
+          tooltip.style('opacity', 0);
           return;
         }
 
-        tooltip.transition()
-          .duration(200)
-          .style('opacity', .9);
+        tooltip.style('opacity', 0.9);
 
         // Build tooltip content based on node type
         let tooltipContent;
@@ -1452,7 +1416,7 @@ function GraphVisualization({
       selectedLinkKeyRef.current = null;
       setSelectedNodes([]);
       updateHighlighting();
-      tooltip.transition().duration(200).style('opacity', 0);
+      tooltip.style('opacity', 0);
     });
 
     // Drag event handlers
@@ -1594,10 +1558,7 @@ function GraphVisualization({
             <span style="opacity:0.85">Strength: ${strengthLabel}</span>
           `;
 
-          d3.select('.tooltip')
-            .transition()
-            .duration(200)
-            .style('opacity', 0.9);
+          d3.select('.tooltip').style('opacity', 0.9);
           tooltip.html(tooltipContent);
           scheduleTooltipPosition(event.currentTarget);
         });
@@ -1670,9 +1631,7 @@ function GraphVisualization({
 
           // Show tooltip with node details
           const tooltip = d3.select('.tooltip');
-          tooltip.transition()
-            .duration(200)
-            .style('opacity', .9);
+          tooltip.style('opacity', 0.9);
 
           let tooltipContent = '';
           try {
@@ -1963,7 +1922,7 @@ function GraphVisualization({
         playbackScrubToken !== lastPlaybackFadeTokenRef.current
       ) {
         lastPlaybackFadeTokenRef.current = playbackScrubToken;
-        if (EASE_SCRUB_MS > 0) {
+        {
           const removedComm = prevCommIds
             ? new Set(
               Array.from(prevCommIds).filter((id) => !buildCommunityIdSet(visibleElements).has(id))
@@ -2021,47 +1980,23 @@ function GraphVisualization({
               });
             }
 
-            nodes.each(function easeNewCommunity(d) {
-              if (!newComm.has(String(d.id))) return;
-              const el = d3.select(this);
-              el.style('opacity', 0);
-              el.transition()
-                .duration(EASE_SCRUB_MS)
-                .ease(d3.easeCubicOut)
-                .style('opacity', 1);
-            });
-            links.each(function easeNewLink(d) {
-              const k = linkKeyForProcessedCommunityLink(d);
-              if (!newLk.has(k)) return;
-              const el = d3.select(this);
-              el.style('opacity', 0);
-              el.transition()
-                .duration(EASE_SCRUB_MS)
-                .ease(d3.easeCubicOut)
-                .style('opacity', 1);
-            });
+            // no ease-in/out transitions
             if (playbackEaseHighlightTimerRef.current) {
               window.clearTimeout(playbackEaseHighlightTimerRef.current);
             }
-            playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
+            if (playbackEaseHighlightTimerRef.current) {
+              window.clearTimeout(playbackEaseHighlightTimerRef.current);
               playbackEaseHighlightTimerRef.current = null;
-              playbackStepHotNodeIdsRef.current = new Set();
-              playbackStepHotLinkKeysRef.current = new Set();
-              updateHighlighting();
-            }, EASE_SCRUB_MS + 24);
+            }
+            playbackStepHotNodeIdsRef.current = new Set();
+            playbackStepHotLinkKeysRef.current = new Set();
+            updateHighlighting();
           }
         }
       }
 
-      // Fade out any previous root we kept (playback scrubs).
-      const prevLayer = svg.select('g.graph-root--prev');
-      if (!prevLayer.empty()) {
-        prevLayer
-          .transition()
-          .duration(FADE_MS)
-          .style('opacity', 0)
-          .remove();
-      }
+      // no fade-out transitions
+      svg.selectAll('g.graph-root--prev').remove();
     };
 
     function resetCanvasToFullView() {
@@ -2112,8 +2047,6 @@ function GraphVisualization({
         const applyTransform = (t) => {
           skipZoomClusteringRef.current = true;
           d3.select(svgRef.current)
-            .transition()
-            .duration(450)
             .call(zoom.transform, t)
             .on('end', () => {
               skipZoomClusteringRef.current = false;
