@@ -1946,7 +1946,6 @@ function GraphVisualization({
         preservedPlaybackNodePositionsRef.current.clear();
       } else if (communitiesRef.current?.size) {
         const m = preservedPlaybackNodePositionsRef.current;
-        m.clear();
         for (const c of communitiesRef.current.values()) {
           for (const n of c.nodes || []) {
             if (n?.id == null) continue;
