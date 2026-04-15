@@ -801,6 +801,10 @@ function GraphVisualization({
       );
       return (
         '<div class="graph-tooltip-explode-wrap">' +
+        '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
+        'data-testid="graph-tooltip-explode-btn" ' +
+        `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +
+        '💥 Explode subgraph</button>' +
         '<div class="graph-tooltip-explode-guidance">' +
         '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-preset">' +
         'Guidance (optional)</label>' +
@@ -829,11 +833,7 @@ function GraphVisualization({
         'aria-label="Number of new concepts for explode subgraph" ' +
         'data-testid="graph-tooltip-explode-count" />' +
         `<span class="graph-tooltip-explode-count-value" data-testid="graph-tooltip-explode-count-value">${countVal}</span>` +
-        '</div></div>' +
-        '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
-        'data-testid="graph-tooltip-explode-btn" ' +
-        `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +
-        '💥 Explode subgraph</button></div>'
+        '</div></div></div>'
       );
     }
 
