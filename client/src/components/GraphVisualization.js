@@ -29,6 +29,14 @@ const PLAYBACK_STEP_HIGHLIGHT_MS = 1300;
 
 /** Matches `forceManyBody().strength(...)` on the graph simulation in this file. */
 const COMMUNITY_SIM_CHARGE_DEFAULT = -200;
+/**
+ * Softer forces while explode warp reheats the sim (disjoint-style; see startExplodeNodeStretchAnimation).
+ * https://observablehq.com/@d3/disjoint-force-directed-graph
+ */
+const COMMUNITY_SIM_VELOCITY_DECAY_EXPLODE = 0.86;
+const COMMUNITY_SIM_CHARGE_EXPLODE = -52;
+const COMMUNITY_SIM_ALPHA_TARGET_EXPLODE = 0.055;
+const COMMUNITY_SIM_ALPHA_MIN_EXPLODE = 0.2;
 
 /** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
 function pathHasConsecutiveGraphLinks(pathIds, links) {
@@ -213,25 +221,19 @@ function GraphVisualization({
     const sim = communityForceSimulationRef.current;
     if (sim) {
       try {
-        // Disjoint-style gentle reheat: high velocityDecay, mild many-body, low alphaTarget
-        // (see https://observablehq.com/@d3/disjoint-force-directed-graph ).
-        const explodeCharge = -52;
-        const explodeVelocityDecay = 0.86;
-        const explodeAlphaTarget = 0.055;
-        const explodeAlphaMin = 0.2;
         explodeSimRestoreRef.current = {
           velocityDecay: sim.velocityDecay(),
           chargeTweaked: false,
         };
-        sim.velocityDecay(explodeVelocityDecay);
+        sim.velocityDecay(COMMUNITY_SIM_VELOCITY_DECAY_EXPLODE);
         const ch = sim.force('charge');
         if (ch && typeof ch.strength === 'function') {
-          ch.strength(explodeCharge);
+          ch.strength(COMMUNITY_SIM_CHARGE_EXPLODE);
           explodeSimRestoreRef.current.chargeTweaked = true;
         }
         sim
-          .alphaTarget(explodeAlphaTarget)
-          .alpha(Math.max(sim.alpha(), explodeAlphaMin))
+          .alphaTarget(COMMUNITY_SIM_ALPHA_TARGET_EXPLODE)
+          .alpha(Math.max(sim.alpha(), COMMUNITY_SIM_ALPHA_MIN_EXPLODE))
           .restart();
       } catch (_) {
         explodeSimRestoreRef.current = null;
