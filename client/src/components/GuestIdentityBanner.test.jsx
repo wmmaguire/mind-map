@@ -92,12 +92,13 @@ describe('GuestIdentityBanner', () => {
     expect(accountBtn.textContent).toMatch(/acct/);
   });
 
-  it('shows View menu on /visualize with Playback and Search toggles', () => {
+  it('shows View menu on /visualize with Playback, Search, and Insights toggles', () => {
     render(wrap(<GuestIdentityBanner />, { route: '/visualize' }));
     fireEvent.click(screen.getByRole('button', { name: /^View\b/i }));
     expect(screen.getByRole('menu')).toBeInTheDocument();
     expect(screen.getByRole('menuitemcheckbox', { name: /Playback/i })).toBeInTheDocument();
     expect(screen.getByRole('menuitemcheckbox', { name: /Search/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemcheckbox', { name: /^Insights$/i })).toBeInTheDocument();
   });
 
   it('shows Go to home on /visualize and hides it on landing', () => {

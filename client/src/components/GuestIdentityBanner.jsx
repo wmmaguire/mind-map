@@ -51,8 +51,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
   const {
     playbackStripVisible,
     graphSearchBarVisible,
+    insightsPanelVisible,
     togglePlaybackStrip,
     toggleGraphSearchBar,
+    toggleInsightsPanel,
   } = useGraphChromeUi();
   const { sharePayload } = useGraphHistoryUi();
   const onVisualizeRoute = pathname === '/visualize';
@@ -247,6 +249,18 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                         {graphSearchBarVisible ? '✓' : '○'}
                       </span>
                       Search
+                    </button>
+                    <button
+                      type="button"
+                      className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                      role="menuitemcheckbox"
+                      aria-checked={insightsPanelVisible}
+                      onClick={() => toggleInsightsPanel()}
+                    >
+                      <span className="guest-identity-banner__menu-check" aria-hidden>
+                        {insightsPanelVisible ? '✓' : '○'}
+                      </span>
+                      Insights
                     </button>
                   </div>
                 ) : null}
@@ -642,6 +656,18 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                       {graphSearchBarVisible ? '✓' : '○'}
                     </span>
                     Search
+                  </button>
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
+                    role="menuitemcheckbox"
+                    aria-checked={insightsPanelVisible}
+                    onClick={() => toggleInsightsPanel()}
+                  >
+                    <span className="guest-identity-banner__menu-check" aria-hidden>
+                      {insightsPanelVisible ? '✓' : '○'}
+                    </span>
+                    Insights
                   </button>
                 </div>
               ) : null}

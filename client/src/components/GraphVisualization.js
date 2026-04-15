@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
@@ -14,6 +14,7 @@ import {
   createFocusZoomTransform,
   discoveryFocusPoint,
 } from '../utils/graphDiscovery';
+import { computeGraphInsights } from '../utils/graphInsights';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
 import { pickCommunityAnchorNode } from '../utils/clusterAnchor';
 import {
@@ -338,7 +339,7 @@ function GraphVisualization({
   const communitiesRef = useRef(null);
 
   const { sessionId } = useSession();
-  const { graphSearchBarVisible } = useGraphChromeUi();
+  const { graphSearchBarVisible, insightsPanelVisible } = useGraphChromeUi();
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -555,6 +556,39 @@ function GraphVisualization({
     });
     setDiscoveryFocusIndex((idx + 1) % matches.length);
   }, [discoveryQuery, discoveryFocusIndex, data, width, height]);
+
+  const graphInsights = useMemo(() => {
+    if (!insightsPanelVisible) return null;
+    return computeGraphInsights(data || { nodes: [], links: [] });
+  }, [insightsPanelVisible, data]);
+
+  const focusInsightNodeById = useCallback(
+    (nodeId) => {
+      if (!data?.nodes?.length) return;
+      const idStr = String(nodeId);
+      const node = data.nodes.find((n) => String(n.id) === idStr);
+      if (!node) return;
+      const fbX = width / 2;
+      const fbY = height / 2;
+      const { x: nx, y: ny } = discoveryFocusPoint(
+        node,
+        communitiesRef.current,
+        fbX,
+        fbY
+      );
+      const kCur = graphTransformRef.current?.k;
+      const k =
+        typeof kCur === 'number' && kCur > 0 && Number.isFinite(kCur) ? kCur : 1.2;
+      const t = createFocusZoomTransform(nx, ny, width, height, k);
+      applyProgrammaticZoomTransformRef.current?.(t);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          applyDiscoveryFocusNodeUiRef.current?.(node);
+        });
+      });
+    },
+    [data, width, height]
+  );
 
   // Add new refs without modifying existing state
   const previousZoomRef = useRef(1);
@@ -3535,6 +3569,79 @@ function GraphVisualization({
           >
             Show all
           </button>
+        </div>
+      ) : null}
+
+      {insightsPanelVisible && graphInsights ? (
+        <div
+          className="graph-insights-panel"
+          role="region"
+          aria-label="Graph insights"
+          data-testid="graph-insights-panel"
+        >
+          <div className="graph-insights-panel__header">Network snapshot</div>
+          <dl className="graph-insights-panel__stats">
+            <div className="graph-insights-panel__stat">
+              <dt>Nodes</dt>
+              <dd>{graphInsights.nodeCount}</dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Edges</dt>
+              <dd>{graphInsights.edgeCount}</dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Density</dt>
+              <dd>{graphInsights.density.toFixed(4)}</dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Components</dt>
+              <dd>
+                {graphInsights.componentCount}
+                <span className="graph-insights-panel__sub">
+                  {' '}
+                  (largest {graphInsights.largestComponentSize})
+                </span>
+              </dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Degree</dt>
+              <dd>
+                {graphInsights.degreeMin} / {graphInsights.degreeMedian} /{' '}
+                {graphInsights.degreeMax}
+                <span className="graph-insights-panel__sub"> min / med / max</span>
+              </dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Avg clustering</dt>
+              <dd>{graphInsights.averageClustering.toFixed(3)}</dd>
+            </div>
+            <div className="graph-insights-panel__stat">
+              <dt>Isolates</dt>
+              <dd>{graphInsights.isolateCount}</dd>
+            </div>
+          </dl>
+          {graphInsights.topByDegree.length ? (
+            <div className="graph-insights-panel__top">
+              <div className="graph-insights-panel__top-title">Top by degree</div>
+              <ul className="graph-insights-panel__top-list">
+                {graphInsights.topByDegree.map((row) => (
+                  <li key={row.id} className="graph-insights-panel__top-row">
+                    <span className="graph-insights-panel__top-label" title={row.label}>
+                      {row.label}
+                    </span>
+                    <span className="graph-insights-panel__top-deg">{row.degree}</span>
+                    <button
+                      type="button"
+                      className="graph-insights-panel__focus"
+                      onClick={() => focusInsightNodeById(row.id)}
+                    >
+                      Focus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

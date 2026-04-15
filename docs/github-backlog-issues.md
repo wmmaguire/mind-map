@@ -147,7 +147,7 @@ Refs: #20 #46 #32 #64
 - **Minimap interaction** — Click to **center** the main view on a region (preserves zoom **k**); drag to **pan**. Minimap **`pointer-events: auto`** (was `none` while overview was display-only). Overview SVG: **`role="img"`**, descriptive **`aria-label`**. Programmatic zoom uses **`applyProgrammaticZoomTransformRef`** (same **`d3.zoom`** instance as **`svg.call(zoom)`**). Effect cleanup captures minimap element for **`exhaustive-deps`**.
 - **Focus next correctness** — Search matches return raw **`data.nodes`**; layout/simulation positions **community** datums. **`discoveryFocusPoint`** (**`graphDiscovery.js`**) maps a matched node to its owning community’s **`x`/`y`** so pan targets real on-screen positions (avoids placeholder **`(0,0)`** collapsing every match to the viewport center). Tests in **`graphDiscovery.test.js`**.
 - **Focus next UX** — After zoom, **selects** the focused graph node (**`selectedNodeIds`** / **`selectedNodeId`**), runs **`updateHighlighting`** (including **merged clusters** when any member id is selected), fills the **docked `graph-canvas-tooltip`**, and positions it like a node click. **`setSelectedNodes` is intentionally not called** here: **`selectedNodes`** is in the D3 **`useEffect`** dependency array; updating it **tears down** the graph and **`tooltip.remove()`**, which hid selection + tooltip. **Follow-up:** decouple selection React state from that effect (**backlog issue** below / **#51**).
-- **Chrome UI** — **`GraphChromeUiProvider`** (**`client/src/context/GraphChromeUiContext.jsx`**) persists **`playbackStripVisible`** and **`graphSearchBarVisible`** in **`localStorage`** (`mindmap.chrome.playbackStripVisible`, `mindmap.chrome.graphSearchBarVisible`, default **on**). **View** menu in **`GuestIdentityBanner`** toggles **Playback strip** and **Graph search**; **`GraphPlaybackBanner`** and **`GraphVisualization`** consume. Provider wraps the app in **`client/src/index.js`** (inside **`SessionProvider`** / **`AuthIdentityBridge`** per current tree).
+- **Chrome UI** — **`GraphChromeUiProvider`** (**`client/src/context/GraphChromeUiContext.jsx`**) persists **`playbackStripVisible`**, **`graphSearchBarVisible`**, and **`insightsPanelVisible`** in **`localStorage`** (`mindmap.chrome.playbackStripVisible`, `mindmap.chrome.graphSearchBarVisible`, default **on**; `mindmap.chrome.insightsPanelVisible`, default **off**, **#83**). **View** menu in **`GuestIdentityBanner`** toggles **Playback strip**, **Graph search**, and **Insights**; **`GraphPlaybackBanner`** and **`GraphVisualization`** consume. Provider wraps the app in **`client/src/index.js`** (inside **`SessionProvider`** / **`AuthIdentityBridge`** per current tree).
 
 **Backlog (#73 — outside current #38 scope; add comments on refs below):**
 
@@ -159,7 +159,7 @@ Refs: #20 #46 #32 #64
 6. **Performance & scale** — Profile **medium/large** graphs (search + minimap **rAF**, merge/split + simulation).
 7. **D3 / `updateVisualization` hardening** — Stale selections after merge/split; **`selectedNodes` in D3 `useEffect` deps** forces full rebuild on selection state changes — see **backlog: Decouple D3 setup from React `selectedNodes`** below and **#51**.
 8. **Docs** — This section + **`client/README.md`** module bullets (supersedes #73 checklist item “Docs”).
-9. **Read-only / share** — Product policy: default on/off for discovery bar + minimap for **`readOnly`** viewers (today available unless user hides **Search** via **View**); overlap **#74** share polish. *(GitHub **#39** closed; policy still tracked here / #74.)*
+9. **Read-only / share** — Product policy: default on/off for discovery bar + minimap for **`readOnly`** viewers (today available unless user hides **Search** via **View**); overlap **#74** share polish. *(GitHub **#39** closed; policy still tracked here / #74.)* **Insights (#83 v1)** uses the same **View** toggle for all modes; default-off panel still follows **localStorage** per browser.
 
 **Follow-ups outside this ticket (Apr 2026, post–minimap / Focus next slice):**
 
@@ -184,6 +184,39 @@ Refs: #20 #46 #32 #64
 - **#74** — *Apr 2026: Read-only/share policy for discovery chrome still open (#73 item 9); minimap is now interactive for all modes that show it.*
 - **#70** — *Apr 2026: Time-travel UX may intersect discovery (e.g. search during playback); #73 neighborhood/lenses are separate product tracks.*
 - **#40** — *Apr 2026: Chrome toggles and discovery UI are part of shell/graph polish; optional toasts for search “no matches” align with #50.*
+
+### Interactive network insights — GitHub **#83** (v1 shipped, branch `issue-83-graph-insights`) / phase 2 on **#83** + **#95**
+
+**Shipped (v1):**
+
+- **`client/src/utils/graphInsights.js`** — **`computeGraphInsights`**, **`graphInsightNodeId`**: undirected **multigraph** (parallel links increase degree), optional **`link.strength`** for weighted degree; **density**, **components**, degree **min/median/max**, **average local clustering** (k≥2), **isolates**, **top 10 by degree**. Tests: **`graphInsights.test.js`**.
+- **`GraphChromeUiContext`** — **`insightsPanelVisible`**, **`toggleInsightsPanel`**, **`setInsightsPanelVisible`**; **`localStorage`** **`mindmap.chrome.insightsPanelVisible`** (default **off**).
+- **`GuestIdentityBanner`** — **View → Insights** (`menuitemcheckbox`) in both chrome variants.
+- **`GraphVisualization`** — **Network snapshot** panel (`role="region"`, **`data-testid="graph-insights-panel"`**): metrics + **Focus** per top node. **Focus** = same path as discovery **Focus next**: **`discoveryFocusPoint`** + **`createFocusZoomTransform`** + **`applyProgrammaticZoomTransformRef`** + **rAF×2** + **`applyDiscoveryFocusNodeUiRef`** (**`setSelectedNodes` omitted**, **#94**). Metrics **memoized** only while the panel is visible.
+
+**Still on epic #83 / child backlog #96 (outside v1):**
+
+| Topic | Notes | Track on |
+| --- | --- | --- |
+| **Global: diameter / avg shortest path** | Exact or **sampled** on large graphs | **#83** / **#95** |
+| **Centrality** | Betweenness (sampled), PageRank / eigenvector | **#83** / **#95** |
+| **Pattern detection** | Bridges, articulation points, hub/authority, weak ties (strength vs betweenness) | **#83** / **#95**; ties **#80** |
+| **Community-aware lists** | Top communities, membership (#81 chips / **#91**) | **#91**, **#83** |
+| **Playback-linked metrics** | Trends of density / components / hubs across **`buildGraphAtPlaybackTime`** steps; “what changed” between steps | **#70**, **#83** |
+| **Click metric → highlight subgraph** | e.g. component, k-hop ego from panel | **#73**, **#83** |
+| **Performance** | Web worker, progressive compute, snapshot **cache** (hash nodes/links/times), server precompute for huge graphs | **#95** |
+| **Weighted degree in UI** | v1 uses strength internally for ranking weights; optional column or tooltip | **#83** |
+| **Read-only default** | Align Insights default with **#74** / #73 item 9 if product wants | **#74** |
+
+**Suggested GitHub comments (Apr 2026, post–#83 v1):**
+
+- **#83** — *Phase 1 merged on `issue-83-graph-insights`: View→Insights, `graphInsights.js`, panel + Focus (discovery parity). Remaining epic items + scale work tracked in body + **#95**.*
+- **#73** — *Insights Focus reuses discovery zoom/focus refs; future “metric → highlight neighborhood” belongs here alongside N-hop / lenses.*
+- **#70** — *#83 proposed playback **metric trends**; v1 is snapshot-only. Consider `computeGraphInsights(buildGraphAtPlaybackTime(...))` per step with caching.*
+- **#74** — *Insights toggle is per-browser `localStorage` for share viewers too; product may want default-off or hidden chrome for read-only.*
+- **#91** — *v1 ranks by degree/weighted degree; phase 2 can surface cluster-level stats or align chip anchors with insight selections.*
+- **#94** — *Insights **Focus** matches **Focus next** (no `setSelectedNodes`); decoupling D3 deps allows syncing React selection if needed.*
+- **#57** — *New insights region + focus buttons: follow up with live region on Focus, keyboard traversal of top list.*
 
 ### Backlog: Decouple D3 graph effect from React `selectedNodes` — **GitHub #94**
 
