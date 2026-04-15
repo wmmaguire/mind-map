@@ -82,7 +82,6 @@ function GraphVisualization({
   /** GitHub #82 — branch extrapolation (POST /api/generate-branch). */
   const [brIterations, setBrIterations] = useState(2);
   const [brMemoryK, setBrMemoryK] = useState(3);
-  const [brCrossLinks, setBrCrossLinks] = useState(1);
   /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
   const [guidancePreset, setGuidancePreset] = useState('none');
   const [guidanceCustomText, setGuidanceCustomText] = useState('');
@@ -1989,7 +1988,6 @@ function GraphVisualization({
             iterations: brIterations,
             memoryK: brMemoryK,
             nodesPerIteration: numNodesToAdd,
-            crossLinksPerIteration: brCrossLinks,
             ...(g ? { generationContext: g } : {})
           }
         });
@@ -2111,8 +2109,6 @@ function GraphVisualization({
           numCyclesCompleted: cyclesCompleted,
           branchMemoryK:
             expansionAlgorithm === 'branchExtrapolation' ? brMemoryK : undefined,
-          branchCrossLinksPerIteration:
-            expansionAlgorithm === 'branchExtrapolation' ? brCrossLinks : undefined,
           connectionsPerNewNode:
             expansionAlgorithm === 'randomizedGrowth'
               ? rgConnectionsPerNewNode
@@ -3219,24 +3215,6 @@ function GraphVisualization({
                           Math.min(
                             40,
                             Math.max(1, parseInt(e.target.value, 10) || 1)
-                          )
-                        );
-                        setGenerateSubmitError(null);
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Cross-links per iteration:
-                    <input
-                      type="number"
-                      min="0"
-                      max="6"
-                      value={brCrossLinks}
-                      onChange={e => {
-                        setBrCrossLinks(
-                          Math.min(
-                            6,
-                            Math.max(0, parseInt(e.target.value, 10) || 0)
                           )
                         );
                         setGenerateSubmitError(null);
