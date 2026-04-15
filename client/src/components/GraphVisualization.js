@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  useContext,
+} from 'react';
 import PropTypes from 'prop-types';
 import * as d3 from 'd3';
 import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
+import { GraphTitleContext } from '../context/GraphTitleContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
 import {
   resolveGenerationContext,
@@ -14,7 +22,11 @@ import {
   createFocusZoomTransform,
   discoveryFocusPoint,
 } from '../utils/graphDiscovery';
-import { computeGraphInsights } from '../utils/graphInsights';
+import {
+  computeGraphInsights,
+  buildGraphInsightAssessPayload,
+  INSIGHT_ASSESS_TONE_OPTIONS,
+} from '../utils/graphInsights';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
 import { pickCommunityAnchorNode } from '../utils/clusterAnchor';
 import {
@@ -28,6 +40,20 @@ import './GraphVisualization.css';
 
 /** How long to keep orange “new in this step” styling after a history scrub (no D3 transition). */
 const PLAYBACK_STEP_HIGHLIGHT_MS = 1300;
+
+/** @param {string | null | undefined} graphTitle */
+function buildNetworkAssessmentFilename(graphTitle) {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+  const raw =
+    typeof graphTitle === 'string' && graphTitle.trim()
+      ? graphTitle.trim()
+      : 'network-assessment';
+  const slug = raw
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  return `${slug || 'network-assessment'}-${stamp}.txt`;
+}
 
 /** Matches `forceManyBody().strength(...)` on the graph simulation in this file. */
 const COMMUNITY_SIM_CHARGE_DEFAULT = -200;
@@ -318,6 +344,18 @@ function GraphVisualization({
   /** GitHub #38: label search + minimap (refs avoid re-running the D3 effect on each keystroke). */
   const [discoveryQuery, setDiscoveryQuery] = useState('');
   const [discoveryFocusIndex, setDiscoveryFocusIndex] = useState(0);
+  /** Insights panel: LLM assessment from centrality-notable nodes. */
+  const [insightsAssessTone, setInsightsAssessTone] = useState('jung');
+  const [insightsAssessCustomTone, setInsightsAssessCustomTone] = useState('');
+  const [insightsAssessment, setInsightsAssessment] = useState('');
+  const [insightsAssessLoading, setInsightsAssessLoading] = useState(false);
+  const [insightsAssessError, setInsightsAssessError] = useState(null);
+  /** Top by degree list: minimized (collapsed) by default. */
+  const [insightsTopByDegreeExpanded, setInsightsTopByDegreeExpanded] =
+    useState(false);
+  /** Transient Copy / Save feedback under the assessment toolbar. */
+  const [insightsAssessActionFeedback, setInsightsAssessActionFeedback] =
+    useState(null);
   const discoveryQueryRef = useRef('');
   /** Set in D3 effect: `zoom.transform` must use the same zoom instance as `svg.call(zoom)`. */
   const applyProgrammaticZoomTransformRef = useRef(null);
@@ -340,6 +378,7 @@ function GraphVisualization({
 
   const { sessionId } = useSession();
   const { graphSearchBarVisible, insightsPanelVisible } = useGraphChromeUi();
+  const graphTitleContext = useContext(GraphTitleContext);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -589,6 +628,111 @@ function GraphVisualization({
     },
     [data, width, height]
   );
+
+  const handleInsightsAssess = useCallback(async () => {
+    if (!data?.nodes?.length) return;
+    if (insightsAssessTone === 'custom' && insightsAssessCustomTone.trim().length < 8) {
+      setInsightsAssessError('Custom voice: enter at least 8 characters.');
+      return;
+    }
+    setInsightsAssessLoading(true);
+    setInsightsAssessError(null);
+    setInsightsAssessActionFeedback(null);
+    try {
+      const payload = buildGraphInsightAssessPayload(data, 6);
+      const body = {
+        tone: insightsAssessTone,
+        ...payload,
+      };
+      if (insightsAssessTone === 'custom') {
+        body.customTone = insightsAssessCustomTone.trim();
+      }
+      const res = await apiRequest('/api/graph-insights-assess', {
+        method: 'POST',
+        json: body,
+      });
+      if (!res.success) {
+        throw new Error(res.details || res.error || 'Assessment failed');
+      }
+      setInsightsAssessment(
+        typeof res.assessment === 'string' ? res.assessment : ''
+      );
+      setInsightsAssessActionFeedback(null);
+    } catch (err) {
+      setInsightsAssessment('');
+      setInsightsAssessError(getApiErrorMessage(err));
+    } finally {
+      setInsightsAssessLoading(false);
+    }
+  }, [data, insightsAssessTone, insightsAssessCustomTone]);
+
+  const copyInsightsAssessment = useCallback(async () => {
+    const text = insightsAssessment;
+    if (!text) return;
+    const flash = (message) => {
+      setInsightsAssessActionFeedback({ message, variant: 'default' });
+      window.setTimeout(() => setInsightsAssessActionFeedback(null), 2500);
+    };
+    const flashErr = (message) => {
+      setInsightsAssessActionFeedback({ message, variant: 'error' });
+      window.setTimeout(() => setInsightsAssessActionFeedback(null), 4000);
+    };
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        flash('Copied to clipboard');
+        return;
+      }
+    } catch {
+      /* fallback */
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) {
+        flash('Copied to clipboard');
+      } else {
+        flashErr('Could not copy — select the text manually');
+      }
+    } catch {
+      flashErr('Could not copy — select the text manually');
+    }
+  }, [insightsAssessment]);
+
+  const saveInsightsAssessment = useCallback(() => {
+    if (!insightsAssessment) return;
+    const name = buildNetworkAssessmentFilename(graphTitleContext?.graphTitle);
+    const blob = new Blob([insightsAssessment], {
+      type: 'text/plain;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setInsightsAssessActionFeedback({
+      message: 'Download started',
+      variant: 'default',
+    });
+    window.setTimeout(() => setInsightsAssessActionFeedback(null), 2500);
+  }, [insightsAssessment, graphTitleContext?.graphTitle]);
+
+  const closeInsightsAssessment = useCallback(() => {
+    setInsightsAssessment('');
+    setInsightsAssessActionFeedback(null);
+  }, []);
 
   // Add new refs without modifying existing state
   const previousZoomRef = useRef(1);
@@ -3579,7 +3723,118 @@ function GraphVisualization({
           aria-label="Graph insights"
           data-testid="graph-insights-panel"
         >
-          <div className="graph-insights-panel__header">Network snapshot</div>
+          <div className="graph-insights-panel__header-row">
+            <div className="graph-insights-panel__header">Network snapshot</div>
+            <div className="graph-insights-panel__assess-controls">
+              <label htmlFor="insights-assess-tone" className="graph-insights-panel__assess-label">
+                Voice
+              </label>
+              <select
+                id="insights-assess-tone"
+                className="graph-insights-panel__assess-select"
+                data-testid="graph-insights-assess-tone"
+                value={insightsAssessTone}
+                onChange={(e) => setInsightsAssessTone(e.target.value)}
+                disabled={insightsAssessLoading}
+              >
+                {INSIGHT_ASSESS_TONE_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="graph-insights-panel__assess-submit"
+                data-testid="graph-insights-assess"
+                onClick={() => handleInsightsAssess()}
+                disabled={insightsAssessLoading || !graphInsights.nodeCount}
+                title="Generate an interpretive summary from notable nodes (degree, betweenness, closeness, eigenvector); uses OpenAI on the server."
+              >
+                {insightsAssessLoading ? 'Assessing…' : 'Assess graph'}
+              </button>
+            </div>
+          </div>
+          {insightsAssessTone === 'custom' ? (
+            <div className="graph-insights-panel__custom-tone-wrap">
+              <label htmlFor="insights-assess-custom" className="graph-insights-panel__assess-label">
+                Custom voice (how the write-up should sound)
+              </label>
+              <textarea
+                id="insights-assess-custom"
+                className="graph-insights-panel__custom-tone"
+                data-testid="graph-insights-assess-custom"
+                rows={2}
+                maxLength={4000}
+                placeholder="e.g. Dry academic sociology; or playful podcast banter; avoid inventing facts…"
+                value={insightsAssessCustomTone}
+                onChange={(e) => setInsightsAssessCustomTone(e.target.value)}
+                disabled={insightsAssessLoading}
+              />
+            </div>
+          ) : null}
+          {insightsAssessError ? (
+            <div className="graph-insights-panel__assess-error" role="alert">
+              {insightsAssessError}
+            </div>
+          ) : null}
+          {insightsAssessment ? (
+            <div
+              className="graph-insights-panel__assessment"
+              data-testid="graph-insights-assessment"
+            >
+              <div className="graph-insights-panel__assessment-header">
+                <div className="graph-insights-panel__assessment-title">
+                  Interpretive assessment
+                </div>
+                <div
+                  className="graph-insights-panel__assessment-actions"
+                  role="toolbar"
+                  aria-label="Assessment actions"
+                >
+                  <button
+                    type="button"
+                    className="graph-insights-panel__assessment-action"
+                    data-testid="graph-insights-assessment-copy"
+                    onClick={() => copyInsightsAssessment()}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    className="graph-insights-panel__assessment-action"
+                    data-testid="graph-insights-assessment-save"
+                    onClick={() => saveInsightsAssessment()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="graph-insights-panel__assessment-action graph-insights-panel__assessment-action--close"
+                    data-testid="graph-insights-assessment-close"
+                    onClick={() => closeInsightsAssessment()}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              {insightsAssessActionFeedback ? (
+                <div
+                  className={
+                    insightsAssessActionFeedback.variant === 'error'
+                      ? 'graph-insights-panel__assessment-action-msg graph-insights-panel__assessment-action-msg--error'
+                      : 'graph-insights-panel__assessment-action-msg'
+                  }
+                  role="status"
+                >
+                  {insightsAssessActionFeedback.message}
+                </div>
+              ) : null}
+              <div className="graph-insights-panel__assessment-body">
+                {insightsAssessment}
+              </div>
+            </div>
+          ) : null}
           <dl className="graph-insights-panel__stats">
             <div className="graph-insights-panel__stat">
               <dt>Nodes</dt>
@@ -3621,25 +3876,53 @@ function GraphVisualization({
             </div>
           </dl>
           {graphInsights.topByDegree.length ? (
-            <div className="graph-insights-panel__top">
-              <div className="graph-insights-panel__top-title">Top by degree</div>
-              <ul className="graph-insights-panel__top-list">
-                {graphInsights.topByDegree.map((row) => (
-                  <li key={row.id} className="graph-insights-panel__top-row">
-                    <span className="graph-insights-panel__top-label" title={row.label}>
-                      {row.label}
-                    </span>
-                    <span className="graph-insights-panel__top-deg">{row.degree}</span>
-                    <button
-                      type="button"
-                      className="graph-insights-panel__focus"
-                      onClick={() => focusInsightNodeById(row.id)}
-                    >
-                      Focus
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <div
+              className={`graph-insights-panel__top${
+                insightsTopByDegreeExpanded
+                  ? ' graph-insights-panel__top--expanded'
+                  : ' graph-insights-panel__top--collapsed'
+              }`}
+            >
+              <button
+                type="button"
+                className="graph-insights-panel__top-toggle"
+                data-testid="graph-insights-top-by-degree-toggle"
+                onClick={() => setInsightsTopByDegreeExpanded((v) => !v)}
+                aria-expanded={insightsTopByDegreeExpanded}
+                aria-controls="insights-top-by-degree-list"
+                id="insights-top-by-degree-heading"
+              >
+                <span className="graph-insights-panel__top-chevron" aria-hidden>
+                  {insightsTopByDegreeExpanded ? '▼' : '▶'}
+                </span>
+                <span className="graph-insights-panel__top-title">Top by degree</span>
+                <span className="graph-insights-panel__top-meta">
+                  ({graphInsights.topByDegree.length})
+                </span>
+              </button>
+              {insightsTopByDegreeExpanded ? (
+                <ul
+                  id="insights-top-by-degree-list"
+                  className="graph-insights-panel__top-list"
+                  aria-labelledby="insights-top-by-degree-heading"
+                >
+                  {graphInsights.topByDegree.map((row) => (
+                    <li key={row.id} className="graph-insights-panel__top-row">
+                      <span className="graph-insights-panel__top-label" title={row.label}>
+                        {row.label}
+                      </span>
+                      <span className="graph-insights-panel__top-deg">{row.degree}</span>
+                      <button
+                        type="button"
+                        className="graph-insights-panel__focus"
+                        onClick={() => focusInsightNodeById(row.id)}
+                      >
+                        Focus
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
         </div>

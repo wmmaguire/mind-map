@@ -41,7 +41,7 @@ Resolved in `server/config.js` (loaded after `dotenv` via `import 'dotenv/config
   This directory holds `uploads/`, `metadata/`, and `graphs/` on disk.  
   If unset: **development** uses the `server/` folder (same directory as `config.js`); **production** defaults to `/opt/render/project/src/server` (Render layout).
 
-- **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze` and `POST /api/generate-node` (default **`gpt-4o`**). Override if your API key only has access to a different model.
+- **`OPENAI_ANALYZE_MODEL`**: optional; chat model id for `POST /api/analyze`, `POST /api/generate-node`, and **`POST /api/graph-insights-assess`** (insights panel “Assess graph”, GitHub **#83**; default **`gpt-4o`**). Override if your API key only has access to a different model.
 
 - **`GENERATE_NODE_MAX_NEW_NODES`** / **`GENERATE_NODE_MAX_SELECTED`**: optional caps for **`POST /api/generate-node`** (defaults **5** / **12**; GitHub **#37**).
 
@@ -106,7 +106,8 @@ The server intentionally stores some data **on disk** and related metadata **in 
 ## Project layout (server/)
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
-- `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + DB connect); mounts routers below; **`GET /health`** and **`GET /api/test`** (JSON health) are registered **early** (before other `/api` routers); HTTP server uses **`http.createServer`** with configurable **`maxHeaderSize`**
+- `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + **`POST /api/graph-insights-assess`** + DB connect); mounts routers below; **`GET /health`** and **`GET /api/test`** (JSON health) are registered **early** (before other `/api` routers); HTTP server uses **`http.createServer`** with configurable **`maxHeaderSize`**
+- `lib/graphInsightsAssess.js`: validates **`POST /api/graph-insights-assess`** body (tone presets, notable nodes from client centralities); OpenAI chat completion; theme-led interpretive prompt (metrics inform reasoning privately—see GitHub **#83**)
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
 - `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`GET /api/auth/me`**, **`PATCH /api/auth/me`**, **`POST /api/auth/forgot-password`**, **`POST /api/auth/reset-password`** (JWT **`mindmap_auth`** httpOnly cookie; password reset uses one-time token, **1h** expiry, hashed at rest — GitHub **#63** / **#31**)
 - `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats, read-only share token — **#39**)

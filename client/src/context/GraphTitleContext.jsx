@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 
-const GraphTitleContext = createContext(null);
+export const GraphTitleContext = createContext(null);
 
 /**
  * Shell graph title shown in {@link GuestIdentityBanner} while Library is active.

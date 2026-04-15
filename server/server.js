@@ -49,6 +49,10 @@ import { enrichGraphNodesWithThumbnails } from './lib/enrichGraphNodesWithThumbn
 import { ensureGraphLinkStrength } from './lib/linkStrength.js';
 import { runExplodeNodeCore } from './lib/explodeNode.js';
 import {
+  validateGraphInsightsAssessRequest,
+  runGraphInsightsAssess,
+} from './lib/graphInsightsAssess.js';
+import {
   dataDir,
   uploadsDir,
   metadataDir,
@@ -981,6 +985,56 @@ app.post('/api/generate-branch', async (req, res) => {
       error: 'Failed to generate branch',
       details,
       code
+    });
+  }
+});
+
+/** Optional LLM narrative from centrality-notable nodes (insights panel). */
+app.post('/api/graph-insights-assess', async (req, res) => {
+  const validated = validateGraphInsightsAssessRequest(req.body);
+  if (!validated.ok) {
+    return res.status(validated.status).json({
+      success: false,
+      error: validated.error,
+      code: validated.code,
+      ...(validated.details ? { details: validated.details } : {}),
+    });
+  }
+
+  try {
+    const result = await runGraphInsightsAssess(openai, validated.value);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({
+        success: false,
+        error: result.error,
+        code: result.code,
+      });
+    }
+    return res.json({ success: true, assessment: result.assessment });
+  } catch (error) {
+    console.error('graph-insights-assess error:', error);
+    const httpStatus = openaiErrorHttpStatus(error);
+    let statusCode = 500;
+    let details = error.message || 'Unknown error';
+    let code = 'GRAPH_INSIGHTS_ASSESS_FAILED';
+
+    if (httpStatus === 429) {
+      statusCode = 429;
+      code = 'OPENAI_QUOTA';
+      details =
+        'OpenAI returned 429 (quota or rate limit). Add billing or credits in the OpenAI dashboard, or wait and retry.';
+    } else if (httpStatus === 401) {
+      statusCode = 401;
+      code = 'OPENAI_AUTH';
+      details =
+        'OpenAI rejected the API key (401). Check that OPENAI_API_KEY is valid and not revoked.';
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      error: 'Failed to assess graph insights',
+      details,
+      code,
     });
   }
 });

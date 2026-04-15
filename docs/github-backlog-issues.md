@@ -192,14 +192,20 @@ Refs: #20 #46 #32 #64
 - **`client/src/utils/graphInsights.js`** — **`computeGraphInsights`**, **`graphInsightNodeId`**: undirected **multigraph** (parallel links increase degree), optional **`link.strength`** for weighted degree; **density**, **components**, degree **min/median/max**, **average local clustering** (k≥2), **isolates**, **top 10 by degree**. Tests: **`graphInsights.test.js`**.
 - **`GraphChromeUiContext`** — **`insightsPanelVisible`**, **`toggleInsightsPanel`**, **`setInsightsPanelVisible`**; **`localStorage`** **`mindmap.chrome.insightsPanelVisible`** (default **off**).
 - **`GuestIdentityBanner`** — **View → Insights** (`menuitemcheckbox`) in both chrome variants.
-- **`GraphVisualization`** — **Network snapshot** panel (`role="region"`, **`data-testid="graph-insights-panel"`**): metrics + **Focus** per top node. **Focus** = same path as discovery **Focus next**: **`discoveryFocusPoint`** + **`createFocusZoomTransform`** + **`applyProgrammaticZoomTransformRef`** + **rAF×2** + **`applyDiscoveryFocusNodeUiRef`** (**`setSelectedNodes` omitted**, **#94**). Metrics **memoized** only while the panel is visible.
+- **`GraphVisualization`** — **Network snapshot** panel (`role="region"`, **`data-testid="graph-insights-panel"`**): metrics; **Top by degree** collapsible (minimized by default); **Assess graph** → **`POST /api/graph-insights-assess`**; assessment **Copy** / **Save** / **Close**. **Focus** per row = same path as discovery **Focus next** (**#94**). Metrics **memoized** while the panel is visible.
 
-**Still on epic #83 / child backlog #96 (outside v1):**
+**Shipped (post–v1 snapshot, same branch / PR stack):**
+
+- **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; prompt emphasizes **thematic / psychoanalytic interpretation** (metrics guide reasoning **without** foregrounding technical centrality names). Uses **`OPENAI_ANALYZE_MODEL`**.
+- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, voice dropdown (Jung / Freud / Murakami / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Top by degree** **collapsed by default** (disclosure toggle).
+- **`GraphTitleContext`** — context object **exported** for safe **`useContext`** in **`GraphVisualization`** when tests omit the provider.
+
+**Still on epic #83 / child backlog #95 (outside current slice):**
 
 | Topic | Notes | Track on |
 | --- | --- | --- |
 | **Global: diameter / avg shortest path** | Exact or **sampled** on large graphs | **#83** / **#95** |
-| **Centrality** | Betweenness (sampled), PageRank / eigenvector | **#83** / **#95** |
+| **Centrality** | Extra metrics (sampled PageRank, etc.) beyond assess payload | **#83** / **#95** |
 | **Pattern detection** | Bridges, articulation points, hub/authority, weak ties (strength vs betweenness) | **#83** / **#95**; ties **#80** |
 | **Community-aware lists** | Top communities, membership (#81 chips / **#91**) | **#91**, **#83** |
 | **Playback-linked metrics** | Trends of density / components / hubs across **`buildGraphAtPlaybackTime`** steps; “what changed” between steps | **#70**, **#83** |
@@ -207,6 +213,7 @@ Refs: #20 #46 #32 #64
 | **Performance** | Web worker, progressive compute, snapshot **cache** (hash nodes/links/times), server precompute for huge graphs | **#95** |
 | **Weighted degree in UI** | v1 uses strength internally for ranking weights; optional column or tooltip | **#83** |
 | **Read-only default** | Align Insights default with **#74** / #73 item 9 if product wants | **#74** |
+| **LLM assess polish** | Rate limits, **`UserActivity`** audit, response **cache** by graph hash, persist text with graph, iOS clipboard for Copy, `aria-live` on complete — see **open backlog issue** linked from **#83** comments |
 
 **Suggested GitHub comments (Apr 2026, post–#83 v1):**
 

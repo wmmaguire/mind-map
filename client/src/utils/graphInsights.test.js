@@ -1,4 +1,10 @@
-import { computeGraphInsights, graphInsightNodeId } from './graphInsights';
+import {
+  computeGraphInsights,
+  graphInsightNodeId,
+  computeInsightNotableCentralities,
+  buildGraphInsightAssessPayload,
+  INSIGHT_ASSESS_TONE_OPTIONS,
+} from './graphInsights';
 
 describe('graphInsights (#83)', () => {
   it('graphInsightNodeId normalizes objects and primitives', () => {
@@ -72,5 +78,57 @@ describe('graphInsights (#83)', () => {
     expect(s.density).toBe(0);
     expect(s.componentCount).toBe(0);
     expect(s.topByDegree).toEqual([]);
+    expect(s.degreeByNodeId).toEqual({});
+  });
+
+  it('exposes degreeByNodeId for all nodes', () => {
+    const g = {
+      nodes: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      links: [{ source: 'a', target: 'b' }],
+    };
+    const s = computeGraphInsights(g);
+    expect(s.degreeByNodeId.a).toBe(1);
+    expect(s.degreeByNodeId.b).toBe(1);
+  });
+
+  it('ranks betweenness: middle of a path is most central', () => {
+    const g = {
+      nodes: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+        { id: 'c', label: 'C' },
+      ],
+      links: [
+        { source: 'a', target: 'b' },
+        { source: 'b', target: 'c' },
+      ],
+    };
+    const n = computeInsightNotableCentralities(g, 3);
+    expect(n.betweenness[0].label).toBe('B');
+    expect(n.betweenness[0].score).toBeGreaterThan(0);
+  });
+
+  it('buildGraphInsightAssessPayload includes four centrality lists', () => {
+    const g = {
+      nodes: [
+        { id: 'a', label: 'A', description: 'alpha' },
+        { id: 'b', label: 'B' },
+      ],
+      links: [{ source: 'a', target: 'b' }],
+    };
+    const p = buildGraphInsightAssessPayload(g, 2);
+    expect(p.graphSummary.nodeCount).toBe(2);
+    expect(p.notableNodes.degree.length).toBeGreaterThan(0);
+    expect(p.notableNodes.betweenness.length).toBeGreaterThan(0);
+    expect(p.notableNodes.closeness.length).toBeGreaterThan(0);
+    expect(p.notableNodes.eigenvector.length).toBeGreaterThan(0);
+    expect(p.notableNodes.degree.some((r) => r.description === 'alpha')).toBe(true);
+  });
+
+  it('INSIGHT_ASSESS_TONE_OPTIONS includes custom', () => {
+    expect(INSIGHT_ASSESS_TONE_OPTIONS.some((o) => o.id === 'custom')).toBe(true);
   });
 });
