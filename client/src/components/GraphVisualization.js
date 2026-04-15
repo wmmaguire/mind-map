@@ -1949,14 +1949,8 @@ function GraphVisualization({
         m.clear();
         for (const c of communitiesRef.current.values()) {
           for (const n of c.nodes || []) {
-            if (n?.id == null) continue;
-            // During community-mode simulation, the force layout updates the community's x/y,
-            // but individual member node x/y may not be kept in sync. Fall back to community
-            // position so frozen playback steps don't collapse to defaults.
-            const nx = Number.isFinite(n.x) ? n.x : c?.x;
-            const ny = Number.isFinite(n.y) ? n.y : c?.y;
-            if (Number.isFinite(nx) && Number.isFinite(ny)) {
-              m.set(String(n.id), { x: nx, y: ny });
+            if (n?.id != null && Number.isFinite(n.x) && Number.isFinite(n.y)) {
+              m.set(String(n.id), { x: n.x, y: n.y });
             }
           }
         }
