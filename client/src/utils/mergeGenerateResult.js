@@ -103,6 +103,9 @@ export function mergeGenerateNodeResponse(
         source: sourceNode,
         target: targetNode,
         relationship: link.relationship,
+        ...(typeof link.strength === 'number' && Number.isFinite(link.strength)
+          ? { strength: Math.max(0, Math.min(1, link.strength)) }
+          : {}),
         createdAt: ts,
         timestamp: ts,
       });

@@ -102,7 +102,7 @@ function buildCrossLinks(newNodes, frontierId, memoryIds, crossCount, ts) {
   return out;
 }
 
-function newNodesConnectToFrontier(links, newIds, frontierId) {
+function _newNodesConnectToFrontier(links, newIds, frontierId) {
   const f = String(frontierId);
   for (const nid of newIds) {
     const ok = links.some(l => {

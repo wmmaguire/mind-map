@@ -96,6 +96,9 @@ router.post('/graphs/save', async (req, res) => {
       source: String(typeof link.source === 'object' ? link.source.id : link.source),
       target: String(typeof link.target === 'object' ? link.target.id : link.target),
       relationship: link.relationship || '',
+      ...(typeof link.strength === 'number' && Number.isFinite(link.strength)
+        ? { strength: Math.max(0, Math.min(1, link.strength)) }
+        : {}),
       ...(link.createdAt != null ? { createdAt: link.createdAt } : {}),
       ...(link.timestamp != null ? { timestamp: link.timestamp } : {}),
       ...(link.deletedAt != null ? { deletedAt: link.deletedAt } : {}),

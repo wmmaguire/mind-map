@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test routes/transcribe.test.mjs routes/graphs.share.integration.test.mjs lib/generateNodeBudget.test.mjs lib/generateBranchRequest.test.mjs lib/graphNodeIdValidation.test.mjs lib/randomExpansionLinks.test.mjs lib/randomGrowthPrune.test.mjs lib/authService.test.mjs lib/graphShareRead.test.mjs lib/wikipediaExtract.test.mjs lib/wikipediaThumbnail.test.mjs lib/enrichGraphNodesWithThumbnails.test.mjs lib/repairAnalyzeGraphWikiUrls.test.mjs lib/relationshipSynthesisConfig.test.mjs lib/manualExpansionLinks.test.mjs",
+    "test": "node --test routes/transcribe.test.mjs routes/graphs.share.integration.test.mjs lib/generateNodeBudget.test.mjs lib/generateBranchRequest.test.mjs lib/graphNodeIdValidation.test.mjs lib/randomExpansionLinks.test.mjs lib/randomGrowthPrune.test.mjs lib/authService.test.mjs lib/graphShareRead.test.mjs lib/wikipediaExtract.test.mjs lib/wikipediaThumbnail.test.mjs lib/enrichGraphNodesWithThumbnails.test.mjs lib/repairAnalyzeGraphWikiUrls.test.mjs lib/relationshipSynthesisConfig.test.mjs lib/manualExpansionLinks.test.mjs lib/linkStrength.test.mjs",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "lint": "eslint .",

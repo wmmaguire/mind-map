@@ -20,7 +20,7 @@ describe('mergeGenerateNodeResponse', () => {
     const patch = {
       nodes: [{ id: 't_2', label: 'New', description: 'd' }],
       links: [
-        { source: 't_2', target: 'n1', relationship: 'linked' }
+        { source: 't_2', target: 'n1', relationship: 'linked', strength: 0.82 }
       ]
     };
 
@@ -34,6 +34,7 @@ describe('mergeGenerateNodeResponse', () => {
     expect(out.links[0].source.id).toBe('t_2');
     expect(out.links[0].target.id).toBe('n1');
     expect(out.links[0].relationship).toBe('linked');
+    expect(out.links[0].strength).toBeCloseTo(0.82, 6);
     expect(out.links[0].timestamp).toEqual(expect.any(Number));
     expect(out.links[0].createdAt).toEqual(out.links[0].timestamp);
   });

@@ -46,6 +46,7 @@ import {
 import { normalizeManualExpansionLinks } from './lib/manualExpansionLinks.js';
 import { repairAnalyzeGraphWikiUrls } from './lib/repairAnalyzeGraphWikiUrls.js';
 import { enrichGraphNodesWithThumbnails } from './lib/enrichGraphNodesWithThumbnails.js';
+import { ensureGraphLinkStrength } from './lib/linkStrength.js';
 import {
   dataDir,
   uploadsDir,
@@ -342,6 +343,7 @@ Rules:
     } catch (thumbErr) {
       console.error('enrichGraphNodesWithThumbnails failed:', thumbErr);
     }
+    graphData = ensureGraphLinkStrength(graphData);
     console.log('Analysis completed successfully');
 
     graphTransform.result = graphData;
@@ -868,6 +870,7 @@ app.post('/api/generate-node', async (req, res) => {
     } catch (thumbErr) {
       console.error('enrichGraphNodesWithThumbnails (generate-node) failed:', thumbErr);
     }
+    newData = ensureGraphLinkStrength(newData);
 
     return res.json({
       success: true,
@@ -946,6 +949,7 @@ app.post('/api/generate-branch', async (req, res) => {
     } catch (thumbErr) {
       console.error('enrichGraphNodesWithThumbnails (generate-branch) failed:', thumbErr);
     }
+    newData = ensureGraphLinkStrength(newData);
 
     return res.json({
       success: true,
