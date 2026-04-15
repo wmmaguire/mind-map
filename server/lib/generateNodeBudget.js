@@ -145,7 +145,7 @@ export function validateGenerateNodeRequest(body) {
       : 'manual';
 
   // Manual mode expands from highlighted anchors (required).
-  // Randomized growth mode can run without highlights (optional).
+  // Community evolution (randomizedGrowth) can run without highlights (optional).
   const selectedNodesRaw = body.selectedNodes;
   const selectedNodes =
     Array.isArray(selectedNodesRaw) ? selectedNodesRaw : [];
@@ -366,7 +366,7 @@ export function validateGenerateNodeRequest(body) {
           status: 400,
           code: 'MISSING_EXISTING_GRAPH_NODE_IDS',
           error:
-            'existingGraphNodeIds must be a non-empty array when using randomizedGrowth'
+            'existingGraphNodeIds must be a non-empty array when using community evolution (randomizedGrowth)'
         };
       }
       existingGraphNodeIds = ids.map(id => String(id));

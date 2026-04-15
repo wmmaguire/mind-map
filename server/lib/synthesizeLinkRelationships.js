@@ -1,5 +1,5 @@
 /**
- * Replace templated randomized-growth link text with short phrases grounded in
+ * Replace templated community-evolution / randomized-growth link text with short phrases grounded in
  * node labels, descriptions, and (when available) Wikipedia extracts.
  */
 

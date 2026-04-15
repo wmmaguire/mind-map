@@ -706,7 +706,7 @@ svg .graph-node-hit {
   line-height: 1.4;
 }
 
-/* GitHub #68 — randomized growth strategy + prune */
+/* GitHub #68 — community evolution strategy + prune */
 .graph-generate-strategy {
   display: flex;
   flex-direction: column;

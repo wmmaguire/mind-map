@@ -1,5 +1,5 @@
 /**
- * Random attachment for multi-cycle AI growth (GitHub #62, #68).
+ * Random attachment for community evolution / multi-cycle AI growth (GitHub #62, #68).
  *
  * Pool rule: before adding links for new node N (processed in batch order),
  * the candidate pool is every node id already on the graph for this request:

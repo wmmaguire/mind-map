@@ -47,11 +47,11 @@ function GraphVisualization({
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
-  /** GitHub #62: manual (single call, link to all highlights) vs multi-cycle randomized */
+  /** GitHub #62: manual (single call, link to all highlights) vs community evolution */
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
   const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
   const [rgNumCycles, setRgNumCycles] = useState(2);
-  /** GitHub #68: attachment bias for randomized growth (-1 low-degree … +1 hub). */
+  /** GitHub #68: attachment bias for community evolution (-1 low-degree … +1 hub). */
   const [rgAnchorStrategy, setRgAnchorStrategy] = useState(0);
   const [rgPruneDuringGrowth, setRgPruneDuringGrowth] = useState(false);
   const [rgDeletionsPerCycle, setRgDeletionsPerCycle] = useState(1);
@@ -67,7 +67,7 @@ function GraphVisualization({
   const expansionAlgorithmMeta =
     expansionAlgorithm === 'randomizedGrowth'
       ? {
-        title: 'Randomized AI growth',
+        title: 'Community evolution',
         description:
           'Runs multiple cycles. Each cycle adds AI nodes with random links to the current graph. Use the strategy slider to bias attachment toward low- or high-degree nodes (when link data is sent), and optionally prune non-anchor nodes between cycles.'
       }
@@ -1861,7 +1861,7 @@ function GraphVisualization({
       data.nodes.length < rgConnectionsPerNewNode
     ) {
       setGenerateSubmitError(
-        `Randomized growth needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
+        `Community evolution needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
       );
       return;
     }
@@ -2386,7 +2386,7 @@ function GraphVisualization({
   if (isGenerating) {
     const baseHint =
       expansionAlgorithm === 'randomizedGrowth'
-        ? 'Generating (multi-cycle randomized).'
+        ? 'Generating (community evolution).'
         : 'Generating (manual).';
     const progressHint =
       expansionAlgorithm === 'randomizedGrowth' && generateProgress
@@ -2423,7 +2423,7 @@ function GraphVisualization({
       hint:
         expansionAlgorithm === 'manual'
           ? 'Confirm runs one generation.'
-          : 'Multi-cycle mode runs one API batch per cycle (rate limits apply). You can stop between cycles.',
+          : 'Community evolution runs one API batch per cycle (rate limits apply). You can stop between cycles.',
     };
   } else if (showAddForm) {
     activeGraphEditBanner = {
@@ -2476,7 +2476,7 @@ function GraphVisualization({
       : showGenerateForm &&
         expansionAlgorithm === 'randomizedGrowth' &&
         data.nodes.length < rgConnectionsPerNewNode
-        ? `Randomized growth needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
+        ? `Community evolution needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
         : pruneValidationMessage;
   const generateFormErrorDisplay =
     generateFormValidationMessage || generateSubmitError;
@@ -2666,7 +2666,7 @@ function GraphVisualization({
                     }}
                   >
                     <option value="manual">manual</option>
-                    <option value="randomizedGrowth">multi-cycle randomized</option>
+                    <option value="randomizedGrowth">community evolution</option>
                   </select>
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼

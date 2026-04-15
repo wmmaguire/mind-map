@@ -1,5 +1,5 @@
 /**
- * Optional per-request pruning for randomized growth (GitHub #68).
+ * Optional per-request pruning for community evolution (GitHub #68).
  */
 
 import {
