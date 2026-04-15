@@ -133,6 +133,58 @@ Refs: #20 #46 #32 #64
 
 **Note:** **#62** — **Graph expansion modes:** dropdown to choose **manual generate** (current **`/api/generate-node`**) vs **multi-cycle randomized growth** (parameterized AI nodes per cycle, connections per node, cycle count; random attachment to existing nodes). Supersedes the cancelled **#37** budget-preview experiment; see GitHub **#62** for acceptance criteria and open questions.
 
+### Graph discovery & navigation — GitHub **#38** (shipped) / **#73** (phase 2 backlog)
+
+**Tracked as:** `https://github.com/wmmaguire/mind-map/issues/73` — *Backlog: Graph discovery & navigation — phase 2+ (post–#38 slice)*.
+
+**Shipped (#38, branch `issue-38-discovery-navigation`):**
+
+- **Label search** — Substring + case-fold on **`node.label`** only (**`client/src/utils/graphDiscovery.js`**: **`normalizeGraphLabel`**, **`nodesMatchingLabelQuery`**; tests **`graphDiscovery.test.js`**). Not semantic / embeddings.
+- **Focus / fit** — **Focus next** match cycles **`createFocusZoomTransform`** (**d3.zoomIdentity**); **Show all** resets zoom-driven merge/split and fits the graph (**`resetCanvasViewRef`**).
+- **Minimap** — Read-only overview + viewport rectangle; **`requestAnimationFrame`** throttling with main graph zoom (**`GraphVisualization`**, **`data-testid="graph-minimap"`**).
+- **Chrome UI** — **`GraphChromeUiProvider`** (**`client/src/context/GraphChromeUiContext.jsx`**) persists **`playbackStripVisible`** and **`graphSearchBarVisible`** in **`localStorage`** (`mindmap.chrome.playbackStripVisible`, `mindmap.chrome.graphSearchBarVisible`, default **on**). **View** menu in **`GuestIdentityBanner`** toggles **Playback strip** and **Graph search**; **`GraphPlaybackBanner`** and **`GraphVisualization`** consume. Provider wraps the app in **`client/src/index.js`** (inside **`SessionProvider`** / **`AuthIdentityBridge`** per current tree).
+
+**Backlog (#73 — outside current #38 scope; add comments on refs below):**
+
+1. **Semantic search / jump** — Embeddings or server-side search; today keyword-only on **`label`**.
+2. **Neighborhood focus** — Explicit “focus **N**-hop neighborhood” (not only single-node zoom).
+3. **Saved lenses / filters** — Named persisted views (subset, layout, or query).
+4. **Lightweight provenance panel** — Source/evidence per node or edge where data exists.
+5. **Minimap interaction** — Click/drag on minimap to **pan** viewport (display-only today).
+6. **Performance & scale** — Profile **medium/large** graphs (search + minimap **rAF**, merge/split + simulation).
+7. **D3 / `updateVisualization` hardening** — Stale selections after merge/split; aligns with **#51**.
+8. **Docs** — This section + **`client/README.md`** module bullets (supersedes #73 checklist item “Docs”).
+9. **Read-only / share (#39)** — Product policy: default on/off for discovery bar + minimap for **`readOnly`** viewers (today available unless user hides **Search** via **View**); overlap **#74** share polish.
+
+**Suggested GitHub comments (paste on open issues):**
+
+- **#73** — *Apr 2026: Repo docs synced — `docs/github-backlog-issues.md` section *Graph discovery & navigation (#38 shipped / #73 backlog)* + `client/README.md` (`GraphChromeUiContext`, `graphDiscovery.js`, minimap/search). Shipped scope unchanged; follow-ups remain on #73.*
+- **#38** — *Apr 2026: Doc pointer — discovery slice summarized in `docs/github-backlog-issues.md` under #73 section; phase 2 items stay on #73.*
+- **#33** — *Apr 2026: View menu toggles graph chrome via `GraphChromeUiContext` (playback strip + search bar visibility, localStorage).*
+- **#39** — *Apr 2026: Read-only viewers still get discovery search + minimap unless hidden via View — policy follow-up on #73 item 9 / #74.*
+- **#51** — *Apr 2026: #73 lists D3/updateVisualization hardening post-merge/split as part of discovery/nav phase 2.*
+- **#52** — *Apr 2026: Narrow layout + playback strip + search row — continue z-index / overflow polish as discovery grows (#73 minimap interaction, etc.).*
+- **#57** — *Apr 2026: Discovery search + minimap a11y (live regions, minimap controls when interactive) — #73 follow-ups.*
+- **#70** — *Apr 2026: Time-travel UX may intersect discovery (e.g. search during playback); #73 neighborhood/lenses are separate product tracks.*
+- **#40** — *Apr 2026: Chrome toggles and discovery UI are part of shell/graph polish; optional toasts for search “no matches” align with #50.*
+
+### Backlog: Interactive minimap — pan/zoom from overview (suggested if split from #73)
+
+**Title:** `Backlog: Graph minimap — click/drag to pan viewport`
+
+**Body:**
+
+```markdown
+## Context
+#73 item 5: minimap is display-only today (`GraphVisualization`).
+
+## Scope
+- Hit-testing + map minimap coordinates to d3 zoom transform (pan; optional zoom).
+- Keyboard / SR labels when minimap becomes interactive (#57).
+
+Refs: #38 #73 #51 #57 #52
+```
+
 **Note:** **#68** / **#69** — **#68 (Apr 2026, partial ship on branch `issue-68-random-growth-strategy`):** UI label **Community evolution** (API still **`expansionAlgorithm: "randomizedGrowth"`**). Shipped: **`anchorStrategy`** slider (**random** / **lowCommunity** / **highCommunity**), **`existingGraphLinks`** for clustering-aware pools, optional **prune** (**`enableDeletions`**, **`deletionsPerCycle`**), default **`deleteStrategy`** = inverse of **`anchorStrategy`**, **`deletedNodeIds`** in responses, **`mergeGenerateResult`** client merge, unit tests (**`randomExpansionLinks`**, **`randomGrowthPrune`**, **`generateNodeBudget`**). **Still on #68 or follow-on tickets:** consolidated backlog **#87** (*Community evolution phase 2* — reproducible RNG, graph-safe prune, `dryRun` UI, operations/telemetry, E2E, richer metrics). **#69 (Apr 2026, branch `issue-69-explode-node`):** **`POST /api/explode-node`** + tooltip **Explode** (Wikipedia-backed dense subgraph from one anchor); see *Explode subgraph (#69)* below and **`server/READEME.md`** §5c. Refs: `https://github.com/wmmaguire/mind-map/issues/68`, `https://github.com/wmmaguire/mind-map/issues/87`, `https://github.com/wmmaguire/mind-map/issues/69`. **Related:** *Backlog: Node image / Wikipedia thumbnail* at end of this file.
 
 ### Explode subgraph (#69) — shipped slice + follow-ups (Apr 2026, branch `issue-69-explode-node`)
