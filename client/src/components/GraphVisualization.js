@@ -2017,6 +2017,7 @@ function GraphVisualization({
     let operationError = null;
     let generatedNodes = [];
     let cyclesCompleted = 0;
+    let selectAfterGenerateIds = [];
 
     try {
       console.log(
@@ -2102,6 +2103,13 @@ function GraphVisualization({
           height
         );
 
+        selectAfterGenerateIds = generatedNodes.map(n => String(n.id));
+        selectedNodeIds.current = new Set(selectAfterGenerateIds);
+        selectedNodeId.current = selectAfterGenerateIds[0] ?? null;
+        setSelectedNodes(
+          newData.nodes.filter(n => selectedNodeIds.current.has(String(n.id)))
+        );
+
         if (onDataUpdate) {
           onDataUpdate(newData);
         }
@@ -2126,6 +2134,13 @@ function GraphVisualization({
           result.data,
           width,
           height
+        );
+
+        selectAfterGenerateIds = generatedNodes.map(n => String(n.id));
+        selectedNodeIds.current = new Set(selectAfterGenerateIds);
+        selectedNodeId.current = selectAfterGenerateIds[0] ?? null;
+        setSelectedNodes(
+          newData.nodes.filter(n => selectedNodeIds.current.has(String(n.id)))
         );
 
         console.log('Final data validation:', {
@@ -2174,10 +2189,17 @@ function GraphVisualization({
             onDataUpdate(working);
           }
         }
+
+        selectAfterGenerateIds = generatedNodes.map(n => String(n.id));
+        selectedNodeIds.current = new Set(selectAfterGenerateIds);
+        selectedNodeId.current = selectAfterGenerateIds[0] ?? null;
+        setSelectedNodes(
+          working.nodes.filter(n => selectedNodeIds.current.has(String(n.id)))
+        );
       }
 
-      selectedNodeIds.current.clear();
-      selectedNodeId.current = null;
+      // Keep the newly generated nodes highlighted after AI operations.
+      // (Selection refs + selectedNodes state are updated above per algorithm.)
     } catch (error) {
       console.error('Error generating nodes:', error);
       operationStatus = 'FAILURE';
