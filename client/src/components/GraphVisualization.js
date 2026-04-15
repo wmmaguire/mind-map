@@ -20,6 +20,30 @@ import {
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
+/** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
+function pathHasConsecutiveGraphLinks(pathIds, links) {
+  if (!Array.isArray(pathIds) || pathIds.length < 2 || !Array.isArray(links)) {
+    return false;
+  }
+  for (let i = 0; i < pathIds.length - 1; i += 1) {
+    const a = String(pathIds[i]);
+    const b = String(pathIds[i + 1]);
+    const ok = links.some(l => {
+      const s =
+        typeof l.source === 'object' && l.source != null
+          ? String(l.source.id)
+          : String(l.source);
+      const t =
+        typeof l.target === 'object' && l.target != null
+          ? String(l.target.id)
+          : String(l.target);
+      return (s === a && t === b) || (s === b && t === a);
+    });
+    if (!ok) return false;
+  }
+  return true;
+}
+
 function GraphVisualization({
   data,
   onDataUpdate,
@@ -55,6 +79,10 @@ function GraphVisualization({
   const [rgAnchorStrategy, setRgAnchorStrategy] = useState(0);
   const [rgPruneDuringGrowth, setRgPruneDuringGrowth] = useState(false);
   const [rgDeletionsPerCycle, setRgDeletionsPerCycle] = useState(1);
+  /** GitHub #82 — branch extrapolation (POST /api/generate-branch). */
+  const [brIterations, setBrIterations] = useState(2);
+  const [brMemoryK, setBrMemoryK] = useState(3);
+  const [brCrossLinks, setBrCrossLinks] = useState(1);
   /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
   const [guidancePreset, setGuidancePreset] = useState('none');
   const [guidanceCustomText, setGuidanceCustomText] = useState('');
@@ -71,11 +99,17 @@ function GraphVisualization({
         description:
           'Each cycle asks the AI for new concepts, then wires them in with random edges to your existing graph. The strategy slider nudges those edges toward peripheral or hub-like neighbors (using your graph’s links). Optional pruning removes a few non-highlighted nodes per cycle—highlighted anchors are never deleted. One API request per cycle; stop between cycles from the on-canvas chip.'
       }
-      : {
-        title: 'Manual AI generate',
-        description:
-          'One-shot generation. The model returns nodes and links, and each new node must connect to every highlighted node.'
-      };
+      : expansionAlgorithm === 'branchExtrapolation'
+        ? {
+          title: 'Extrapolate branch',
+          description:
+            'Highlight an ordered path along edges (click in sequence from root toward the tip). The server grows from the path tip for several iterations, each time conditioning on the last memoryK nodes. One API call runs all iterations; progress shows on the chip until the response returns.'
+        }
+        : {
+          title: 'Manual AI generate',
+          description:
+            'One-shot generation. The model returns nodes and links, and each new node must connect to every highlighted node.'
+        };
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNodeData, setNewNodeData] = useState({
     label: '',
@@ -1865,6 +1899,20 @@ function GraphVisualization({
       );
       return;
     }
+    if (expansionAlgorithm === 'branchExtrapolation') {
+      if (sourceIdSnapshot.length < 2) {
+        setGenerateSubmitError(
+          'Extrapolate branch needs at least two highlighted nodes in click order along edges (tip last).'
+        );
+        return;
+      }
+      if (!pathHasConsecutiveGraphLinks(sourceIdSnapshot, data.links)) {
+        setGenerateSubmitError(
+          'Each consecutive highlighted pair must be linked on the graph. Click nodes in path order from root toward the tip, then try again.'
+        );
+        return;
+      }
+    }
 
     setGenerateSubmitError(null);
     setIsGenerating(true);
@@ -1922,7 +1970,51 @@ function GraphVisualization({
         });
       };
 
-      if (expansionAlgorithm === 'manual') {
+      if (expansionAlgorithm === 'branchExtrapolation') {
+        const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
+        const result = await apiRequest('/api/generate-branch', {
+          method: 'POST',
+          json: {
+            existingGraphNodes: data.nodes.map(n => ({
+              id: n.id,
+              label: n.label,
+              description: n.description,
+              wikiUrl: n.wikiUrl || ''
+            })),
+            existingGraphLinks: data.links.map(l => ({
+              source: typeof l.source === 'object' ? l.source.id : l.source,
+              target: typeof l.target === 'object' ? l.target.id : l.target
+            })),
+            branch: { pathNodeIds: sourceIdSnapshot.map(String) },
+            iterations: brIterations,
+            memoryK: brMemoryK,
+            nodesPerIteration: numNodesToAdd,
+            crossLinksPerIteration: brCrossLinks,
+            ...(g ? { generationContext: g } : {})
+          }
+        });
+
+        if (!result.success) {
+          operationStatus = 'FAILURE';
+          operationError =
+            result.details || result.error || 'Request failed';
+          throw new Error(operationError);
+        }
+
+        generatedNodes = result.data.nodes;
+        cyclesCompleted = brIterations;
+
+        const newData = mergeGenerateNodeResponse(
+          data,
+          result.data,
+          width,
+          height
+        );
+
+        if (onDataUpdate) {
+          onDataUpdate(newData);
+        }
+      } else if (expansionAlgorithm === 'manual') {
         const result = await runOneGenerateRequest({
           nodes: data.nodes,
           links: data.links,
@@ -2011,8 +2103,16 @@ function GraphVisualization({
           expansionAlgorithm,
           numNodesRequested: numNodesToAdd,
           numCyclesRequested:
-            expansionAlgorithm === 'randomizedGrowth' ? rgNumCycles : 1,
+            expansionAlgorithm === 'randomizedGrowth'
+              ? rgNumCycles
+              : expansionAlgorithm === 'branchExtrapolation'
+                ? brIterations
+                : 1,
           numCyclesCompleted: cyclesCompleted,
+          branchMemoryK:
+            expansionAlgorithm === 'branchExtrapolation' ? brMemoryK : undefined,
+          branchCrossLinksPerIteration:
+            expansionAlgorithm === 'branchExtrapolation' ? brCrossLinks : undefined,
           connectionsPerNewNode:
             expansionAlgorithm === 'randomizedGrowth'
               ? rgConnectionsPerNewNode
@@ -2387,7 +2487,9 @@ function GraphVisualization({
     const baseHint =
       expansionAlgorithm === 'randomizedGrowth'
         ? 'Generating (community evolution).'
-        : 'Generating (manual).';
+        : expansionAlgorithm === 'branchExtrapolation'
+          ? 'Generating (branch extrapolation).'
+          : 'Generating (manual).';
     const progressHint =
       expansionAlgorithm === 'randomizedGrowth' && generateProgress
         ? `Cycle ${generateProgress.current}/${generateProgress.total}…`
@@ -2423,7 +2525,9 @@ function GraphVisualization({
       hint:
         expansionAlgorithm === 'manual'
           ? 'Confirm runs one generation.'
-          : 'Community evolution runs one API batch per cycle (rate limits apply). You can stop between cycles.',
+          : expansionAlgorithm === 'branchExtrapolation'
+            ? 'Branch mode uses one server request for all iterations; keep the tab open until it finishes.'
+            : 'Community evolution runs one API batch per cycle (rate limits apply). You can stop between cycles.',
     };
   } else if (showAddForm) {
     activeGraphEditBanner = {
@@ -2474,10 +2578,18 @@ function GraphVisualization({
     generateFormAnchorIds.length === 0
       ? 'Manual generation needs at least one highlighted node. Close this form, highlight one or more nodes, then open AI Generation again.'
       : showGenerateForm &&
-        expansionAlgorithm === 'randomizedGrowth' &&
-        data.nodes.length < rgConnectionsPerNewNode
-        ? `Community evolution needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
-        : pruneValidationMessage;
+        expansionAlgorithm === 'branchExtrapolation' &&
+        generateFormAnchorIds.length < 2
+        ? 'Extrapolate branch needs at least two highlighted nodes in click order along edges (tip last). Close the form, select the path, then open this action again.'
+        : showGenerateForm &&
+          expansionAlgorithm === 'branchExtrapolation' &&
+          !pathHasConsecutiveGraphLinks(generateFormAnchorIds, data.links)
+          ? 'Each consecutive highlighted pair must be linked on the graph. Click nodes in path order, then reopen Extrapolate branch.'
+          : showGenerateForm &&
+            expansionAlgorithm === 'randomizedGrowth' &&
+            data.nodes.length < rgConnectionsPerNewNode
+            ? `Community evolution needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
+            : pruneValidationMessage;
   const generateFormErrorDisplay =
     generateFormValidationMessage || generateSubmitError;
 
@@ -2667,9 +2779,25 @@ function GraphVisualization({
                   >
                     <option value="manual">manual</option>
                     <option value="randomizedGrowth">community evolution</option>
+                    <option value="branchExtrapolation">extrapolate branch</option>
                   </select>
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="generate-button graph-action-menu__action"
+                  aria-label="Open Extrapolate branch form"
+                  onClick={() =>
+                    onMenuPickGenerateWithAlgorithm('branchExtrapolation')
+                  }
+                >
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    🌿
+                  </span>
+                  <span className="graph-action-menu__action-label">
+                    Extrapolate branch…
                   </span>
                 </button>
               </div>
@@ -2965,7 +3093,9 @@ function GraphVisualization({
               <label>
                 {expansionAlgorithm === 'manual'
                   ? 'Number of nodes to generate'
-                  : 'AI nodes per cycle'}
+                  : expansionAlgorithm === 'branchExtrapolation'
+                    ? 'Nodes per iteration'
+                    : 'AI nodes per cycle'}
                 :
                 <input
                   type="number"
@@ -3070,6 +3200,64 @@ function GraphVisualization({
                       />
                     </label>
                   )}
+                </>
+              )}
+              {expansionAlgorithm === 'branchExtrapolation' && (
+                <>
+                  <label>
+                    Iterations (growth cycles):
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={brIterations}
+                      onChange={e => {
+                        setBrIterations(
+                          Math.min(
+                            20,
+                            Math.max(1, parseInt(e.target.value, 10) || 1)
+                          )
+                        );
+                        setGenerateSubmitError(null);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Memory window (nodes along path):
+                    <input
+                      type="number"
+                      min="1"
+                      max="40"
+                      value={brMemoryK}
+                      onChange={e => {
+                        setBrMemoryK(
+                          Math.min(
+                            40,
+                            Math.max(1, parseInt(e.target.value, 10) || 1)
+                          )
+                        );
+                        setGenerateSubmitError(null);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Cross-links per iteration:
+                    <input
+                      type="number"
+                      min="0"
+                      max="6"
+                      value={brCrossLinks}
+                      onChange={e => {
+                        setBrCrossLinks(
+                          Math.min(
+                            6,
+                            Math.max(0, parseInt(e.target.value, 10) || 0)
+                          )
+                        );
+                        setGenerateSubmitError(null);
+                      }}
+                    />
+                  </label>
                 </>
               )}
               {generateProgress && expansionAlgorithm === 'randomizedGrowth' && (

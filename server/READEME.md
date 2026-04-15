@@ -277,6 +277,16 @@ Relevant code:
 - `server/lib/randomExpansionLinks.js`, **`randomGrowthPrune.js`** (community evolution attach + prune; tests: **`lib/randomExpansionLinks.test.mjs`**, **`lib/randomGrowthPrune.test.mjs`**)
 - `server/lib/relationshipSynthesisConfig.js`, **`synthesizeLinkRelationships.js`**, **`wikipediaExtract.js`**, **`manualExpansionLinks.js`**
 
+### 5b) Branch extrapolation (`POST /api/generate-branch`, GitHub **#82**)
+
+**Goal:** grow along an ordered **path** on the graph (user-highlighted branch): each iteration extends from the current **frontier** (path tip) with **`nodesPerIteration`** new nodes, conditioning on the last **`memoryK`** path nodes and their inter-links. Optional **`crossLinksPerIteration`** adds tie-backs into that memory window. The server runs **all iterations in one request** (multiple OpenAI calls internally). Budgets: **`iterations`** capped by **`GENERATE_BRANCH_MAX_ITERATIONS`** (default **10**, max **20**), **`iterations × nodesPerIteration`** capped by **`GENERATE_BRANCH_MAX_TOTAL_NEW_NODES`** (default at most **40**), **`nodesPerIteration`** ≤ **`GENERATE_NODE_MAX_NEW_NODES`**, **`memoryK`** ≤ **40**, **`crossLinksPerIteration`** ≤ **6**.
+
+**Body:** **`existingGraphNodes`**, **`existingGraphLinks`** (`{ source, target }` string ids), **`branch.pathNodeIds`** (length ≥ 2; each consecutive pair must appear as an edge in **`existingGraphLinks`**), **`iterations`**, **`memoryK`**, **`nodesPerIteration`**, **`crossLinksPerIteration`** (≥ 0), optional **`generationContext`**, optional **`dryRun: true`** (returns **`preview`** only).
+
+**Response:** **`{ success, data: { nodes, links } }`** plus optional **`debug.cycles`** (frontier id and memory window per iteration). Errors use **`code`** such as **`BRANCH_PATH_NOT_CONNECTED`**, **`BRANCH_FRONTIER_CONNECTIVITY`**, **`INVALID_MODEL_JSON`**, **`GENERATE_BRANCH_FAILED`**.
+
+Relevant code: **`server/server.js`**, **`server/lib/generateBranchRequest.js`** (tests: **`lib/generateBranchRequest.test.mjs`**), **`server/lib/generateBranch.js`**, **`server/lib/parseGraphJsonFromCompletion.js`**, **`server/lib/validateNewNodesAgainstExisting.js`**.
+
 ### 6) Save/load graphs (MongoDB)
 
 **Goal**: persist generated/edited graphs and reload them later.

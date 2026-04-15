@@ -23,11 +23,18 @@ import {
   buildGenerateNodeDryRunPreview
 } from './lib/generateNodeBudget.js';
 import {
+  validateGenerateBranchRequest,
+  buildGenerateBranchDryRunPreview
+} from './lib/generateBranchRequest.js';
+import { executeGenerateBranch } from './lib/generateBranch.js';
+import {
   buildRandomExpansionLinks,
   normalizeGraphLinkPairs,
 } from './lib/randomExpansionLinks.js';
 import { pickRandomGrowthDeletes } from './lib/randomGrowthPrune.js';
 import { fetchWikipediaExtract, normalizeConceptLabel } from './lib/wikipediaExtract.js';
+import { parseGraphJsonFromCompletion } from './lib/parseGraphJsonFromCompletion.js';
+import { validateNewNodesAgainstExisting } from './lib/validateNewNodesAgainstExisting.js';
 import {
   synthesizeLinkRelationships,
   buildNodeLookupMap
@@ -45,29 +52,6 @@ import {
   metadataDir,
   getAllowedCorsOrigins
 } from './config.js';
-
-/** OpenAI often wraps JSON in markdown fences; extract `{ nodes, links }` and parse. */
-function parseGraphJsonFromCompletion(raw) {
-  if (raw == null || typeof raw !== 'string') {
-    throw new Error('Empty or invalid model response');
-  }
-  let s = raw.trim();
-  const fence = /^```(?:json)?\s*\r?\n?([\s\S]*?)\r?\n?```$/im.exec(s);
-  if (fence) {
-    s = fence[1].trim();
-  } else {
-    const firstBrace = s.indexOf('{');
-    const lastBrace = s.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      s = s.slice(firstBrace, lastBrace + 1);
-    }
-  }
-  const parsed = JSON.parse(s);
-  if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.links)) {
-    throw new Error('Model response must be JSON with nodes and links arrays');
-  }
-  return parsed;
-}
 
 /** HTTP status from OpenAI SDK errors (e.g. APIError). */
 function openaiErrorHttpStatus(err) {
@@ -445,30 +429,6 @@ async function wikiAnchorLinesForNodes(nodes) {
     })
   );
   return parts.join('\n\n');
-}
-
-function validateNewNodesAgainstExisting(newData, forbidden) {
-  const seenNew = new Set();
-  for (const node of newData.nodes || []) {
-    const k = normalizeConceptLabel(node.label || '');
-    if (!k) continue;
-    if (forbidden.has(k)) {
-      return {
-        ok: false,
-        error: `Generated concept duplicates an existing graph node: "${node.label}"`,
-        code: 'DUPLICATE_WITH_EXISTING'
-      };
-    }
-    if (seenNew.has(k)) {
-      return {
-        ok: false,
-        error: `Generated batch contains duplicate concepts: "${node.label}"`,
-        code: 'DUPLICATE_WITHIN_BATCH'
-      };
-    }
-    seenNew.add(k);
-  }
-  return { ok: true };
 }
 
 /**
@@ -942,6 +902,78 @@ app.post('/api/generate-node', async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       error: 'Failed to generate graph',
+      details,
+      code
+    });
+  }
+});
+
+/** GitHub #82 — memory-based iterative branch extrapolation (single round-trip; server runs all cycles). */
+app.post('/api/generate-branch', async (req, res) => {
+  const validated = validateGenerateBranchRequest(req.body);
+  if (!validated.ok) {
+    return res.status(validated.status).json({
+      success: false,
+      error: validated.error,
+      code: validated.code,
+      ...(validated.details ? { details: validated.details } : {})
+    });
+  }
+
+  if (validated.dryRun) {
+    return res.json({
+      success: true,
+      dryRun: true,
+      preview: buildGenerateBranchDryRunPreview(validated)
+    });
+  }
+
+  try {
+    const result = await executeGenerateBranch(openai, validated);
+    if (!result.ok) {
+      const status = result.status || (result.code === 'INVALID_MODEL_JSON' ? 502 : 400);
+      return res.status(status).json({
+        success: false,
+        error: result.error,
+        code: result.code,
+        ...(result.details ? { details: result.details } : {})
+      });
+    }
+
+    let newData = result.data;
+    try {
+      newData = await enrichGraphNodesWithThumbnails(newData, globalThis.fetch);
+    } catch (thumbErr) {
+      console.error('enrichGraphNodesWithThumbnails (generate-branch) failed:', thumbErr);
+    }
+
+    return res.json({
+      success: true,
+      data: newData,
+      ...(result.debug ? { debug: result.debug } : {})
+    });
+  } catch (error) {
+    console.error('generate-branch error:', error);
+    const httpStatus = openaiErrorHttpStatus(error);
+    let statusCode = 500;
+    let details = error.message || 'Unknown error';
+    let code = 'GENERATE_BRANCH_FAILED';
+
+    if (httpStatus === 429) {
+      statusCode = 429;
+      code = 'OPENAI_QUOTA';
+      details =
+        'OpenAI returned 429 (quota or rate limit). Add billing or credits in the OpenAI dashboard, or wait and retry.';
+    } else if (httpStatus === 401) {
+      statusCode = 401;
+      code = 'OPENAI_AUTH';
+      details =
+        'OpenAI rejected the API key (401). Check that OPENAI_API_KEY is valid and not revoked.';
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      error: 'Failed to generate branch',
       details,
       code
     });
