@@ -396,10 +396,6 @@ function GraphVisualization({
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
 
-    if (forceLayoutEnabledRef.current) {
-      preservedPlaybackNodePositionsRef.current.clear();
-    }
-
     const svg = d3.select(svgRef.current);
     const reduceMotion =
       typeof window !== 'undefined' &&
@@ -414,9 +410,6 @@ function GraphVisualization({
       lastPlaybackFadeTokenRef.current = 0;
       playbackPrevCommunityIdsRef.current = null;
       playbackPrevLinkKeysRef.current = null;
-      if (!forceLayoutEnabledRef.current) {
-        preservedPlaybackNodePositionsRef.current.clear();
-      }
     }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
