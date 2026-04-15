@@ -25,6 +25,45 @@ export function nodesMatchingLabelQuery(nodes, query) {
   return nodes.filter(n => normalizeGraphLabel(n.label || '').includes(q));
 }
 
+function graphCoordOrFallback(node, fallbackX, fallbackY) {
+  const x = node?.x;
+  const y = node?.y;
+  const xf = typeof x === 'number' && Number.isFinite(x);
+  const yf = typeof y === 'number' && Number.isFinite(y);
+  if (xf && yf && !(x === 0 && y === 0)) {
+    return { x, y };
+  }
+  return { x: fallbackX, y: fallbackY };
+}
+
+/**
+ * Map a matched graph node to the coordinates used for “Focus next”.
+ * The force layout runs on **community** datums; base `data.nodes` may keep (0,0) placeholders,
+ * so we prefer the community that currently contains the node.
+ *
+ * @param {{ id: string|number, x?: number, y?: number }|null|undefined} node
+ * @param {Map<unknown, { nodes?: Array<{ id?: string|number }>, x?: number, y?: number }>|null|undefined} communitiesMap
+ * @param {number} fallbackX
+ * @param {number} fallbackY
+ */
+export function discoveryFocusPoint(node, communitiesMap, fallbackX, fallbackY) {
+  if (!node) return { x: fallbackX, y: fallbackY };
+  const tid = String(node.id);
+  if (communitiesMap && typeof communitiesMap.values === 'function') {
+    for (const c of communitiesMap.values()) {
+      if (!c) continue;
+      const inner = c.nodes;
+      if (
+        Array.isArray(inner) &&
+        inner.some((n) => n && String(n.id) === tid)
+      ) {
+        return graphCoordOrFallback(c, fallbackX, fallbackY);
+      }
+    }
+  }
+  return graphCoordOrFallback(node, fallbackX, fallbackY);
+}
+
 /**
  * d3.zoomIdentity transform that centers graph point (nx, ny) in the viewport.
  * @param {number} nx

@@ -141,7 +141,12 @@ Refs: #20 #46 #32 #64
 
 - **Label search** — Substring + case-fold on **`node.label`** only (**`client/src/utils/graphDiscovery.js`**: **`normalizeGraphLabel`**, **`nodesMatchingLabelQuery`**; tests **`graphDiscovery.test.js`**). Not semantic / embeddings.
 - **Focus / fit** — **Focus next** match cycles **`createFocusZoomTransform`** (**d3.zoomIdentity**); **Show all** resets zoom-driven merge/split and fits the graph (**`resetCanvasViewRef`**).
-- **Minimap** — Read-only overview + viewport rectangle; **`requestAnimationFrame`** throttling with main graph zoom (**`GraphVisualization`**, **`data-testid="graph-minimap"`**).
+
+**Shipped (Apr 2026, branch `issue-73-minimap-pan` — #73 slice; see commit on branch):**
+
+- **Minimap interaction** — Click to **center** the main view on a region (preserves zoom **k**); drag to **pan**. Minimap **`pointer-events: auto`** (was `none` while overview was display-only). Overview SVG: **`role="img"`**, descriptive **`aria-label`**. Programmatic zoom uses **`applyProgrammaticZoomTransformRef`** (same **`d3.zoom`** instance as **`svg.call(zoom)`**). Effect cleanup captures minimap element for **`exhaustive-deps`**.
+- **Focus next correctness** — Search matches return raw **`data.nodes`**; layout/simulation positions **community** datums. **`discoveryFocusPoint`** (**`graphDiscovery.js`**) maps a matched node to its owning community’s **`x`/`y`** so pan targets real on-screen positions (avoids placeholder **`(0,0)`** collapsing every match to the viewport center). Tests in **`graphDiscovery.test.js`**.
+- **Focus next UX** — After zoom, **selects** the focused graph node (**`selectedNodeIds`** / **`selectedNodeId`**), runs **`updateHighlighting`** (including **merged clusters** when any member id is selected), fills the **docked `graph-canvas-tooltip`**, and positions it like a node click. **`setSelectedNodes` is intentionally not called** here: **`selectedNodes`** is in the D3 **`useEffect`** dependency array; updating it **tears down** the graph and **`tooltip.remove()`**, which hid selection + tooltip. **Follow-up:** decouple selection React state from that effect (**backlog issue** below / **#51**).
 - **Chrome UI** — **`GraphChromeUiProvider`** (**`client/src/context/GraphChromeUiContext.jsx`**) persists **`playbackStripVisible`** and **`graphSearchBarVisible`** in **`localStorage`** (`mindmap.chrome.playbackStripVisible`, `mindmap.chrome.graphSearchBarVisible`, default **on**). **View** menu in **`GuestIdentityBanner`** toggles **Playback strip** and **Graph search**; **`GraphPlaybackBanner`** and **`GraphVisualization`** consume. Provider wraps the app in **`client/src/index.js`** (inside **`SessionProvider`** / **`AuthIdentityBridge`** per current tree).
 
 **Backlog (#73 — outside current #38 scope; add comments on refs below):**
@@ -150,37 +155,70 @@ Refs: #20 #46 #32 #64
 2. **Neighborhood focus** — Explicit “focus **N**-hop neighborhood” (not only single-node zoom).
 3. **Saved lenses / filters** — Named persisted views (subset, layout, or query).
 4. **Lightweight provenance panel** — Source/evidence per node or edge where data exists.
-5. **Minimap interaction** — Click/drag on minimap to **pan** viewport (display-only today).
+5. ~~**Minimap interaction**~~ — **Shipped** on branch **`issue-73-minimap-pan`** (click-to-center, drag-to-pan). Optional future: **zoom-from-minimap** (change **k** from overview) — not implemented.
 6. **Performance & scale** — Profile **medium/large** graphs (search + minimap **rAF**, merge/split + simulation).
-7. **D3 / `updateVisualization` hardening** — Stale selections after merge/split; aligns with **#51**.
+7. **D3 / `updateVisualization` hardening** — Stale selections after merge/split; **`selectedNodes` in D3 `useEffect` deps** forces full rebuild on selection state changes — see **backlog: Decouple D3 setup from React `selectedNodes`** below and **#51**.
 8. **Docs** — This section + **`client/README.md`** module bullets (supersedes #73 checklist item “Docs”).
-9. **Read-only / share (#39)** — Product policy: default on/off for discovery bar + minimap for **`readOnly`** viewers (today available unless user hides **Search** via **View**); overlap **#74** share polish.
+9. **Read-only / share** — Product policy: default on/off for discovery bar + minimap for **`readOnly`** viewers (today available unless user hides **Search** via **View**); overlap **#74** share polish. *(GitHub **#39** closed; policy still tracked here / #74.)*
+
+**Follow-ups outside this ticket (Apr 2026, post–minimap / Focus next slice):**
+
+| Topic | Notes | Track on |
+| --- | --- | --- |
+| **Sync React `selectedNodes` after Focus next** | Today only **`selectedNodeIds`** refs update so the D3 effect does not teardown. UI that reads **`selectedNodes` state** (e.g. branch extrapolation labels, **`captureGraphActionSnapshot`’s `relationshipNodes`**) can be stale until a real click. | **#94** + **#51** |
+| **Remove `selectedNodes` from D3 effect deps** | Prefer **`selectedNodesRef`** + `updateHighlightingRef` on selection change; avoids **`tooltip.remove()`** on programmatic selection. | **#94**, **#51** |
+| **Minimap zoom** | Overview could adjust main view **scale** (**k**), not only pan/center. | **#73** / new small issue |
+| **RTL / E2E** | Focus next: match count, pan, tooltip visible, selection styling (**#24**). | **#24** |
+| **Live region / SR** | Announce “Focused: {label}” when stepping matches (**#57**). | **#57** |
+| **Search “no matches” toast** | Optional non-blocking feedback (**#50**, **#40**). | **#50** |
 
 **Suggested GitHub comments (paste on open issues):**
 
-- **#73** — *Apr 2026: Repo docs synced — `docs/github-backlog-issues.md` section *Graph discovery & navigation (#38 shipped / #73 backlog)* + `client/README.md` (`GraphChromeUiContext`, `graphDiscovery.js`, minimap/search). Shipped scope unchanged; follow-ups remain on #73.*
-- **#38** — *Apr 2026: Doc pointer — discovery slice summarized in `docs/github-backlog-issues.md` under #73 section; phase 2 items stay on #73.*
+- **#73** — *Apr 2026 (branch `issue-73-minimap-pan`): Shipped **interactive minimap** (click center, drag pan) + **Focus next** fixes: **`discoveryFocusPoint`** for community coords, **`applyProgrammaticZoomTransformRef`**, selection + docked tooltip after focus (refs only — **`setSelectedNodes` omitted** to avoid D3 effect teardown). Docs: `docs/github-backlog-issues.md`, `client/README.md`, `docs/status.md`. Remaining backlog: semantic search, N-hop, lenses, minimap **zoom**, **#94** / **#51** decouple selection from effect, **#24** E2E, **#57** SR.*
+- **#38** — *Apr 2026: #73 slice landed minimap interaction + Focus next hardening on branch `issue-73-minimap-pan`; doc pointer in `docs/github-backlog-issues.md`. #38 remains closed.*
 - **#33** — *Apr 2026: View menu toggles graph chrome via `GraphChromeUiContext` (playback strip + search bar visibility, localStorage).*
-- **#39** — *Apr 2026: Read-only viewers still get discovery search + minimap unless hidden via View — policy follow-up on #73 item 9 / #74.*
-- **#51** — *Apr 2026: #73 lists D3/updateVisualization hardening post-merge/split as part of discovery/nav phase 2.*
-- **#52** — *Apr 2026: Narrow layout + playback strip + search row — continue z-index / overflow polish as discovery grows (#73 minimap interaction, etc.).*
-- **#57** — *Apr 2026: Discovery search + minimap a11y (live regions, minimap controls when interactive) — #73 follow-ups.*
+- **#39** — *(closed) Apr 2026: Discovery + minimap behavior for read-only viewers unchanged; policy follow-up on #73 item 9 / **#74**.*
+- **#51** — *Apr 2026: Focus next / discovery now relies on refs for selection to avoid full graph rebuild. **Backlog #94:** remove **`selectedNodes`** from D3 `useEffect` deps (or equivalent) so React selection state can sync without **`tooltip.remove()`**; aligns with D3 lifecycle hardening.*
+- **#52** — *Apr 2026: Minimap is interactive + **`pointer-events: auto`**; re-check z-index / overflow with search row + library sidebar on narrow widths.*
+- **#57** — *Apr 2026: Minimap has **`role="img"`** + **`aria-label`**; follow-up: live region when **Focus next** moves selection; keyboard operability for minimap if required by product.*
+- **#74** — *Apr 2026: Read-only/share policy for discovery chrome still open (#73 item 9); minimap is now interactive for all modes that show it.*
 - **#70** — *Apr 2026: Time-travel UX may intersect discovery (e.g. search during playback); #73 neighborhood/lenses are separate product tracks.*
 - **#40** — *Apr 2026: Chrome toggles and discovery UI are part of shell/graph polish; optional toasts for search “no matches” align with #50.*
 
-### Backlog: Interactive minimap — pan/zoom from overview (suggested if split from #73)
+### Backlog: Decouple D3 graph effect from React `selectedNodes` — **GitHub #94**
 
-**Title:** `Backlog: Graph minimap — click/drag to pan viewport`
+**Title:** `Backlog: GraphVisualization — sync selection state without rebuilding D3 on every selection change`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026)
+- The main D3 `useEffect` depends on **`[data, selectedNodes, width, height, readOnly, playbackScrubToken]`**.
+- **Focus next** must update selection + tooltip without calling **`setSelectedNodes`**, because that triggers effect cleanup (**`tooltip.remove()`**, full graph teardown) and hid the tooltip/selection.
+- Node clicks already use **`selectedNodeIds`** refs + **`updateHighlighting()`**; React **`selectedNodes`** can drift.
+
+## Scope
+- Remove or narrow **`selectedNodes`** from the D3 effect dependency array (use a ref mirror + targeted **`updateHighlightingRef`** calls), **or** split “selection-driven” updates from “data/viewport” rebuilds.
+- After decoupling, **Focus next** can call **`setSelectedNodes`** so branch extrapolation / **`captureGraphActionSnapshot`** stay consistent.
+
+Refs: #73 #51
+```
+
+### Backlog: Interactive minimap — ~~pan~~ shipped; zoom from overview (optional)
+
+**Status:** **Pan + click-to-center** shipped on **`issue-73-minimap-pan`**. This draft is for **zoom-from-overview** only if product wants it.
+
+**Title:** `Backlog: Graph minimap — zoom main viewport from overview`
 
 **Body:**
 
 ```markdown
 ## Context
-#73 item 5: minimap is display-only today (`GraphVisualization`).
+Minimap on `issue-73-minimap-pan`: click centers, drag pans; **k** preserved on center.
 
 ## Scope
-- Hit-testing + map minimap coordinates to d3 zoom transform (pan; optional zoom).
-- Keyboard / SR labels when minimap becomes interactive (#57).
+- Optional: map minimap wheel/double-click or gesture to change main view **scale** (**d3.zoom** **k**).
+- Constrain **k** with existing **scaleExtent**; keep **#57** a11y in mind.
 
 Refs: #38 #73 #51 #57 #52
 ```

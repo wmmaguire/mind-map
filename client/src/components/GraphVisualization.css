@@ -1229,7 +1229,7 @@ svg .graph-node-hit {
   border: 1px solid #d0d0d0;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 4;
 }
 

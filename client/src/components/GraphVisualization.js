@@ -12,6 +12,7 @@ import {
 import {
   nodesMatchingLabelQuery,
   createFocusZoomTransform,
+  discoveryFocusPoint,
 } from '../utils/graphDiscovery';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
 import { pickCommunityAnchorNode } from '../utils/clusterAnchor';
@@ -317,7 +318,10 @@ function GraphVisualization({
   const [discoveryQuery, setDiscoveryQuery] = useState('');
   const [discoveryFocusIndex, setDiscoveryFocusIndex] = useState(0);
   const discoveryQueryRef = useRef('');
-  const zoomBehaviorRef = useRef(null);
+  /** Set in D3 effect: `zoom.transform` must use the same zoom instance as `svg.call(zoom)`. */
+  const applyProgrammaticZoomTransformRef = useRef(null);
+  /** Set in D3 effect: select matched node, refresh highlights, show docked tooltip (Focus next / Enter). */
+  const applyDiscoveryFocusNodeUiRef = useRef(null);
   const updateHighlightingRef = useRef(null);
   const updateMinimapRef = useRef(null);
   const graphTransformRef = useRef(null);
@@ -330,6 +334,8 @@ function GraphVisualization({
   /** Skip merge/split while applying programmatic fit (zoom-out would otherwise re-cluster). */
   const skipZoomClusteringRef = useRef(false);
   const resetCanvasViewRef = useRef(null);
+  /** Hierarchical communities map — same datums the force sim positions on screen. */
+  const communitiesRef = useRef(null);
 
   const { sessionId } = useSession();
   const { graphSearchBarVisible } = useGraphChromeUi();
@@ -529,20 +535,30 @@ function GraphVisualization({
     if (!matches.length) return;
     const idx = discoveryFocusIndex % matches.length;
     const node = matches[idx];
-    const { x: nx, y: ny } = effectiveGraphCoords(node, width / 2, height / 2);
-    const t = createFocusZoomTransform(nx, ny, width, height, 1.2);
-    const svg = d3.select(svgRef.current);
-    const zoom = zoomBehaviorRef.current;
-    if (svg.node() && zoom) {
-      svg.call(zoom.transform, t);
-    }
+    const fbX = width / 2;
+    const fbY = height / 2;
+    const { x: nx, y: ny } = discoveryFocusPoint(
+      node,
+      communitiesRef.current,
+      fbX,
+      fbY
+    );
+    const kCur = graphTransformRef.current?.k;
+    const k =
+      typeof kCur === 'number' && kCur > 0 && Number.isFinite(kCur) ? kCur : 1.2;
+    const t = createFocusZoomTransform(nx, ny, width, height, k);
+    applyProgrammaticZoomTransformRef.current?.(t);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        applyDiscoveryFocusNodeUiRef.current?.(node);
+      });
+    });
     setDiscoveryFocusIndex((idx + 1) % matches.length);
   }, [discoveryQuery, discoveryFocusIndex, data, width, height]);
 
   // Add new refs without modifying existing state
   const previousZoomRef = useRef(1);
   const MERGE_THRESHOLD = 0.8; // When to merge: current zoom is 80% of previous
-  const communitiesRef = useRef(null);
 
   // Add new refs for tracking thresholds
   const mergeThresholdRef = useRef(0.8);  // Initial merge threshold
@@ -892,7 +908,10 @@ function GraphVisualization({
     }
 
     svg.call(zoom);
-    zoomBehaviorRef.current = zoom;
+    applyProgrammaticZoomTransformRef.current = (transform) => {
+      if (!svgRef.current || !transform) return;
+      d3.select(svgRef.current).call(zoom.transform, transform);
+    };
 
     // no fade-in
 
@@ -1148,7 +1167,14 @@ function GraphVisualization({
       .data(data.nodes)
       .join('g')
       .attr('class', 'node')
-      .classed('selected', d => selectedNodes.some(n => n.id === d.id))
+      .classed('selected', d =>
+        selectedNodes.some(
+          (n) =>
+            String(n.id) === String(d.id) ||
+            (Array.isArray(d.nodes) &&
+              d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
+        )
+      )
       .on('click', (event, d) => {
         event.stopPropagation();
         
@@ -1298,8 +1324,26 @@ function GraphVisualization({
       .data(d => [d])
       .join('circle')
       .attr('r', 20)
-      .attr('fill', d => selectedNodes.some(n => n.id === d.id) ? highlightedColor : defaultNodeColor)
-      .classed('selected', d => selectedNodes.some(n => n.id === d.id));
+      .attr(
+        'fill',
+        d =>
+          selectedNodes.some(
+            (n) =>
+              String(n.id) === String(d.id) ||
+              (Array.isArray(d.nodes) &&
+                d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
+          )
+            ? highlightedColor
+            : defaultNodeColor
+      )
+      .classed('selected', d =>
+        selectedNodes.some(
+          (n) =>
+            String(n.id) === String(d.id) ||
+            (Array.isArray(d.nodes) &&
+              d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
+        )
+      );
 
     // Add labels
     node.append('text')
@@ -1661,10 +1705,20 @@ function GraphVisualization({
     function updateHighlighting() {
       const matchIds = getSearchMatchIds();
 
+      const datumMatchesSelectedGraphNode = (d) => {
+        if (!d) return false;
+        const sel = selectedNodeIds.current;
+        if (sel.has(String(d.id))) return true;
+        if (Array.isArray(d.nodes)) {
+          return d.nodes.some((n) => n && sel.has(String(n.id)));
+        }
+        return false;
+      };
+
       const radiusForNode = d => {
         const hot = playbackStepHotNodeIdsRef.current;
         const isHot = hot && hot.size && hot.has(String(d.id));
-        if (selectedNodeIds.current.has(d.id)) return 25;
+        if (datumMatchesSelectedGraphNode(d)) return 25;
         const mergedR =
           d && d.nodes && d.nodes.length > 1
             ? Math.min(40, Math.max(30, 20 + 3 * d.nodes.length))
@@ -1683,7 +1737,7 @@ function GraphVisualization({
       };
 
       const strokeForNode = d => {
-        if (selectedNodeIds.current.has(d.id)) return '#f1c40f';
+        if (datumMatchesSelectedGraphNode(d)) return '#f1c40f';
         if (datumMatchesSearch(d, matchIds)) return searchHighlightStroke;
         const hot = playbackStepHotNodeIdsRef.current;
         if (hot && hot.size && hot.has(String(d.id))) return '#f39c12';
@@ -1691,7 +1745,7 @@ function GraphVisualization({
       };
 
       const strokeWidthForNode = d => {
-        if (selectedNodeIds.current.has(d.id)) return 4;
+        if (datumMatchesSelectedGraphNode(d)) return 4;
         if (datumMatchesSearch(d, matchIds)) return 3;
         const hot = playbackStepHotNodeIdsRef.current;
         if (hot && hot.size && hot.has(String(d.id))) return 4;
@@ -1700,7 +1754,7 @@ function GraphVisualization({
 
       g.selectAll('.node circle.graph-node-disc')
         .style('fill', d => {
-          if (selectedNodeIds.current.has(d.id)) return highlightedColor;
+          if (datumMatchesSelectedGraphNode(d)) return highlightedColor;
           if (datumMatchesSearch(d, matchIds)) return searchHighlightFill;
           return d.color || defaultNodeColor;
         })
@@ -1784,6 +1838,112 @@ function GraphVisualization({
     }
 
     updateHighlightingRef.current = updateHighlighting;
+
+    function findCommunityOwningGraphNodeId(nodeId) {
+      const map = communitiesRef.current;
+      if (!map) return null;
+      for (const c of map.values()) {
+        if (c?.nodes?.some((n) => n && String(n.id) === String(nodeId))) return c;
+      }
+      return null;
+    }
+
+    function buildTooltipHtmlForDiscoveryFocus(rawNode) {
+      if (!rawNode) return '<strong>No node</strong>';
+      const comm = findCommunityOwningGraphNodeId(rawNode.id);
+      if (comm && comm.nodes && comm.nodes.length > 1) {
+        const communityLabel = comm.label || 'Group';
+        const communityDescription =
+          comm.description || `Contains ${comm.nodes.length} nodes`;
+        const validNodes = comm.nodes.filter(
+          (node) => node && typeof node === 'object'
+        );
+        const nodeLabels = validNodes
+          .map((node) => node.label || 'Unnamed Node')
+          .join(', ');
+        return (
+          `<strong>${communityLabel}</strong><br/><br/>${communityDescription}<br/><br/>` +
+          `Nodes: ${nodeLabels}`
+        );
+      }
+      const nodeToShow = rawNode;
+      const showLabel = nodeToShow.label || 'Unnamed Node';
+      let html =
+        `<strong>${showLabel}</strong><br/>` +
+        (nodeToShow.description ? `${nodeToShow.description}<br/>` : '') +
+        (nodeToShow.wikiUrl
+          ? `<a href="${nodeToShow.wikiUrl}" target="_blank">Learn more</a><br/>`
+          : '');
+      const connectedLinks = data.links
+        ? data.links.filter((link) => {
+          const sourceId =
+            typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === 'object' ? link.target.id : link.target;
+          return sourceId === nodeToShow.id || targetId === nodeToShow.id;
+        })
+        : [];
+      if (connectedLinks.length > 0) {
+        html += '<br/><strong>Related Concepts:</strong><br/>';
+        html += connectedLinks
+          .map((link) => {
+            try {
+              const otherNodeId =
+                typeof link.source === 'object'
+                  ? link.source.id === nodeToShow.id
+                    ? link.target.id
+                    : link.source.id
+                  : link.source === nodeToShow.id
+                    ? link.target
+                    : link.source;
+              const otherNode = data.nodes.find((n) => n.id === otherNodeId);
+              if (!otherNode) return '';
+              const strengthNum =
+                typeof link.strength === 'number' && Number.isFinite(link.strength)
+                  ? Math.max(0, Math.min(1, link.strength))
+                  : null;
+              const strengthLabel =
+                strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
+              return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
+            } catch (e) {
+              return '';
+            }
+          })
+          .filter(Boolean)
+          .join('<br/>');
+      }
+      html += explodeTooltipActionsHtml(nodeToShow);
+      return html;
+    }
+
+    function applyDiscoveryFocusNodeUi(rawNode) {
+      if (!rawNode) return;
+      selectedLinkKeyRef.current = null;
+      selectedNodeIds.current.clear();
+      selectedNodeId.current = rawNode.id;
+      selectedNodeIds.current.add(rawNode.id);
+      // Do not call setSelectedNodes here: it is in the D3 effect deps, so updating it tears
+      // down the graph (cleanup removes the tooltip SVG mount) and clears this UI. Matches
+      // handleNodeClick, which only uses refs + updateHighlighting.
+      updateHighlighting();
+      tooltip
+        .html(buildTooltipHtmlForDiscoveryFocus(rawNode))
+        .style('opacity', 0.9);
+      const el = g
+        .selectAll('.node')
+        .filter((d) => {
+          if (!d) return false;
+          if (String(d.id) === String(rawNode.id)) return true;
+          return (
+            Array.isArray(d.nodes) &&
+            d.nodes.some((n) => n && String(n.id) === String(rawNode.id))
+          );
+        })
+        .node();
+      if (el) scheduleTooltipPosition(el);
+    }
+
+    applyDiscoveryFocusNodeUiRef.current = applyDiscoveryFocusNodeUi;
 
     // Add click handler to svg to deselect
     svg.on('click', () => {
@@ -2482,7 +2642,8 @@ function GraphVisualization({
       simulation.stop();
       communityForceSimulationRef.current = null;
       tooltip.remove();
-      zoomBehaviorRef.current = null;
+      applyProgrammaticZoomTransformRef.current = null;
+      applyDiscoveryFocusNodeUiRef.current = null;
       updateHighlightingRef.current = null;
       updateMinimapRef.current = null;
       resetCanvasViewRef.current = null;
