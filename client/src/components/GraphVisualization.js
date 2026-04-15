@@ -575,6 +575,10 @@ function GraphVisualization({
     // Always initialize communities when the component mounts or data changes
     communitiesRef.current = initializeCommunities();
 
+    // This effect can re-run (e.g. Escape clears selection). Ensure we don't append a
+    // second graph layer on top of the previous one.
+    svg.selectAll('g.graph-root').remove();
+
     // Modify the zoom behavior
     const g = svg
       .append('g')
