@@ -268,6 +268,34 @@ describe('GraphVisualization graph action menu', () => {
     });
   });
 
+  it('exposes an accessible minimap with pointer interaction (GitHub #73)', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const mini = screen.getByTestId('graph-minimap');
+    expect(mini).toHaveAttribute('role', 'img');
+    expect(mini.getAttribute('aria-label') || '').toMatch(/overview/i);
+
+    fireEvent.pointerDown(mini, {
+      pointerId: 42,
+      button: 0,
+      clientX: 70,
+      clientY: 50,
+    });
+    fireEvent.pointerUp(mini, {
+      pointerId: 42,
+      button: 0,
+      clientX: 70,
+      clientY: 50,
+    });
+  });
+
   it('still closes add-node modal on Escape', () => {
     render(
       <GraphVisualization

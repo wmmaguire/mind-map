@@ -323,6 +323,10 @@ function GraphVisualization({
   const graphTransformRef = useRef(null);
   const minimapRafRef = useRef(null);
   const minimapSvgRef = useRef(null);
+  /** GitHub #73: last minimap world bounds (graph coords) for click/drag → pan. */
+  const minimapExtentsRef = useRef(null);
+  /** Pointer-drag state for minimap pan (avoids treating drags as clicks). */
+  const minimapNavDragRef = useRef(null);
   /** Skip merge/split while applying programmatic fit (zoom-out would otherwise re-cluster). */
   const skipZoomClusteringRef = useRef(false);
   const resetCanvasViewRef = useRef(null);
@@ -1484,7 +1488,10 @@ function GraphVisualization({
 
     function renderMinimap() {
       const el = minimapSvgRef.current;
-      if (!el || !data.nodes?.length) return;
+      if (!el || !data.nodes?.length) {
+        minimapExtentsRef.current = null;
+        return;
+      }
       const T = graphTransformRef.current || d3.zoomIdentity;
       const tw = width;
       const th = height;
@@ -1551,9 +1558,96 @@ function GraphVisualization({
         .attr('stroke', '#e74c3c')
         .attr('stroke-width', 1.25)
         .attr('pointer-events', 'none');
+
+      minimapExtentsRef.current = { minX, maxX, minY, maxY, mw, mh };
     }
 
     updateMinimapRef.current = renderMinimap;
+
+    /** GitHub #73: map minimap SVG coords (viewBox 0–mw, 0–mh) to graph space. */
+    function centerMainViewOnGraphPoint(gx, gy) {
+      if (!Number.isFinite(gx) || !Number.isFinite(gy)) return;
+      const T = graphTransformRef.current || d3.zoomIdentity;
+      const k = T.k;
+      const t = d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(k)
+        .translate(-gx, -gy);
+      d3.select(svgRef.current).call(zoom.transform, t);
+    }
+
+    function panMainViewByMinimapDelta(dmx, dmy) {
+      const ext = minimapExtentsRef.current;
+      if (!ext || !Number.isFinite(dmx) || !Number.isFinite(dmy)) return;
+      const dgx = (dmx / ext.mw) * (ext.maxX - ext.minX);
+      const dgy = (dmy / ext.mh) * (ext.maxY - ext.minY);
+      const T = graphTransformRef.current || d3.zoomIdentity;
+      const newT = d3.zoomIdentity
+        .translate(T.x - T.k * dgx, T.y - T.k * dgy)
+        .scale(T.k);
+      d3.select(svgRef.current).call(zoom.transform, newT);
+    }
+
+    function setupMinimapNavigation() {
+      const el = minimapSvgRef.current;
+      if (!el) return;
+      const sel = d3.select(el);
+      sel
+        .style('cursor', 'grab')
+        .style('touch-action', 'none')
+        .on('pointerdown.minimapNav', (event) => {
+          if (event.button !== 0) return;
+          const pt = d3.pointer(event, el);
+          minimapNavDragRef.current = {
+            pointerId: event.pointerId,
+            lastM: pt,
+            didDrag: false,
+          };
+          sel.style('cursor', 'grabbing');
+          try {
+            el.setPointerCapture(event.pointerId);
+          } catch {
+            /* ignore */
+          }
+        })
+        .on('pointermove.minimapNav', (event) => {
+          const st = minimapNavDragRef.current;
+          if (!st || event.pointerId !== st.pointerId) return;
+          const pt = d3.pointer(event, el);
+          const dmx = pt[0] - st.lastM[0];
+          const dmy = pt[1] - st.lastM[1];
+          if (Math.abs(dmx) < 0.5 && Math.abs(dmy) < 0.5) return;
+          st.didDrag = true;
+          st.lastM = pt;
+          panMainViewByMinimapDelta(dmx, dmy);
+        });
+
+      function endMinimapPointer(event) {
+        const st = minimapNavDragRef.current;
+        if (!st || event.pointerId !== st.pointerId) return;
+        try {
+          el.releasePointerCapture(event.pointerId);
+        } catch {
+          /* ignore */
+        }
+        minimapNavDragRef.current = null;
+        sel.style('cursor', 'grab');
+        const clickToCenter = event.type === 'pointerup' && !st.didDrag;
+        if (!clickToCenter) return;
+        const ext = minimapExtentsRef.current;
+        if (!ext) return;
+        const [mx, my] = st.lastM;
+        const gx = ext.minX + (mx / ext.mw) * (ext.maxX - ext.minX);
+        const gy = ext.minY + (my / ext.mh) * (ext.maxY - ext.minY);
+        centerMainViewOnGraphPoint(gx, gy);
+      }
+
+      sel
+        .on('pointerup.minimapNav', endMinimapPointer)
+        .on('pointercancel.minimapNav', endMinimapPointer);
+    }
+
+    setupMinimapNavigation();
 
     /** Matches unselected radii used before first `updateHighlighting` pass. */
     function initialCommunityRadius(d) {
@@ -2356,6 +2450,8 @@ function GraphVisualization({
     updateVisualization();
     updateHighlighting();
 
+    const minimapElForNavCleanup = minimapSvgRef.current;
+
     // Cleanup
     return () => {
       stopExplodeNodeStretchAnimation();
@@ -2372,6 +2468,17 @@ function GraphVisualization({
         cancelAnimationFrame(minimapRafRef.current);
         minimapRafRef.current = null;
       }
+      if (minimapElForNavCleanup) {
+        d3.select(minimapElForNavCleanup)
+          .on('pointerdown.minimapNav', null)
+          .on('pointermove.minimapNav', null)
+          .on('pointerup.minimapNav', null)
+          .on('pointercancel.minimapNav', null)
+          .style('cursor', null)
+          .style('touch-action', null);
+      }
+      minimapExtentsRef.current = null;
+      minimapNavDragRef.current = null;
       simulation.stop();
       communityForceSimulationRef.current = null;
       tooltip.remove();
@@ -4033,7 +4140,8 @@ function GraphVisualization({
           width={140}
           height={100}
           viewBox="0 0 140 100"
-          aria-hidden
+          role="img"
+          aria-label="Graph overview. Click to center the view on a region. Drag to pan."
           data-testid="graph-minimap"
         />
         {actionsFabButton || null}
