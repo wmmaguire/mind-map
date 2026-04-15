@@ -37,6 +37,8 @@ const COMMUNITY_SIM_VELOCITY_DECAY_EXPLODE = 0.86;
 const COMMUNITY_SIM_CHARGE_EXPLODE = -52;
 const COMMUNITY_SIM_ALPHA_TARGET_EXPLODE = 0.055;
 const COMMUNITY_SIM_ALPHA_MIN_EXPLODE = 0.2;
+/** `forceX` / `forceY` strength toward `width/2` & `height/2` (default D3 is 0.1). */
+const COMMUNITY_SIM_XY_STRENGTH = 0.32;
 
 /** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
 function pathHasConsecutiveGraphLinks(pathIds, links) {
@@ -875,8 +877,8 @@ function GraphVisualization({
         .id(d => d.id)
         .distance(100))
       .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
-      .force('x', d3.forceX(width / 2).strength(0.1))
-      .force('y', d3.forceY(height / 2).strength(0.1))
+      .force('x', d3.forceX(width / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
+      .force('y', d3.forceY(height / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
       .force('collision', d3.forceCollide().radius(50));
 
     // Tooltip: placed just left of the clicked node/link (clamped inside canvas)
