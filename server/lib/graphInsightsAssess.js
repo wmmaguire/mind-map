@@ -2,7 +2,7 @@
  * POST /api/graph-insights-assess — LLM narrative from centrality-notable nodes (GitHub #83 extension).
  */
 
-const TONE_IDS = ['jung', 'freud', 'murakami', 'thompson', 'custom'];
+const TONE_IDS = ['jung', 'freud', 'murakami', 'jones', 'thompson', 'custom'];
 
 const TONE_SYSTEM_HINTS = {
   jung:
@@ -11,6 +11,8 @@ const TONE_SYSTEM_HINTS = {
     'Adopt a probing, associative voice inspired by Sigmund Freud: latent connections, tension between ideas—use as literary framing only; avoid medical or diagnostic language.',
   murakami:
     'Adopt a spare, dream-adjacent tone inspired by Haruki Murakami: quiet images, subtle uncanny links between concepts—still factual about the graph structure.',
+  jones:
+    'Adopt a broad satirical parody of an urgent talk-radio / broadcast style (breathless pacing, conspiratorial, dramatic pivots) inspired by Alex Jones as **voice only**—comedic exaggeration. Every substantive claim must be grounded in the map structure.',
   thompson:
     'Adopt a vivid, first-person-leaning energy inspired by Hunter S. Thompson: punchy, satirical, high-color prose—without inventing facts not supported by the node summaries.',
 };
