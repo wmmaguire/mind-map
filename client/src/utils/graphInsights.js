@@ -8,6 +8,7 @@ export const INSIGHT_ASSESS_TONE_OPTIONS = [
   { id: 'jung', label: 'Carl Jung' },
   { id: 'freud', label: 'Sigmund Freud' },
   { id: 'murakami', label: 'Haruki Murakami' },
+  { id: 'jones', label: 'Alex Jones' },
   { id: 'thompson', label: 'Hunter S. Thompson' },
   { id: 'custom', label: 'Custom' },
 ];

@@ -107,7 +107,7 @@ The server intentionally stores some data **on disk** and related metadata **in 
 
 - `config.js`: **`DATA_DIR`** (uploads/metadata/graphs root) and **`CORS_ORIGINS`** parsing
 - `server.js`: main entrypoint (Express app + OpenAI analyze/generate-node + **`POST /api/graph-insights-assess`** + DB connect); mounts routers below; **`GET /health`** and **`GET /api/test`** (JSON health) are registered **early** (before other `/api` routers); HTTP server uses **`http.createServer`** with configurable **`maxHeaderSize`**
-- `lib/graphInsightsAssess.js`: validates **`POST /api/graph-insights-assess`** body (tone presets, notable nodes from client centralities); OpenAI chat completion; theme-led interpretive prompt (metrics inform reasoning privately—see GitHub **#83**)
+- `lib/graphInsightsAssess.js`: validates **`POST /api/graph-insights-assess`** body (tone presets including **`jones`**, notable nodes from client centralities); OpenAI chat completion; **psychoanalytic** interpretive prompt (three guiding questions: structure, theme/meaning, direction/inspiration; **2–3** paragraphs; `max_tokens` **1100**; metrics inform reasoning privately—see GitHub **#83**)
 - `routes/files.js`: **`/api/files`**, **`/api/upload`**, **`/api/files/:filename`** (library uploads + metadata)
 - `routes/auth.js`: **`/api/auth/register`**, **`/api/auth/login`**, **`/api/auth/logout`**, **`GET /api/auth/me`**, **`PATCH /api/auth/me`**, **`POST /api/auth/forgot-password`**, **`POST /api/auth/reset-password`** (JWT **`mindmap_auth`** httpOnly cookie; password reset uses one-time token, **1h** expiry, hashed at rest — GitHub **#63** / **#31**)
 - `routes/graphs.js`: **`/api/graphs/*`** (save, list, load, view stats, read-only share token — **#39**)

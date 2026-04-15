@@ -196,9 +196,20 @@ Refs: #20 #46 #32 #64
 
 **Shipped (post–v1 snapshot, same branch / PR stack):**
 
-- **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; prompt emphasizes **thematic / psychoanalytic interpretation** (metrics guide reasoning **without** foregrounding technical centrality names). Uses **`OPENAI_ANALYZE_MODEL`**.
-- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, voice dropdown (Jung / Freud / Murakami / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Top by degree** **collapsed by default** (disclosure toggle).
+- **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; **psychoanalytic** framing with **three guiding questions** (symptomatic structure; theme/meaning; projected thematic direction / inspiration); output **2–3 short paragraphs**; `max_tokens` **1100**; system message stresses **speculative** reading vs clinical diagnosis; metrics guide reasoning **without** foregrounding technical centrality names. Uses **`OPENAI_ANALYZE_MODEL`**.
+- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, voice dropdown (Jung / Freud / Murakami / **Alex Jones** parody `jones` / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Top by degree** **collapsed by default** (disclosure toggle).
 - **`GraphTitleContext`** — context object **exported** for safe **`useContext`** in **`GraphVisualization`** when tests omit the provider.
+
+**Follow-ups outside the assess prompt / voice slice (still backlog):**
+
+| Topic | Notes | Track on |
+| --- | --- | --- |
+| **Client ↔ server tone ids** | Contract test or shared source so **`INSIGHT_ASSESS_TONE_OPTIONS`** and **`TONE_IDS`** cannot drift (avoids **400** `INVALID_TONE`) | **#97** |
+| **LLM assess product polish** | Rate limits, **`UserActivity`** audit, response cache, persist text with graph, iOS clipboard, `aria-live` | **#96** (unchanged) |
+| **Metrics / playback / scale** | Diameter, extra centralities, patterns, playback-linked trends, workers — unchanged by prompt work | **#83** / **#95** |
+| **Ops** | Restart API after **`graphInsightsAssess.js`** deploy so validation + prompt changes load | deploy runbook |
+
+GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizing this assess update; **#97** opened for tone-id parity.
 
 **Still on epic #83 / child backlog #95 (outside current slice):**
 
@@ -217,13 +228,14 @@ Refs: #20 #46 #32 #64
 
 **Suggested GitHub comments (Apr 2026, post–#83 v1):**
 
-- **#83** — *Phase 1 merged on `issue-83-graph-insights`: View→Insights, `graphInsights.js`, panel + Focus (discovery parity). Remaining epic items + scale work tracked in body + **#95**.*
+- **#83** — *Phase 1 merged on `issue-83-graph-insights`: View→Insights, `graphInsights.js`, panel + Focus (discovery parity). Remaining epic items + scale work tracked in body + **#95**.* *(Apr 2026: assess prompt + **`jones`** tone — see issue comment thread.)*
 - **#73** — *Insights Focus reuses discovery zoom/focus refs; future “metric → highlight neighborhood” belongs here alongside N-hop / lenses.*
 - **#70** — *#83 proposed playback **metric trends**; v1 is snapshot-only. Consider `computeGraphInsights(buildGraphAtPlaybackTime(...))` per step with caching.*
 - **#74** — *Insights toggle is per-browser `localStorage` for share viewers too; product may want default-off or hidden chrome for read-only.*
 - **#91** — *v1 ranks by degree/weighted degree; phase 2 can surface cluster-level stats or align chip anchors with insight selections.*
 - **#94** — *Insights **Focus** matches **Focus next** (no `setSelectedNodes`); decoupling D3 deps allows syncing React selection if needed.*
 - **#57** — *New insights region + focus buttons: follow up with live region on Focus, keyboard traversal of top list.*
+- **#95** / **#96** / **#97** — *Assess narrative changes and tone parity: see issue comments (Apr 2026) and **#97**.*
 
 ### Backlog: Decouple D3 graph effect from React `selectedNodes` — **GitHub #94**
 

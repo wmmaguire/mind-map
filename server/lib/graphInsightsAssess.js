@@ -163,21 +163,22 @@ export async function runGraphInsightsAssess(openai, validated) {
 | Closeness | Relevance | "Core" — so central to the map's concerns that almost every train of thought can return to it quickly. |
 | Eigenvector | Depth/authority | "Sophisticated neighbor" — may show up modestly in the lists, yet sits among the weightiest ideas structurally. |`;
 
-  const userContent = `You are helping a user read a concept graph (mind map) as a **coherent psychological or thematic field**: what holds attention, what mediates between sub-themes, and what gives the whole its overarching tone or structure.
+  const userContent = `You are helping a user read a concept graph (mind map) through a **psychoanalytic lens**: treat the map as a symbolic field—what is being worked through, avoided, or returned to—and **speculate** on the **underlying theme or psychic “meaning”** the arrangement suggests (always grounded in the nodes and links, not clinical fact).
 
-**Guiding questions (address both, in order — in plain, interpretive language):**
-1. **What stands out:** Which topics *feel* load-bearing or symptomatic—carrying disproportionate weight, linking unlike areas, or anchoring the graph's "climate"? What latent patterns tie the map together (fragmentation vs unity, a dominant pole vs many equals, etc.)? You may use graphSummary (e.g. components, density) only as light texture, not as a lecture.
-2. **How meaning is organized:** How do the standout topics shape the graph's overarching story or meaning—what gets foregrounded, what stays peripheral, what must pass through what to connect?
+**Guiding questions (answer in a flowing psychoanalytic reading, not a checklist):**
+1. **Symptomatic structure:** What topics *feel* load-bearing—carrying weight, linking unlike areas, or anchoring the graph’s emotional or intellectual “climate”? What latent tensions or repetitions appear (splitting, fixation, a dominant pole vs many equals, bridges vs isolates)? Use graphSummary only as light texture.
+2. **Theme and meaning:** What overarching story or unconscious preoccupation might this map *express*—what is foregrounded vs peripheral, what must be “passed through” to connect disparate concerns, and what single or few **themes** might unify the field?
+3. **Direction and inspiration:** What is the **projected thematic direction** of this graph—where the structure seems to lean, open, or resolve—and **what might it inspire** (lines of thought, feeling-tones, or creative next steps), without inventing content absent from the data?
 
-**How to use the data:** The JSON lists rank notable nodes along different *structural* roles. Those roles are **for your inference only**. Translate them into **topic names and images** (umbrella vs pivot vs gravitational core vs quietly authoritative thread). **Avoid** foregrounding technical vocabulary: do **not** name or emphasize "degree," "betweenness," "closeness," "eigenvector," or "centrality" in the prose unless a single understated mention is unavoidable. Never open sentences with metric names. Prefer psychoanalytic / thematic language: fixation, return of the same motif, bridge between two psychic or discursive worlds, horizon of concern, etc., always tied to **specific concept labels** from the data.
+**How to use the data:** The JSON ranks nodes by structural role; that is **private inference**. Translate into **images and motives** (umbrella, pivot, gravitational core, quiet authority). **Avoid** metric jargon: do **not** name or stress "degree," "betweenness," "closeness," "eigenvector," or "centrality" unless one understated mention is unavoidable. Never open sentences with metric names. Prefer psychoanalytic language tied to **specific concept labels**: desire and defense, return of the motif, object relations, shadow/splitting only as metaphor, horizon of concern, what the map *keeps circling*.
 
 ${metricGuide}
 
-**Data:** JSON below (keys like degree / betweenness are for your sorting only—do not repeat those key names as headings or emphasis in the answer). Ground claims in descriptions and URLs when present; otherwise labels and structure. Do not invent facts.
+**Data:** JSON below (keys like degree / betweenness are for your sorting only—do not repeat those key names as headings). Ground claims in descriptions and URLs when present; otherwise labels and structure. Do not invent facts about real people or events.
 
 ${JSON.stringify(payload, null, 2)}
 
-**Output:** **3–5 short paragraphs**, plain text (no JSON, no markdown tables). Warm, readable, concept-led; structure your reasoning using the internal table above, but the reader should experience an interpretation of **topics and themes**, not a methods recap.
+**Output:** **2–3 short paragraphs**, plain text (no JSON, no markdown tables). Weave the three angles together: **psychoanalytic interpretation**, **speculative theme**, and **projected direction / what the map might inspire**—the reader should feel **meaning, motive, and forward possibility**, not a methods recap.
 
 ${toneInstruction}`;
 
@@ -187,12 +188,12 @@ ${toneInstruction}`;
       {
         role: 'system',
         content:
-          'You write interpretive, theme-forward commentary on knowledge graphs. Structural rankings inform your reasoning privately; you write about topics, psychological or narrative weight, and overarching meaning—not about network metrics by name. You avoid medical diagnoses, legal advice, and false precision. You never claim a real historical figure is speaking.',
+          'You write psychoanalytically inflected, theme-forward readings of knowledge graphs: speculative interpretation of what the map might express, not clinical diagnosis. Structural rankings inform your reasoning privately; you avoid network jargon by name. You avoid medical diagnoses, legal advice, and false precision about real individuals. You never claim a real historical figure is speaking.',
       },
       { role: 'user', content: userContent },
     ],
     temperature: 0.65,
-    max_tokens: 1400,
+    max_tokens: 1100,
   });
 
   const text = completion.choices[0]?.message?.content?.trim() || '';
