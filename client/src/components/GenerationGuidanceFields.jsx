@@ -20,6 +20,11 @@ function GenerationGuidanceFields({
   const helpId = `${idPrefix}-context-help`;
   const presetId = `${idPrefix}-preset`;
   const customId = `${idPrefix}-custom`;
+  const presetOptions = GUIDANCE_PRESET_SELECT_OPTIONS.map(([value, optionLabel]) => (
+    <option key={value} value={value}>
+      {optionLabel}
+    </option>
+  ));
 
   return (
     <div
@@ -38,11 +43,7 @@ function GenerationGuidanceFields({
         disabled={disabled}
         aria-describedby={helpId}
       >
-        {GUIDANCE_PRESET_SELECT_OPTIONS.map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
+        {presetOptions}
       </select>
       {preset === 'custom' && (
         <textarea
