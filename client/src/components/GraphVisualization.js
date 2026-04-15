@@ -414,8 +414,14 @@ function GraphVisualization({
     // Keep it around during playback scrubs so we can highlight removals (last-step deltas).
     const prevRoot = svg.select('g.graph-root');
     if (!prevRoot.empty()) {
-      if (FADE_MS > 0 && !skipPlaybackRootCrossfade) {
+      if (FADE_MS > 0) {
+        // During playback scrubs, keep the previous root briefly so the transition is consistent
+        // across steps (including the final step) and we can highlight removals if any.
         prevRoot.classed('graph-root--prev', true).style('pointer-events', 'none');
+        if (!skipPlaybackRootCrossfade) {
+          // Non-playback rerenders: fade out immediately.
+          prevRoot.transition().duration(FADE_MS).style('opacity', 0).remove();
+        }
       } else {
         prevRoot.remove();
       }
