@@ -1695,9 +1695,7 @@ function GraphVisualization({
         .attr('text-anchor', 'middle')
         .text(d => {
           if (!d || !d.nodes) return 'Unknown';
-          if (d.nodes.length > 1) {
-            return d.label || `Group (${d.nodes.length})`;
-          }
+          if (d.nodes.length > 1) return '';
           return d.nodes[0]?.label || 'Unknown';
         });
 
