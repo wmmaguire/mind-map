@@ -135,6 +135,8 @@ function GraphVisualization({
     ty: 1,
   });
   const explodeStretchTimerStopRef = useRef(null);
+  /** `updateVisualization` rebinds this; tick must run for explode scale (sim cools and stops otherwise). */
+  const communityForceSimulationRef = useRef(null);
 
   const stopExplodeNodeStretchAnimation = () => {
     explodeStretchRef.current.active = false;
@@ -147,6 +149,11 @@ function GraphVisualization({
     if (typeof stop === 'function') {
       stop();
       explodeStretchTimerStopRef.current = null;
+    }
+    try {
+      communityForceSimulationRef.current?.alphaTarget(0);
+    } catch (_) {
+      /* ignore */
     }
   };
 
@@ -181,6 +188,15 @@ function GraphVisualization({
     explodeStretchTimerStopRef.current = () => {
       timer.stop();
     };
+
+    const sim = communityForceSimulationRef.current;
+    if (sim) {
+      try {
+        sim.alphaTarget(0.18).alpha(Math.max(sim.alpha(), 0.34)).restart();
+      } catch (_) {
+        /* ignore */
+      }
+    }
   };
 
   const [generateProgress, setGenerateProgress] = useState(null);
@@ -870,7 +886,7 @@ function GraphVisualization({
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
         `data-node-id="${safe}" aria-label="Explode">` +
-        'Explode</button>' +
+        '💥 Explode 💥</button>' +
         '<div class="graph-tooltip-explode-guidance">' +
         '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-preset">' +
         'Guidance (optional)</label>' +
@@ -2079,6 +2095,7 @@ function GraphVisualization({
           }
         });
 
+      communityForceSimulationRef.current = simulation;
       simulation.alpha(0.3).restart();
 
       playbackPrevCommunityIdsRef.current = buildCommunityIdSet(visibleElements);
@@ -2271,6 +2288,7 @@ function GraphVisualization({
         minimapRafRef.current = null;
       }
       simulation.stop();
+      communityForceSimulationRef.current = null;
       tooltip.remove();
       zoomBehaviorRef.current = null;
       updateHighlightingRef.current = null;
