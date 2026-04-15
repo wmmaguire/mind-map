@@ -213,7 +213,7 @@ Refs: #20 #46 #32 #64
 | **Performance** | Web worker, progressive compute, snapshot **cache** (hash nodes/links/times), server precompute for huge graphs | **#95** |
 | **Weighted degree in UI** | v1 uses strength internally for ranking weights; optional column or tooltip | **#83** |
 | **Read-only default** | Align Insights default with **#74** / #73 item 9 if product wants | **#74** |
-| **LLM assess polish** | Rate limits, **`UserActivity`** audit, response **cache** by graph hash, persist text with graph, iOS clipboard for Copy, `aria-live` on complete — see **open backlog issue** linked from **#83** comments |
+| **LLM assess polish** | Rate limits, **`UserActivity`** audit, response **cache** by graph hash, persist text with graph, iOS clipboard for Copy, `aria-live` on complete | **#96** |
 
 **Suggested GitHub comments (Apr 2026, post–#83 v1):**
 
