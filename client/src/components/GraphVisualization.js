@@ -1730,7 +1730,6 @@ function GraphVisualization({
               : null;
 
           const padX = 8;
-          const padY = 5;
           const textX = thumbUrl ? 26 : 8;
           const approxW = Math.min(190, Math.max(90, textX + label.length * 6.2));
           const h = 28;
