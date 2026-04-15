@@ -191,6 +191,69 @@ describe('GraphVisualization graph action menu', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows Explode subgraph control under AI Generation (#69)', () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open graph actions menu/i })
+    );
+    expect(screen.getByTestId('graph-action-explode')).toBeInTheDocument();
+    expect(screen.getByText('Explode subgraph')).toBeInTheDocument();
+  });
+
+  it('shows Explode subgraph on the node selection tooltip (#69)', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    expect(svg).toBeTruthy();
+    const nodeG = svg.querySelector('g.node');
+    expect(nodeG).toBeTruthy();
+    fireEvent.click(nodeG);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('graph-tooltip-explode-btn')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: /Explode subgraph from this concept/i })
+    ).toBeInTheDocument();
+  });
+
+  it('does not show Explode subgraph on the tooltip when readOnly (#69)', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        readOnly
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    fireEvent.click(svg.querySelector('g.node'));
+
+    await waitFor(() => {
+      const tip = document.querySelector('.graph-canvas-tooltip');
+      expect(tip).toBeTruthy();
+      expect(within(tip).getByText(/^One$/)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('graph-tooltip-explode-btn')).not.toBeInTheDocument();
+  });
+
   it('shows discovery search, match count, minimap, and focus control (#38)', async () => {
     render(
       <GraphVisualization

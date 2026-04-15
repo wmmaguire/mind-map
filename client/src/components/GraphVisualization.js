@@ -76,6 +76,9 @@ function GraphVisualization({
   const selectedLinkKeyRef = useRef(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  /** GitHub #69: POST /api/explode-node (Wikipedia-backed dense subgraph from one anchor). */
+  const [explodeInProgress, setExplodeInProgress] = useState(false);
+  const handleExplodeNodeRef = useRef(null);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
   /** GitHub #62: manual (single call, link to all highlights) vs community evolution */
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
@@ -736,6 +739,52 @@ function GraphVisualization({
       .attr('aria-live', 'polite')
       .style('opacity', 0);
 
+    function escapeHtmlAttr(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;');
+    }
+
+    function explodeTooltipActionsHtml(anchorNode) {
+      if (readOnly || typeof onDataUpdate !== 'function' || !anchorNode) return '';
+      const fromData = data.nodes.find((n) => String(n.id) === String(anchorNode.id));
+      if (!fromData) return '';
+      if (fromData.explosionExpandedAt != null) {
+        return '<p class="graph-tooltip-explode-note">Subgraph already expanded for this concept.</p>';
+      }
+      const safe = escapeHtmlAttr(String(fromData.id));
+      return (
+        '<div class="graph-tooltip-explode-wrap">' +
+        '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
+        'data-testid="graph-tooltip-explode-btn" ' +
+        `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +
+        '💥 Explode subgraph</button>' +
+        '<p class="graph-tooltip-explode-hint">Adds a small Wikipedia-backed cluster linked here.</p></div>'
+      );
+    }
+
+    const wrapForExplode = graphCanvasWrapRef.current;
+    let onTooltipExplodeClick = null;
+    if (wrapForExplode) {
+      onTooltipExplodeClick = (e) => {
+        const tgt = e.target;
+        const btn =
+          tgt && typeof tgt.closest === 'function'
+            ? tgt.closest('[data-tooltip-explode="1"]')
+            : null;
+        if (!btn || !wrapForExplode.contains(btn)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const rawId = btn.getAttribute('data-node-id');
+        if (rawId != null && rawId !== '') {
+          void handleExplodeNodeRef.current?.(rawId);
+        }
+      };
+      wrapForExplode.addEventListener('click', onTooltipExplodeClick);
+    }
+
     function positionCanvasTooltipNearTarget(targetEl) {
       const mount = graphCanvasWrapRef.current;
       if (!mount || !targetEl || typeof targetEl.getBoundingClientRect !== 'function') {
@@ -947,6 +996,7 @@ function GraphVisualization({
                 .join('<br/>');
               tooltipContent += relatedNodesContent;
             }
+            tooltipContent += explodeTooltipActionsHtml(selectedNode);
           } else {
             tooltipContent = '<strong>Node information unavailable</strong>';
           }
@@ -1117,6 +1167,7 @@ function GraphVisualization({
               .join('<br/>');
             tooltipContent += relatedNodes;
           }
+          tooltipContent += explodeTooltipActionsHtml(nodeToShow);
         }
 
         tooltip.html(tooltipContent);
@@ -1620,6 +1671,7 @@ function GraphVisualization({
                   .join('<br/>');
                 tooltipContent += relatedNodesContent;
               }
+              tooltipContent += explodeTooltipActionsHtml(selectedNode);
             } else {
               tooltipContent = '<strong>Node information unavailable</strong>';
             }
@@ -2026,6 +2078,9 @@ function GraphVisualization({
         window.clearTimeout(playbackEaseHighlightTimerRef.current);
         playbackEaseHighlightTimerRef.current = null;
       }
+      if (wrapForExplode && onTooltipExplodeClick) {
+        wrapForExplode.removeEventListener('click', onTooltipExplodeClick);
+      }
       if (minimapRafRef.current) {
         cancelAnimationFrame(minimapRafRef.current);
         minimapRafRef.current = null;
@@ -2333,6 +2388,79 @@ function GraphVisualization({
       );
     }
   };
+
+  const handleExplodeNode = async (targetIdStr) => {
+    if (readOnly || !onDataUpdate) return;
+    const targetNode = data.nodes.find((n) => String(n.id) === String(targetIdStr));
+    if (!targetNode) return;
+    if (targetNode.explosionExpandedAt != null) {
+      window.alert(
+        'This concept was already expanded. Pick another node or reload the graph.'
+      );
+      return;
+    }
+    setExplodeInProgress(true);
+    const startTime = Date.now();
+    let operationStatus = 'SUCCESS';
+    let operationError = null;
+    let generatedNodes = [];
+    try {
+      const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
+      const json = {
+        targetNodeId: String(targetIdStr),
+        numNodes: 5,
+        existingGraphNodes: data.nodes.map((n) => ({
+          id: n.id,
+          label: n.label,
+          description: n.description || '',
+          wikiUrl: n.wikiUrl || n.wikipediaUrl || '',
+        })),
+      };
+      if (g) json.generationContext = g;
+      const result = await apiRequest('/api/explode-node', { method: 'POST', json });
+      if (!result.success) {
+        operationStatus = 'FAILURE';
+        operationError = result.details || result.error || 'Explode failed';
+        throw new Error(operationError);
+      }
+      generatedNodes = result.data?.nodes || [];
+      const merged = mergeGenerateNodeResponse(data, result.data, width, height);
+      const tid = String(result.targetNodeId ?? targetIdStr);
+      const nodesMarked = merged.nodes.map((n) =>
+        String(n.id) === tid ? { ...n, explosionExpandedAt: Date.now() } : n
+      );
+      onDataUpdate({ ...merged, nodes: nodesMarked });
+    } catch (e) {
+      console.error(e);
+      operationStatus = 'FAILURE';
+      operationError = getApiErrorMessage(e);
+      window.alert(`Explode subgraph failed: ${getApiErrorMessage(e)}`);
+    } finally {
+      setExplodeInProgress(false);
+      await trackOperation(
+        'GENERATE',
+        {
+          expansionAlgorithm: 'explosion',
+          numNodesRequested: 5,
+          numCyclesRequested: 1,
+          numCyclesCompleted: 1,
+          selectedNodes: [
+            {
+              id: targetNode.id,
+              label: targetNode.label || String(targetNode.id),
+            },
+          ],
+          generatedNodes: generatedNodes.map((node) => ({
+            id: node.id,
+            label: node.label,
+          })),
+        },
+        startTime,
+        operationStatus === 'FAILURE' ? new Error(operationError) : null
+      );
+    }
+  };
+  handleExplodeNodeRef.current = handleExplodeNode;
 
   const handleAddNodeSubmit = async (e) => {
     e.preventDefault();
@@ -2663,6 +2791,7 @@ function GraphVisualization({
     relationshipForm.show ||
     Boolean(connectNewNodeLinksForm) ||
     isGenerating ||
+    explodeInProgress ||
     showGraphActionsHelp;
   const showEditableEmptyGuide =
     !readOnly && nodeCount === 0 && !emptyStateBlockedByModal;
@@ -2670,7 +2799,17 @@ function GraphVisualization({
     readOnly && nodeCount === 0 && !emptyStateBlockedByModal;
 
   let activeGraphEditBanner = null;
-  if (isGenerating) {
+  if (explodeInProgress) {
+    const label =
+      selectedNodes.length === 1
+        ? selectedNodes[0]?.label || 'concept'
+        : 'concept';
+    activeGraphEditBanner = {
+      title: 'Exploding subgraph',
+      hint: `Expanding Wikipedia context for “${label}”…`,
+      progressBar: { mode: 'indeterminate' },
+    };
+  } else if (isGenerating) {
     const baseHint =
       expansionAlgorithm === 'randomizedGrowth'
         ? 'Generating (community evolution).'
@@ -2889,6 +3028,14 @@ function GraphVisualization({
                     to close. On desktop, right-click the graph works too. Keyboard:
                     Escape.
                   </p>
+                  <h3>Explode subgraph (#69)</h3>
+                  <p>
+                    Select one concept: the <strong>node details</strong> card shows{' '}
+                    <strong>Explode subgraph</strong>, or open <strong>AI Generation</strong>{' '}
+                    here with exactly one highlight. The server loads Wikipedia text, returns a
+                    small fully linked cluster, and bridges every new node to your anchor. Each
+                    node can only be exploded once until you reload.
+                  </p>
                   <h3>Add Relationship</h3>
                   <p>
                     To add a link between two ideas, select both on the graph (two
@@ -2971,6 +3118,37 @@ function GraphVisualization({
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
                   </span>
+                </button>
+                <button
+                  type="button"
+                  className="graph-action-menu__action"
+                  data-testid="graph-action-explode"
+                  disabled={readOnly || explodeInProgress || isGenerating}
+                  aria-label="Explode subgraph from one highlighted concept"
+                  onClick={() => {
+                    const snap = graphActionSnapshotRef.current;
+                    if (snap.nodeIds.length !== 1) {
+                      window.alert(
+                        'Highlight exactly one concept on the graph, then tap Explode subgraph.'
+                      );
+                      return;
+                    }
+                    const nid = snap.nodeIds[0];
+                    const node = data.nodes.find((n) => String(n.id) === String(nid));
+                    if (node?.explosionExpandedAt != null) {
+                      window.alert(
+                        'This concept was already expanded. Pick another node or reload the graph.'
+                      );
+                      return;
+                    }
+                    setGraphActionMenu(null);
+                    void handleExplodeNode(nid);
+                  }}
+                >
+                  <span className="graph-action-menu__action-icon" aria-hidden>
+                    💥
+                  </span>
+                  <span className="graph-action-menu__action-label">Explode subgraph</span>
                 </button>
               </div>
             )}

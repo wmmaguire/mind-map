@@ -288,6 +288,17 @@ Relevant code:
 
 Relevant code: **`server/server.js`**, **`server/lib/generateBranchRequest.js`** (tests: **`lib/generateBranchRequest.test.mjs`**), **`server/lib/generateBranch.js`**, **`server/lib/parseGraphJsonFromCompletion.js`**, **`server/lib/validateNewNodesAgainstExisting.js`**.
 
+### 5c) “Explode subgraph” from one anchor (GitHub **#69**, OpenAI + Wikipedia)
+
+**Goal:** from **one** concept, add a small batch of related nodes whose topology is a **clique** among the new nodes plus **bridge** links from each new node back to the anchor. Wikipedia **summary/extract** grounds the model; **`ensureExplosionTopology`** enforces edges.
+
+1. Client sends **`POST /api/explode-node`** with **`targetNodeId`**, **`existingGraphNodes`** (same shape as generate-node), optional **`numNodes`** (**4–8**, default **5**), optional **`generationContext`** (max **2000** characters, same as generate-node).
+2. Server resolves text via **`fetchWikipediaExtract`** / **`wikipediaOpensearchFirstUrl`** when **`wikiUrl`** is missing or empty (**`server/lib/repairAnalyzeGraphWikiUrls.js`**).
+3. OpenAI returns JSON **`nodes`** / **`links`**; **`parseGraphJsonFromCompletion`** parses it. **`runExplodeNodeCore`** (**`server/lib/explodeNode.js`**) validates ids and labels (**`validateNewNodesAgainstExisting`**), then applies topology.
+4. **`applySynthesizedRelationships`**, **`enrichGraphNodesWithThumbnails`**, and **`ensureGraphLinkStrength`** run before the JSON response. The client may set **`explosionExpandedAt`** on the anchor after merge so the same node is not exploded again until reload.
+
+Relevant code: **`server/server.js`** (`POST /api/explode-node`), **`server/lib/explodeNode.js`** (tests: **`lib/explodeNode.test.mjs`**).
+
 ### 6) Save/load graphs (MongoDB)
 
 **Goal**: persist generated/edited graphs and reload them later.
@@ -347,7 +358,7 @@ Relevant code:
 
 ## Notes / current caveats (as implemented)
 
-- **`/api/analyze`** and **`/api/generate-node`** remain in `server/server.js` (OpenAI client wiring). Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
+- **`/api/analyze`**, **`/api/generate-node`**, **`/api/generate-branch`**, **`/api/explode-node`**, and related OpenAI wiring live in `server/server.js`. Library files and graph CRUD live under `routes/files.js` and `routes/graphs.js`.
 - Disk vs Mongo guarantees, legacy orphan **`graphs/`** files, and **upload** durability on ephemeral hosts: see **Data consistency (hybrid persistence)** above, GitHub **#20** / **#44**, and **`docs/github-backlog-issues.md`** (ops note).
 - **Legacy DB:** If uploads still fail with duplicate key on `sessionId`, drop the old `sessionId` unique index on `files` (see upload flow above).
 

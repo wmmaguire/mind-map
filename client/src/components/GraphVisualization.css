@@ -42,6 +42,48 @@ svg {
   color: #357abd;
 }
 
+.graph-tooltip-explode-wrap {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.graph-tooltip-explode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.graph-tooltip-explode-btn:hover {
+  background: #fde68a;
+}
+
+.graph-tooltip-explode-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.graph-tooltip-explode-note {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #64748b;
+}
+
 /* Position set in JS: just left of clicked node/link (clamped inside canvas) */
 .graph-canvas-wrap .graph-canvas-tooltip {
   left: 0;

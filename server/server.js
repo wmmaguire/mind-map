@@ -47,6 +47,7 @@ import { normalizeManualExpansionLinks } from './lib/manualExpansionLinks.js';
 import { repairAnalyzeGraphWikiUrls } from './lib/repairAnalyzeGraphWikiUrls.js';
 import { enrichGraphNodesWithThumbnails } from './lib/enrichGraphNodesWithThumbnails.js';
 import { ensureGraphLinkStrength } from './lib/linkStrength.js';
+import { runExplodeNodeCore } from './lib/explodeNode.js';
 import {
   dataDir,
   uploadsDir,
@@ -980,6 +981,65 @@ app.post('/api/generate-branch', async (req, res) => {
       error: 'Failed to generate branch',
       details,
       code
+    });
+  }
+});
+
+/** GitHub #69 — Wikipedia-grounded dense subgraph from one anchor (clique + bridge links). */
+app.post('/api/explode-node', async (req, res) => {
+  try {
+    const result = await runExplodeNodeCore({
+      openai,
+      fetchFn: globalThis.fetch,
+      body: req.body,
+    });
+    if (!result.ok) {
+      const st = result.status ?? 400;
+      return res.status(st).json(result.payload);
+    }
+    let { data } = result;
+    await applySynthesizedRelationships(
+      data,
+      req.body.existingGraphNodes,
+      openai,
+      typeof req.body.generationContext === 'string'
+        ? req.body.generationContext.trim()
+        : ''
+    );
+    try {
+      data = await enrichGraphNodesWithThumbnails(data, globalThis.fetch);
+    } catch (thumbErr) {
+      console.error('enrichGraphNodesWithThumbnails (explode-node) failed:', thumbErr);
+    }
+    data = ensureGraphLinkStrength(data);
+
+    return res.json({
+      success: true,
+      data,
+      targetNodeId: result.targetNodeId,
+    });
+  } catch (error) {
+    console.error('explode-node error:', error);
+    const httpStatus = openaiErrorHttpStatus(error);
+    let statusCode = 500;
+    let details = error.message || 'Unknown error';
+    let code = 'EXPLODE_NODE_FAILED';
+    if (httpStatus === 429) {
+      statusCode = 429;
+      code = 'OPENAI_QUOTA';
+      details =
+        'OpenAI returned 429 (quota or rate limit). Add billing or credits in the OpenAI dashboard, or wait and retry.';
+    } else if (httpStatus === 401) {
+      statusCode = 401;
+      code = 'OPENAI_AUTH';
+      details =
+        'OpenAI rejected the API key (401). Check that OPENAI_API_KEY is valid and not revoked.';
+    }
+    return res.status(statusCode).json({
+      success: false,
+      error: 'Failed to explode subgraph',
+      details,
+      code,
     });
   }
 });
