@@ -307,7 +307,8 @@ export function validateGenerateNodeRequest(body) {
       }
       deleteStrategy = ds;
     } else {
-      deleteStrategy = anchorStrategy;
+      /** Inverted from attachment (#68): hub-biased attach → leaf-biased prune, and vice versa. */
+      deleteStrategy = -anchorStrategy;
     }
 
     if (body.existingGraphLinks !== undefined && body.existingGraphLinks !== null) {
@@ -461,7 +462,7 @@ export function buildGenerateNodeDryRunPreview(v) {
       anchorStrategy: v.anchorStrategy ?? 0,
       enableDeletions: Boolean(v.enableDeletions),
       deletionsPerCycle: v.enableDeletions ? (v.deletionsPerCycle ?? 0) : 0,
-      deleteStrategy: v.deleteStrategy ?? v.anchorStrategy ?? 0,
+      deleteStrategy: v.deleteStrategy ?? -(v.anchorStrategy ?? 0),
       existingGraphLinksIncluded: Array.isArray(v.existingGraphLinks) && v.existingGraphLinks.length > 0,
       selectedCount,
       estimatedTotalNewNodes: numNodes * nc,

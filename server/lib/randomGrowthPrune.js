@@ -14,7 +14,8 @@ import {
  * @param {string[]} newBatchIds - ids of new nodes in this response (never deleted)
  * @param {{ source: string, target: string }[]} undirectedEdges - edges among existing graph
  * @param {number} count - how many to delete
- * @param {number} deleteStrategy - in [-1, 1]; +1 biases toward high degree, -1 toward low
+ * @param {number} deleteStrategy - in [-1, 1]; +1 biases toward high degree, -1 toward low.
+ *   Default from API is **minus** `anchorStrategy` so attach/prune biases oppose (#68).
  * @param {() => number} random - [0,1)
  * @param {number} minNodesAfterDelete - refuse if existingIds.length - count < this
  * @returns {string[]} ids to delete

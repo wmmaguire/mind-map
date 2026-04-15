@@ -197,7 +197,23 @@ test('validateGenerateNodeRequest accepts anchorStrategy and dry-run preview', (
   });
   assert.equal(v.ok, true);
   assert.equal(v.anchorStrategy, -0.5);
+  assert.equal(v.deleteStrategy, 0.5);
   const p = buildGenerateNodeDryRunPreview(v);
   assert.equal(p.anchorStrategy, -0.5);
+  assert.equal(p.deleteStrategy, 0.5);
   assert.equal(p.existingGraphLinksIncluded, true);
+});
+
+test('validateGenerateNodeRequest explicit deleteStrategy overrides invert', () => {
+  const v = validateGenerateNodeRequest({
+    expansionAlgorithm: 'randomizedGrowth',
+    dryRun: true,
+    numNodes: 1,
+    connectionsPerNewNode: 2,
+    anchorStrategy: 0.9,
+    deleteStrategy: 0.2,
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.anchorStrategy, 0.9);
+  assert.equal(v.deleteStrategy, 0.2);
 });
