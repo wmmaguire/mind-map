@@ -69,6 +69,8 @@ function GraphVisualization({
   const graphCanvasWrapRef = useRef(null);
   const selectedNodeIds = useRef(new Set());
   const selectedNodeId = useRef(null);
+  /** Selected link key (for styling + tooltip). */
+  const selectedLinkKeyRef = useRef(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
@@ -171,6 +173,7 @@ function GraphVisualization({
     setSelectedNodes([]);
     selectedNodeIds.current.clear();
     selectedNodeId.current = null;
+    selectedLinkKeyRef.current = null;
     setGraphActionMenu(null);
     generateSourceIdsRef.current = null;
     setGenerateProgress(null);
@@ -1021,13 +1024,39 @@ function GraphVisualization({
     }
 
     function handleLinkClick(event, link) {
-      selectedNodeIds.current.add(link.source.id);
-      selectedNodeIds.current.add(link.target.id);
+      if (!link) return;
+      event?.stopPropagation?.();
+
+      const { sid, tid } = linkEndpointIds(link);
+      const sidStr = String(sid);
+      const tidStr = String(tid);
+
+      selectedLinkKeyRef.current = linkKey(link);
+      selectedNodeIds.current.clear();
+      selectedNodeIds.current.add(sidStr);
+      selectedNodeIds.current.add(tidStr);
+      selectedNodeId.current = sidStr;
+      setSelectedNodes(data.nodes.filter(n => selectedNodeIds.current.has(String(n.id))));
       updateHighlighting();
 
-      const sourceLabel = link.source.label || 'Unnamed Node';
-      const targetLabel = link.target.label || 'Unnamed Node';
+      const sourceNode =
+        typeof link.source === 'object'
+          ? link.source
+          : data.nodes.find(n => String(n.id) === sidStr);
+      const targetNode =
+        typeof link.target === 'object'
+          ? link.target
+          : data.nodes.find(n => String(n.id) === tidStr);
+
+      const sourceLabel = sourceNode?.label || 'Unnamed Node';
+      const targetLabel = targetNode?.label || 'Unnamed Node';
       const relationship = link.relationship || 'related to';
+      const strengthNum =
+        typeof link.strength === 'number' && Number.isFinite(link.strength)
+          ? Math.max(0, Math.min(1, link.strength))
+          : null;
+      const strengthLabel =
+        strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
   
       const tooltipContent = `
         <strong>${sourceLabel}</strong>
@@ -1035,6 +1064,8 @@ function GraphVisualization({
         ${relationship}
         <br/>
         <strong>${targetLabel}</strong>
+        <br/>
+        <span style="opacity:0.85">Strength: ${strengthLabel}</span>
       `;
   
       d3.select('.tooltip')
@@ -1162,6 +1193,12 @@ function GraphVisualization({
       const sid = typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
       const tid = typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
       return { sid, tid };
+    }
+
+    function linkKey(l) {
+      const { sid, tid } = linkEndpointIds(l);
+      const rel = typeof l.relationship === 'string' ? l.relationship : '';
+      return `${String(sid)}__${String(tid)}__${rel}`;
     }
 
     function getSearchMatchIds() {
@@ -1324,6 +1361,8 @@ function GraphVisualization({
       const applyLinkStyle = (sel) => {
         sel
           .style('stroke-opacity', l => {
+            const picked = selectedLinkKeyRef.current;
+            if (picked && linkKey(l) === picked) return 1;
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1333,6 +1372,8 @@ function GraphVisualization({
             return 0.6;
           })
           .style('stroke', l => {
+            const picked = selectedLinkKeyRef.current;
+            if (picked && linkKey(l) === picked) return highlightedColor;
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1343,6 +1384,8 @@ function GraphVisualization({
             return '#999';
           })
           .style('stroke-width', l => {
+            const picked = selectedLinkKeyRef.current;
+            if (picked && linkKey(l) === picked) return 5;
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1360,12 +1403,18 @@ function GraphVisualization({
 
     // Add click handler to svg to deselect
     svg.on('click', () => {
-      if (selectedNodeId.current) {
-        selectedNodeId.current = null;
-        selectedNodeIds.current.clear();
-        updateHighlighting();
-        tooltip.transition().duration(200).style('opacity', 0);
-      }
+      const hadSelection =
+        selectedNodeId.current != null ||
+        (selectedNodeIds.current && selectedNodeIds.current.size > 0) ||
+        selectedLinkKeyRef.current != null;
+      if (!hadSelection) return;
+
+      selectedNodeId.current = null;
+      selectedNodeIds.current.clear();
+      selectedLinkKeyRef.current = null;
+      setSelectedNodes([]);
+      updateHighlighting();
+      tooltip.transition().duration(200).style('opacity', 0);
     });
 
     // Drag event handlers
