@@ -552,7 +552,7 @@ Refs: #40 #50 #33
 - **Wikipedia lead thumbnails:** **`enrichGraphNodesWithThumbnails`** + **`fetchWikipediaThumbnailUrl`** (REST **page/summary** `thumbnail.source`, no HTML scraping) on **`POST /api/analyze`** and **`POST /api/generate-node`**; persisted via **`POST /api/graphs/save`** when present.
 - **Load parity:** **`GET /api/graphs/:filename`** runs the same enrichment so Mongo loads get **`thumbnailUrl`** even when older **`Graph.payload`** rows omitted it (sequential fetches; first load of a large graph may be slower).
 - **Client D3:** **`updateVisualization()`** + **`updateHighlighting()`** once per effect so single-node communities render **SVG `image`** thumbs on first paint and when the library viewport resizes (not only after zoom merge/split). **`<image>`** **`error`** handler falls back to **`graph-node-disc`** (network / bad URL). **`graph-node-hit`** full-disc click target; **`safeThumbnailUrl.js`** allowlist.
-- **Guidance:** Presets in **`client/src/utils/generationGuidance.js`** — **Awe**, **Funny**, **Happy**, **Nostalgia**, **Profound**, **Sexy**, **Shock**, **Weird** — each describes **writing voice** and **which kinds of concepts to prefer**. **`server/server.js`** frames **`context`** / **`generationContext`** as **USER GUIDANCE — TONE, VOICE, AND CONCEPT CHOICES** for **`/api/analyze`** and **`/api/generate-node`**.
+- **Guidance:** Presets in **`client/src/utils/generationGuidance.js`** — **Awe**, **Simpleton**, **Happy**, **Nostalgia**, **Profound**, **Sexy**, **Shock**, **Weird** — each describes **writing voice** and **which kinds of concepts to prefer**. **`server/server.js`** frames **`context`** / **`generationContext`** as **USER GUIDANCE — TONE, VOICE, AND CONCEPT CHOICES** for **`/api/analyze`** and **`/api/generate-node`**.
 
 #### Follow-ups outside this ticket (address on referenced issues or new backlog)
 
@@ -564,6 +564,7 @@ Refs: #40 #50 #33
 | **Relationship synthesis** (`synthesizeLinkRelationships`) still emphasizes wording; topic choice is step 1 only — align copy if product wants tone on step 2 | **#62** / small task |
 | **i18n** / copy for new preset labels | Future UX |
 | **Telemetry** on preset usage / thumb load failures | Product |
+| **Simpleton** preset (replaces **Funny**) — moderation / brand review of literary-dialect guidance; legacy client value **`funny`** maps in **`resolveGenerationContext`** | **#75** / product |
 
 #### Suggested GitHub issue comments (#75 implementation — paste as needed)
 
@@ -596,6 +597,51 @@ Refs: #40 #50 #33
 ```markdown
 **Update (Apr 2026):** Analyze **`context`** and generate-node **`generationContext`** now explicitly bias **concept selection** (among valid Wikipedia choices) as well as **tone**—see `server/server.js` prompt blocks and `client/src/utils/generationGuidance.js`.
 ```
+
+### Library graph canvas — playback highlight, link UX, guidance (**#80** branch, Apr 2026)
+
+#### Shipped in this slice
+
+- **Playback scrub:** Orange **delta highlight** for newly appearing nodes/links after a history step (`playbackScrubToken`, **`PLAYBACK_STEP_HIGHLIGHT_MS`** timer, `playbackStepHot*` refs); avoids clearing hot sets before paint (regression after D3 transition removal). Non-scrub **`updateVisualization`** clears the timer + hot sets so zoom merge/split does not leave stale highlights.
+- **Scrub + `readOnly`:** **Node drag** uses the real D3 drag behavior when `playbackScrubToken > 0` even if `readOnly` is true for persistence—layout is **ephemeral** until the displayed snapshot changes.
+- **Links:** **Click selection removed** (no `selectedLinkKeyRef` updates from edges); **hover** tooltip unchanged. Node tooltip **Related concepts** lines append **`strength`** as `n/a` or a **percent** when `link.strength` is numeric in \([0,1]\).
+- **Guidance:** Preset **Funny** → **Simpleton** in **`client/src/utils/generationGuidance.js`** + **`GenerationGuidanceFields.jsx`**; **`resolveGenerationContext`** maps legacy preset string **`funny`** → **simpleton** text.
+
+#### Follow-ups outside this ticket (track on issues or new backlog)
+
+| Topic | Where to track |
+|--------|----------------|
+| **Automated tests** (client) for playback hot-highlight, rapid scrub, and tooltip **Related concepts** strength formatting | **#24** or new backlog |
+| **Documentation drift:** older bullets (e.g. in **`docs/status.md`** / **#36** notes) may still describe **fade/crossfade** between playback states; reconcile with current no-transition graph paths | **#36**, **#70** |
+| **Use `link.strength` on the canvas** (stroke opacity/width, filter weak edges)—data is already on payloads (**#80**) | **#80** |
+| **Remove or simplify dead code** around `selectedLinkKeyRef` if nothing sets it after link deselection removal | Chore / **#80** |
+| **Playback + drag:** policy for **persisting** per-step layout vs always resetting from snapshot (today: reset on scrub) | **#93** |
+| **Simpleton** preset: product **moderation** / tone review; **telemetry** on preset usage | **#75** |
+| **Keyboard / SR** path to inspect an edge now that links are not focus-selected | **#57** |
+
+#### Suggested GitHub issue comments (paste on **#36**, **#75**, **#80**)
+
+**On #36 — comment body:**
+
+```markdown
+**Update (Apr 2026, client #80 branch):** Library history scrub again **highlights newly appearing nodes and links** for ~1.3s after stepping forward (`PLAYBACK_STEP_HIGHLIGHT_MS`), fixing a regression where hot highlight refs were cleared before `updateHighlighting` ran. Timer + hot state are cleared on non-scrub redraws (e.g. zoom-driven merge/split) so orange “new step” styling does not stick incorrectly. **Node drag** remains usable during scrub (`playbackScrubToken > 0`) for **layout only**—positions still reset when the snapshot changes. *Follow-up:* add automated tests; align any remaining docs that describe **fade/crossfade** between playback roots with the current implementation.
+```
+
+**On #75 — comment body:**
+
+```markdown
+**Update (Apr 2026):** Guidance preset **Funny** was replaced by **Simpleton** (dropdown + `GUIDANCE_PRESET_TEXT.simpleton`; Steinbeck *Of Mice and Men*–style voice instructions). **`resolveGenerationContext`** still accepts legacy preset value **`funny`** and maps it to **simpleton**. *Follow-up:* moderation/brand review of preset copy; optional telemetry on preset selection.
+```
+
+**On #80 — comment body:**
+
+```markdown
+**Update (Apr 2026):** **Link click selection** was removed from **`GraphVisualization`** (edges: hover tooltip only; default cursor on drawn links). **Related concepts** in the node docked tooltip now shows each neighbor line with **relationship + strength** (`n/a` or percent from `link.strength` in [0,1]). *Follow-ups:* use **`strength`** for edge opacity/width on the canvas; prune any dead **`selectedLinkKeyRef`** styling paths if unused.
+```
+
+### Backlog: Playback — optional per-step layout memory
+
+**Tracked as GitHub #93** — *Library playback — optional per-step layout memory for node drags*.
 
 ### Backlog: Node image / Wikipedia thumbnail — follow-up issue (create manually)
 

@@ -39,7 +39,7 @@ function GenerationGuidanceFields({
       >
         <option value="none">None</option>
         <option value="awe">Awe</option>
-        <option value="funny">Funny</option>
+        <option value="simpleton">Simpleton</option>
         <option value="happy">Happy</option>
         <option value="nostalgia">Nostalgia</option>
         <option value="profound">Profound</option>

@@ -21,6 +21,9 @@ import {
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
+/** How long to keep orange “new in this step” styling after a history scrub (no D3 transition). */
+const PLAYBACK_STEP_HIGHLIGHT_MS = 1300;
+
 /** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
 function pathHasConsecutiveGraphLinks(pathIds, links) {
   if (!Array.isArray(pathIds) || pathIds.length < 2 || !Array.isArray(links)) {
@@ -790,8 +793,7 @@ function GraphVisualization({
       .attr('stroke', 'transparent')
       .attr('stroke-width', 10)
       .on('mouseover', handleLinkMouseover)
-      .on('mouseout', handleLinkMouseout)
-      .on('click', handleLinkClick);
+      .on('mouseout', handleLinkMouseout);
 
     // Add relationship labels to links
     const linkLabels = linkGroups.append('text')
@@ -812,7 +814,10 @@ function GraphVisualization({
       .on('start', () => {})
       .on('drag', () => {})
       .on('end', () => {});
-    const dragBehavior = readOnly ? noOpDrag : drag;
+    // `readOnly` turns off persistence (e.g. library history scrub) but we still allow dragging
+    // for layout while scrubbing; positions reset when the displayed snapshot changes.
+    const dragBehavior =
+      readOnly && playbackScrubToken === 0 ? noOpDrag : drag;
 
     // Update node selection with click and drag handlers
     const node = g.selectAll('.node')
@@ -926,7 +931,13 @@ function GraphVisualization({
                     const otherNode = data.nodes.find(n => n.id === otherNodeId);
                     if (!otherNode) return '';
                     
-                    return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'}`;
+                    const strengthNum =
+                      typeof link.strength === 'number' && Number.isFinite(link.strength)
+                        ? Math.max(0, Math.min(1, link.strength))
+                        : null;
+                    const strengthLabel =
+                      strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
+                    return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
                   } catch (e) {
                     console.error('Error processing related node:', e);
                     return '';
@@ -950,12 +961,12 @@ function GraphVisualization({
       })
       .call(dragBehavior);
 
-    // Update link selection with click handler
+    // Link selection is disabled; links only show hover tooltip.
     g.selectAll('.link-group')
       .data(data.links)
       .join('g')
       .attr('class', 'link-group')
-      .on('click', (event, d) => handleLinkClick(event, d));
+      .on('click', null);
 
     // Update visual states
     node.selectAll('circle')
@@ -1007,56 +1018,6 @@ function GraphVisualization({
     function handleLinkMouseout() {
       d3.select('.tooltip')
         .style('opacity', 0);
-    }
-
-    function handleLinkClick(event, link) {
-      if (!link) return;
-      event?.stopPropagation?.();
-
-      const { sid, tid } = linkEndpointIds(link);
-      const sidStr = String(sid);
-      const tidStr = String(tid);
-
-      selectedLinkKeyRef.current = linkKey(link);
-      selectedNodeIds.current.clear();
-      selectedNodeIds.current.add(sidStr);
-      selectedNodeIds.current.add(tidStr);
-      selectedNodeId.current = sidStr;
-      setSelectedNodes(data.nodes.filter(n => selectedNodeIds.current.has(String(n.id))));
-      updateHighlighting();
-
-      const sourceNode =
-        typeof link.source === 'object'
-          ? link.source
-          : data.nodes.find(n => String(n.id) === sidStr);
-      const targetNode =
-        typeof link.target === 'object'
-          ? link.target
-          : data.nodes.find(n => String(n.id) === tidStr);
-
-      const sourceLabel = sourceNode?.label || 'Unnamed Node';
-      const targetLabel = targetNode?.label || 'Unnamed Node';
-      const relationship = link.relationship || 'related to';
-      const strengthNum =
-        typeof link.strength === 'number' && Number.isFinite(link.strength)
-          ? Math.max(0, Math.min(1, link.strength))
-          : null;
-      const strengthLabel =
-        strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
-  
-      const tooltipContent = `
-        <strong>${sourceLabel}</strong>
-        <br/>
-        ${relationship}
-        <br/>
-        <strong>${targetLabel}</strong>
-        <br/>
-        <span style="opacity:0.85">Strength: ${strengthLabel}</span>
-      `;
-  
-      d3.select('.tooltip').style('opacity', 0.9);
-      tooltip.html(tooltipContent);
-      scheduleTooltipPosition(event.currentTarget);
     }
 
     function handleNodeClick(event, node) {
@@ -1140,9 +1101,14 @@ function GraphVisualization({
                     : (link.source === nodeToShow.id ? link.target : link.source);
                   
                   const otherNode = data.nodes.find(n => n.id === otherNodeId);
-                  return otherNode 
-                    ? `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'}`
-                    : '';
+                  if (!otherNode) return '';
+                  const strengthNum =
+                    typeof link.strength === 'number' && Number.isFinite(link.strength)
+                      ? Math.max(0, Math.min(1, link.strength))
+                      : null;
+                  const strengthLabel =
+                    strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
+                  return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
                 } catch (e) {
                   return '';
                 }
@@ -1463,6 +1429,19 @@ function GraphVisualization({
 
     // Update the visualization function to handle all node cases properly
     const updateVisualization = () => {
+      const isNewPlaybackScrub =
+        playbackScrubToken > 0 &&
+        playbackScrubToken !== lastPlaybackFadeTokenRef.current;
+
+      if (!isNewPlaybackScrub) {
+        if (playbackEaseHighlightTimerRef.current) {
+          window.clearTimeout(playbackEaseHighlightTimerRef.current);
+          playbackEaseHighlightTimerRef.current = null;
+        }
+        playbackStepHotNodeIdsRef.current = new Set();
+        playbackStepHotLinkKeysRef.current = new Set();
+      }
+
       // Get visible communities
       const visibleCommunities = communitiesRef.current;
       const visibleElements = Array.from(visibleCommunities.values());
@@ -1511,57 +1490,7 @@ function GraphVisualization({
         .attr('stroke', '#999')
         .attr('stroke-width', 1)
         .attr('stroke-opacity', 0.6)
-        .style('cursor', 'pointer')
-        .on('click', (event, d) => {
-          if (!d) return;
-          event?.stopPropagation?.();
-
-          // Ensure the clicked link itself is highlighted via the existing linkKey logic.
-          selectedLinkKeyRef.current = linkKey(d);
-
-          // Highlight both endpoint communities (works for merged view)
-          selectedNodeIds.current.clear();
-          selectedNodeIds.current.add(String(d.source?.id));
-          selectedNodeIds.current.add(String(d.target?.id));
-
-          // Also highlight the underlying raw endpoints when available (works for split view / singletons)
-          const raw = d.originalLink;
-          if (raw) {
-            const { sid, tid } = linkEndpointIds(raw);
-            selectedNodeIds.current.add(String(sid));
-            selectedNodeIds.current.add(String(tid));
-          }
-
-          selectedNodeId.current = d.source?.id != null ? String(d.source.id) : null;
-          setSelectedNodes(
-            visibleElements.filter(n => selectedNodeIds.current.has(String(n.id)))
-          );
-          updateHighlighting();
-
-          const sourceLabel = d.source?.label || 'Unnamed Node';
-          const targetLabel = d.target?.label || 'Unnamed Node';
-          const relationship = d.relationship || raw?.relationship || 'related to';
-          const strengthNum =
-            raw && typeof raw.strength === 'number' && Number.isFinite(raw.strength)
-              ? Math.max(0, Math.min(1, raw.strength))
-              : null;
-          const strengthLabel =
-            strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
-
-          const tooltipContent = `
-            <strong>${sourceLabel}</strong>
-            <br/>
-            ${relationship}
-            <br/>
-            <strong>${targetLabel}</strong>
-            <br/>
-            <span style="opacity:0.85">Strength: ${strengthLabel}</span>
-          `;
-
-          d3.select('.tooltip').style('opacity', 0.9);
-          tooltip.html(tooltipContent);
-          scheduleTooltipPosition(event.currentTarget);
-        });
+        .style('cursor', 'default');
 
       // Draw nodes using visible elements but preserve original node data
       const nodes = g.selectAll('.node')
@@ -1674,8 +1603,14 @@ function GraphVisualization({
                         
                       const otherNode = data.nodes.find(n => n.id === otherNodeId);
                       if (!otherNode) return '';
-                      
-                      return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'}`;
+
+                      const strengthNum =
+                        typeof link.strength === 'number' && Number.isFinite(link.strength)
+                          ? Math.max(0, Math.min(1, link.strength))
+                          : null;
+                      const strengthLabel =
+                        strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
+                      return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
                     } catch (e) {
                       console.error('Error processing related node:', e);
                       return '';
@@ -1917,10 +1852,7 @@ function GraphVisualization({
         processedLinks.map(linkKeyForProcessedCommunityLink)
       );
 
-      if (
-        playbackScrubToken > 0 &&
-        playbackScrubToken !== lastPlaybackFadeTokenRef.current
-      ) {
+      if (isNewPlaybackScrub) {
         lastPlaybackFadeTokenRef.current = playbackScrubToken;
         {
           const removedComm = prevCommIds
@@ -1980,17 +1912,23 @@ function GraphVisualization({
               });
             }
 
-            // no ease-in/out transitions
             if (playbackEaseHighlightTimerRef.current) {
               window.clearTimeout(playbackEaseHighlightTimerRef.current);
+              playbackEaseHighlightTimerRef.current = null;
             }
+            playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
+              playbackEaseHighlightTimerRef.current = null;
+              playbackStepHotNodeIdsRef.current = new Set();
+              playbackStepHotLinkKeysRef.current = new Set();
+              updateHighlightingRef.current?.();
+            }, PLAYBACK_STEP_HIGHLIGHT_MS);
+          } else {
             if (playbackEaseHighlightTimerRef.current) {
               window.clearTimeout(playbackEaseHighlightTimerRef.current);
               playbackEaseHighlightTimerRef.current = null;
             }
             playbackStepHotNodeIdsRef.current = new Set();
             playbackStepHotLinkKeysRef.current = new Set();
-            updateHighlighting();
           }
         }
       }
