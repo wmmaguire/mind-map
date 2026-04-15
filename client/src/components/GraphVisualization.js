@@ -1358,6 +1358,14 @@ function GraphVisualization({
         .style('stroke-width', strokeWidthForNode)
         .style('r', radiusForNode);
 
+      // Thumbnail nodes use an invisible hit circle for click targets; when selected/hot/search,
+      // give it the same stroke as the ring so the highlight is visible even if the ring is
+      // occluded or missed during inspection.
+      g.selectAll('.node circle.graph-node-hit')
+        .style('stroke', strokeForNode)
+        .style('stroke-width', strokeWidthForNode)
+        .style('r', radiusForNode);
+
       g.selectAll('.node').each(function forEachThumbNode(d) {
         const nodeG = d3.select(this);
         if (nodeG.select('image.graph-node-thumb').empty()) return;
