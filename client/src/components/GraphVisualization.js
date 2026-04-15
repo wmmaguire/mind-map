@@ -867,13 +867,16 @@ function GraphVisualization({
       };
     });
 
-    // Create the force simulation with processed data
+    // Create the force simulation with processed data.
+    // forceX + forceY (vs forceCenter) behave better for disjoint-style graphs: each component
+    // eases toward the viewport center without one combined pull (Observable disjoint graph pattern).
     const simulation = d3.forceSimulation(data.nodes)
       .force('link', d3.forceLink(processedLinks)
         .id(d => d.id)
         .distance(100))
       .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
-      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('x', d3.forceX(width / 2).strength(0.1))
+      .force('y', d3.forceY(height / 2).strength(0.1))
       .force('collision', d3.forceCollide().radius(50));
 
     // Tooltip: placed just left of the clicked node/link (clamped inside canvas)
