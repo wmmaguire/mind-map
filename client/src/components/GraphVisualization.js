@@ -1534,7 +1534,6 @@ function GraphVisualization({
             if (d.nodes.length > 1) {
               // For community nodes
               const communityLabel = d.label || 'Group';
-              const communityDescription = d.description || `Contains ${d.nodes.length} nodes`;
               const validNodes = d.nodes.filter(node => node && typeof node === 'object');
               const nodeLabels = validNodes
                 .map(node => node.label || 'Unnamed Node')
@@ -1543,7 +1542,7 @@ function GraphVisualization({
               tooltipContent = `
                 <strong>${communityLabel}</strong><br/>
                 <br/>
-                ${communityDescription}<br/>
+                Number of nodes: ${validNodes.length}<br/>
                 <br/>
                 Nodes: ${nodeLabels}
               `;
