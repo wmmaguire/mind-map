@@ -297,6 +297,8 @@ Relevant code: **`server/server.js`**, **`server/lib/generateBranchRequest.js`**
 3. OpenAI returns JSON **`nodes`** / **`links`**; **`parseGraphJsonFromCompletion`** parses it. **`runExplodeNodeCore`** (**`server/lib/explodeNode.js`**) validates ids and labels (**`validateNewNodesAgainstExisting`**), then applies topology.
 4. **`applySynthesizedRelationships`**, **`enrichGraphNodesWithThumbnails`**, and **`ensureGraphLinkStrength`** run before the JSON response. The client may set **`explosionExpandedAt`** on the anchor after merge so the same node is not exploded again until reload.
 
+**Client:** primary control is **Explode subgraph** on the **selected-node tooltip** (`GraphVisualization`); there is no duplicate control in the graph Actions AI Generation section.
+
 Relevant code: **`server/server.js`** (`POST /api/explode-node`), **`server/lib/explodeNode.js`** (tests: **`lib/explodeNode.test.mjs`**).
 
 ### 6) Save/load graphs (MongoDB)

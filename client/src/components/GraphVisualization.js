@@ -3030,11 +3030,10 @@ function GraphVisualization({
                   </p>
                   <h3>Explode subgraph (#69)</h3>
                   <p>
-                    Select one concept: the <strong>node details</strong> card shows{' '}
-                    <strong>Explode subgraph</strong>, or open <strong>AI Generation</strong>{' '}
-                    here with exactly one highlight. The server loads Wikipedia text, returns a
-                    small fully linked cluster, and bridges every new node to your anchor. Each
-                    node can only be exploded once until you reload.
+                    Select one concept on the graph: the <strong>node details</strong> card
+                    includes <strong>Explode subgraph</strong>. The server loads Wikipedia text,
+                    returns a small fully linked cluster, and bridges every new node to your
+                    anchor. Each node can only be exploded once until you reload.
                   </p>
                   <h3>Add Relationship</h3>
                   <p>
@@ -3118,37 +3117,6 @@ function GraphVisualization({
                   <span className="graph-action-select-caret" aria-hidden>
                     ▼
                   </span>
-                </button>
-                <button
-                  type="button"
-                  className="graph-action-menu__action"
-                  data-testid="graph-action-explode"
-                  disabled={readOnly || explodeInProgress || isGenerating}
-                  aria-label="Explode subgraph from one highlighted concept"
-                  onClick={() => {
-                    const snap = graphActionSnapshotRef.current;
-                    if (snap.nodeIds.length !== 1) {
-                      window.alert(
-                        'Highlight exactly one concept on the graph, then tap Explode subgraph.'
-                      );
-                      return;
-                    }
-                    const nid = snap.nodeIds[0];
-                    const node = data.nodes.find((n) => String(n.id) === String(nid));
-                    if (node?.explosionExpandedAt != null) {
-                      window.alert(
-                        'This concept was already expanded. Pick another node or reload the graph.'
-                      );
-                      return;
-                    }
-                    setGraphActionMenu(null);
-                    void handleExplodeNode(nid);
-                  }}
-                >
-                  <span className="graph-action-menu__action-icon" aria-hidden>
-                    💥
-                  </span>
-                  <span className="graph-action-menu__action-label">Explode subgraph</span>
                 </button>
               </div>
             )}

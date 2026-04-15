@@ -191,23 +191,6 @@ describe('GraphVisualization graph action menu', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows Explode subgraph control under AI Generation (#69)', () => {
-    render(
-      <GraphVisualization
-        data={minimalData}
-        onDataUpdate={jest.fn()}
-        width={800}
-        height={600}
-      />
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /Open graph actions menu/i })
-    );
-    expect(screen.getByTestId('graph-action-explode')).toBeInTheDocument();
-    expect(screen.getByText('Explode subgraph')).toBeInTheDocument();
-  });
-
   it('shows Explode subgraph on the node selection tooltip (#69)', async () => {
     render(
       <GraphVisualization
