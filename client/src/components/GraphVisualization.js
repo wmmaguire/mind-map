@@ -339,6 +339,10 @@ function GraphVisualization({
   const playbackPrevLinkKeysRef = useRef(null);
   const lastPlaybackFadeTokenRef = useRef(0);
   const playbackEaseHighlightTimerRef = useRef(null);
+  /** Last known community `{x,y}` by id so scrubbing can reuse layout instead of re-firing cold physics. */
+  const playbackLayoutByCommunityIdRef = useRef(new Map());
+  /** rAF id for easing `simulation.alphaTarget` after playback unfreeze */
+  const playbackPhysicsRampRafRef = useRef(null);
 
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
@@ -355,13 +359,14 @@ function GraphVisualization({
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const FADE_MS = reduceMotion ? 0 : 220;
     /** Observable-style enter easing duration for new communities/links during scrub (#86). */
-    const EASE_SCRUB_MS = reduceMotion ? 0 : 280;
+    const EASE_SCRUB_MS = reduceMotion ? 0 : 320;
     const skipPlaybackRootCrossfade = playbackScrubToken > 0;
 
     if (playbackScrubToken === 0) {
       lastPlaybackFadeTokenRef.current = 0;
       playbackPrevCommunityIdsRef.current = null;
       playbackPrevLinkKeysRef.current = null;
+      playbackLayoutByCommunityIdRef.current.clear();
     }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
@@ -536,6 +541,16 @@ function GraphVisualization({
     svg.attr('height', height);
     // Always initialize communities when the component mounts or data changes
     communitiesRef.current = initializeCommunities();
+    if (playbackScrubToken > 0) {
+      const layout = playbackLayoutByCommunityIdRef.current;
+      communitiesRef.current.forEach((c) => {
+        const p = layout.get(String(c.id));
+        if (p != null && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+          c.x = p.x;
+          c.y = p.y;
+        }
+      });
+    }
 
     // Modify the zoom behavior
     const g = svg
@@ -1367,9 +1382,22 @@ function GraphVisualization({
       const prevCommIds = playbackPrevCommunityIdsRef.current;
       const prevLinkKeys = playbackPrevLinkKeysRef.current;
 
+      if (playbackEaseHighlightTimerRef.current) {
+        window.clearTimeout(playbackEaseHighlightTimerRef.current);
+        playbackEaseHighlightTimerRef.current = null;
+      }
+      if (playbackPhysicsRampRafRef.current != null) {
+        cancelAnimationFrame(playbackPhysicsRampRafRef.current);
+        playbackPhysicsRampRafRef.current = null;
+      }
+
       // Stop the current simulation
       if (simulation) {
         simulation.stop();
+        simulation.nodes().forEach((d) => {
+          d.fx = null;
+          d.fy = null;
+        });
       }
 
       // Clear ALL existing elements before processing new ones
@@ -1654,6 +1682,29 @@ function GraphVisualization({
           return d.nodes[0]?.label || 'Unknown';
         });
 
+      const isNewScrubStep =
+        playbackScrubToken > 0 &&
+        playbackScrubToken !== lastPlaybackFadeTokenRef.current;
+      const newCommForEase = isNewScrubStep
+        ? newCommunityIdsForPlaybackTransition(prevCommIds, visibleElements)
+        : new Set();
+      const newLkForEase = isNewScrubStep
+        ? newLinkKeysForPlaybackTransition(prevLinkKeys, processedLinks)
+        : new Set();
+      const shouldFreezePhysicsForEase =
+        isNewScrubStep &&
+        EASE_SCRUB_MS > 0 &&
+        (newCommForEase.size > 0 || newLkForEase.size > 0);
+
+      function syncCommunityLayerDomPositions() {
+        links
+          .attr('x1', d => d.source.x || 0)
+          .attr('y1', d => d.source.y || 0)
+          .attr('x2', d => d.target.x || 0)
+          .attr('y2', d => d.target.y || 0);
+        nodes.attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+      }
+
       // Update simulation with proper handling of both single nodes and communities
       simulation
         .nodes(visibleElements)
@@ -1666,66 +1717,98 @@ function GraphVisualization({
               updateMinimapRef.current?.();
             });
           }
-          links
-            .attr('x1', d => d.source.x || 0)
-            .attr('y1', d => d.source.y || 0)
-            .attr('x2', d => d.target.x || 0)
-            .attr('y2', d => d.target.y || 0);
-
-          nodes
-            .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+          syncCommunityLayerDomPositions();
         });
 
-      simulation.alpha(0.3).restart();
+      if (isNewScrubStep) {
+        lastPlaybackFadeTokenRef.current = playbackScrubToken;
+      }
+
+      if (shouldFreezePhysicsForEase) {
+        simulation.nodes().forEach((d) => {
+          d.fx = d.x;
+          d.fy = d.y;
+          d.vx = 0;
+          d.vy = 0;
+        });
+        simulation.alphaTarget(0);
+        simulation.alpha(0);
+        syncCommunityLayerDomPositions();
+        simulation.stop();
+      } else {
+        simulation.nodes().forEach((d) => {
+          d.fx = null;
+          d.fy = null;
+        });
+        simulation.alpha(0.3).restart();
+      }
 
       playbackPrevCommunityIdsRef.current = buildCommunityIdSet(visibleElements);
       playbackPrevLinkKeysRef.current = new Set(
         processedLinks.map(linkKeyForProcessedCommunityLink)
       );
 
-      if (
-        playbackScrubToken > 0 &&
-        playbackScrubToken !== lastPlaybackFadeTokenRef.current
-      ) {
-        lastPlaybackFadeTokenRef.current = playbackScrubToken;
-        if (EASE_SCRUB_MS > 0) {
-          const newComm = newCommunityIdsForPlaybackTransition(
-            prevCommIds,
-            visibleElements
-          );
-          const newLk = newLinkKeysForPlaybackTransition(
-            prevLinkKeys,
-            processedLinks
-          );
-          if (newComm.size || newLk.size) {
-            nodes.each(function easeNewCommunity(d) {
-              if (!newComm.has(String(d.id))) return;
-              const el = d3.select(this);
-              el.style('opacity', 0);
-              el.transition()
-                .duration(EASE_SCRUB_MS)
-                .ease(d3.easeCubicOut)
-                .style('opacity', 1);
-            });
-            links.each(function easeNewLink(d) {
-              const k = linkKeyForProcessedCommunityLink(d);
-              if (!newLk.has(k)) return;
-              const el = d3.select(this);
-              el.style('opacity', 0);
-              el.transition()
-                .duration(EASE_SCRUB_MS)
-                .ease(d3.easeCubicOut)
-                .style('opacity', 1);
-            });
-            if (playbackEaseHighlightTimerRef.current) {
-              window.clearTimeout(playbackEaseHighlightTimerRef.current);
-            }
-            playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
-              playbackEaseHighlightTimerRef.current = null;
-              updateHighlighting();
-            }, EASE_SCRUB_MS + 24);
-          }
+      visibleElements.forEach((c) => {
+        playbackLayoutByCommunityIdRef.current.set(String(c.id), {
+          x: c.x,
+          y: c.y,
+        });
+      });
+
+      if (shouldFreezePhysicsForEase) {
+        nodes.each(function easeNewCommunity(d) {
+          if (!newCommForEase.has(String(d.id))) return;
+          const el = d3.select(this);
+          el.style('opacity', 0);
+          el.transition()
+            .duration(EASE_SCRUB_MS)
+            .ease(d3.easeCubicOut)
+            .style('opacity', 1);
+        });
+        links.each(function easeNewLink(d) {
+          const k = linkKeyForProcessedCommunityLink(d);
+          if (!newLkForEase.has(k)) return;
+          const el = d3.select(this);
+          el.style('opacity', 0);
+          el.transition()
+            .duration(EASE_SCRUB_MS)
+            .ease(d3.easeCubicOut)
+            .style('opacity', 1);
+        });
+        if (playbackEaseHighlightTimerRef.current) {
+          window.clearTimeout(playbackEaseHighlightTimerRef.current);
         }
+        playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
+          playbackEaseHighlightTimerRef.current = null;
+          updateHighlighting();
+          simulation.nodes().forEach((d) => {
+            d.fx = null;
+            d.fy = null;
+            d.vx = 0;
+            d.vy = 0;
+          });
+          simulation.alpha(0.05).alphaTarget(0.06).restart();
+          const rampMs = 380;
+          const t0 =
+            typeof performance !== 'undefined' && performance.now
+              ? performance.now()
+              : Date.now();
+          const step = (now) => {
+            const t =
+              typeof performance !== 'undefined' && performance.now
+                ? performance.now()
+                : Date.now();
+            const u = Math.min(1, (t - t0) / rampMs);
+            const te = d3.easeCubicOut(u);
+            simulation.alphaTarget(0.06 + 0.22 * te);
+            if (u < 1) {
+              playbackPhysicsRampRafRef.current = requestAnimationFrame(step);
+            } else {
+              playbackPhysicsRampRafRef.current = null;
+            }
+          };
+          playbackPhysicsRampRafRef.current = requestAnimationFrame(step);
+        }, EASE_SCRUB_MS + 32);
       }
     };
 
@@ -1816,6 +1899,10 @@ function GraphVisualization({
 
     // Cleanup
     return () => {
+      if (playbackPhysicsRampRafRef.current != null) {
+        cancelAnimationFrame(playbackPhysicsRampRafRef.current);
+        playbackPhysicsRampRafRef.current = null;
+      }
       if (playbackEaseHighlightTimerRef.current) {
         window.clearTimeout(playbackEaseHighlightTimerRef.current);
         playbackEaseHighlightTimerRef.current = null;
