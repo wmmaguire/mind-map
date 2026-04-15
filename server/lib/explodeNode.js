@@ -1,6 +1,7 @@
 /**
  * GitHub #69 — Explosion mode: Wikipedia-grounded dense subgraph from one anchor.
  * POST /api/explode-node: fetch extract + model JSON + enforced clique + bridge to anchor.
+ * numNodes: 2–6 (default 4).
  */
 
 import { MAX_GENERATION_CONTEXT_CHARS } from './generateNodeBudget.js';
@@ -16,9 +17,9 @@ import {
 import { parseGraphJsonFromCompletion } from './parseGraphJsonFromCompletion.js';
 import { validateNewNodesAgainstExisting } from './validateNewNodesAgainstExisting.js';
 
-const MIN_NODES = 4;
-const MAX_NODES = 8;
-const DEFAULT_NODES = 5;
+const MIN_NODES = 2;
+const MAX_NODES = 6;
+const DEFAULT_NODES = 4;
 
 function validateExistingGraphNodesArray(nodes) {
   if (!Array.isArray(nodes)) {

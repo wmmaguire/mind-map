@@ -211,6 +211,12 @@ describe('GraphVisualization graph action menu', () => {
       expect(screen.getByTestId('graph-tooltip-explode-btn')).toBeInTheDocument();
     });
     expect(screen.getByTestId('graph-tooltip-explode-preset')).toBeInTheDocument();
+    const explodeCount = screen.getByTestId('graph-tooltip-explode-count');
+    expect(explodeCount).toBeInTheDocument();
+    expect(explodeCount).toHaveAttribute('min', '2');
+    expect(explodeCount).toHaveAttribute('max', '6');
+    expect(explodeCount).toHaveAttribute('value', '4');
+    expect(screen.getByTestId('graph-tooltip-explode-count-value')).toHaveTextContent('4');
     expect(
       screen.getByRole('button', { name: /Explode subgraph from this concept/i })
     ).toBeInTheDocument();

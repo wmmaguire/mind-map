@@ -28,20 +28,30 @@ test('validateExplodeNodeRequest rejects unknown target id', () => {
   assert.equal(r.payload.code, 'UNKNOWN_TARGET_NODE');
 });
 
-test('validateExplodeNodeRequest defaults numNodes to 5', () => {
+test('validateExplodeNodeRequest defaults numNodes to 4', () => {
   const r = validateExplodeNodeRequest({
     targetNodeId: 'a1',
     existingGraphNodes: sampleExisting,
   });
   assert.equal(r.ok, true);
-  assert.equal(r.numNodes, 5);
+  assert.equal(r.numNodes, 4);
+});
+
+test('validateExplodeNodeRequest accepts numNodes in 2–6', () => {
+  const r = validateExplodeNodeRequest({
+    targetNodeId: 'a1',
+    existingGraphNodes: sampleExisting,
+    numNodes: 3,
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.numNodes, 3);
 });
 
 test('validateExplodeNodeRequest rejects numNodes out of range', () => {
   const r = validateExplodeNodeRequest({
     targetNodeId: 'a1',
     existingGraphNodes: sampleExisting,
-    numNodes: 3,
+    numNodes: 1,
   });
   assert.equal(r.ok, false);
   assert.equal(r.payload.code, 'NUM_NODES_OUT_OF_RANGE');

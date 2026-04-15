@@ -82,6 +82,12 @@ function GraphVisualization({
   /** GitHub #69: POST /api/explode-node (Wikipedia-backed dense subgraph from one anchor). */
   const [explodeInProgress, setExplodeInProgress] = useState(false);
   const handleExplodeNodeRef = useRef(null);
+  /** Tooltip explode: how many new nodes the API adds (2–6). */
+  const [explodeTooltipNumNodes, setExplodeTooltipNumNodes] = useState(4);
+  const explodeNumNodesForTooltipRef = useRef(4);
+  explodeNumNodesForTooltipRef.current = explodeTooltipNumNodes;
+  const setExplodeNumNodesForTooltipRef = useRef({ set: () => {} });
+  setExplodeNumNodesForTooltipRef.current = { set: setExplodeTooltipNumNodes };
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
   /** GitHub #62: manual (single call, link to all highlights) vs community evolution */
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
@@ -789,6 +795,10 @@ function GraphVisualization({
       }
       const customDisplay = cur.preset === 'custom' ? 'block' : 'none';
       const customBody = escapeHtmlText(cur.custom || '');
+      const countVal = Math.min(
+        6,
+        Math.max(2, Math.round(Number(explodeNumNodesForTooltipRef.current)) || 4)
+      );
       return (
         '<div class="graph-tooltip-explode-wrap">' +
         '<div class="graph-tooltip-explode-guidance">' +
@@ -807,6 +817,19 @@ function GraphVisualization({
         'data-testid="graph-tooltip-explode-custom">' +
         customBody +
         '</textarea></div></div>' +
+        '<div class="graph-tooltip-explode-count-wrap">' +
+        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-count">' +
+        'Concepts to add</label>' +
+        '<div class="graph-tooltip-explode-count-row">' +
+        '<input type="range" id="graph-tooltip-explode-count" class="graph-tooltip-explode-count" ' +
+        'min="2" max="6" step="1" ' +
+        `value="${countVal}" ` +
+        'aria-valuemin="2" aria-valuemax="6" ' +
+        `aria-valuenow="${countVal}" ` +
+        'aria-label="Number of new concepts for explode subgraph" ' +
+        'data-testid="graph-tooltip-explode-count" />' +
+        `<span class="graph-tooltip-explode-count-value" data-testid="graph-tooltip-explode-count-value">${countVal}</span>` +
+        '</div></div>' +
         '<p class="graph-tooltip-explode-hint">Same presets as <strong>AI Generation</strong>; applies when you tap Explode.</p>' +
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
@@ -831,6 +854,22 @@ function GraphVisualization({
         if (e.type === 'input' && tgt?.classList?.contains('graph-tooltip-explode-custom')) {
           if (!wrapForExplode.contains(tgt)) return;
           setGuidanceForExplodeTooltipRef.current.setCustom(tgt.value);
+          return;
+        }
+        if (
+          (e.type === 'input' || e.type === 'change') &&
+          tgt?.classList?.contains('graph-tooltip-explode-count')
+        ) {
+          if (!wrapForExplode.contains(tgt)) return;
+          let n = Math.round(Number(tgt.value));
+          if (!Number.isFinite(n)) return;
+          n = Math.min(6, Math.max(2, n));
+          if (String(tgt.value) !== String(n)) tgt.value = String(n);
+          tgt.setAttribute('aria-valuenow', String(n));
+          explodeNumNodesForTooltipRef.current = n;
+          setExplodeNumNodesForTooltipRef.current.set(n);
+          const valEl = wrapForExplode.querySelector('.graph-tooltip-explode-count-value');
+          if (valEl) valEl.textContent = String(n);
           return;
         }
         if (e.type !== 'click') return;
@@ -2472,11 +2511,15 @@ function GraphVisualization({
     let operationStatus = 'SUCCESS';
     let operationError = null;
     let generatedNodes = [];
+    const numNodes = Math.min(
+      6,
+      Math.max(2, Math.round(Number(explodeNumNodesForTooltipRef.current)) || 4)
+    );
     try {
       const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
       const json = {
         targetNodeId: String(targetIdStr),
-        numNodes: 5,
+        numNodes,
         existingGraphNodes: data.nodes.map((n) => ({
           id: n.id,
           label: n.label,
@@ -2510,7 +2553,7 @@ function GraphVisualization({
         'GENERATE',
         {
           expansionAlgorithm: 'explosion',
-          numNodesRequested: 5,
+          numNodesRequested: numNodes,
           numCyclesRequested: 1,
           numCyclesCompleted: 1,
           selectedNodes: [
@@ -3102,10 +3145,11 @@ function GraphVisualization({
                   <p>
                     Select one concept on the graph: the <strong>node details</strong> card
                     includes <strong>Guidance (optional)</strong> (same presets as{' '}
-                    <strong>AI Generation</strong>) and <strong>Explode subgraph</strong>. The
-                    server loads Wikipedia text, returns a small fully linked cluster, and
-                    bridges every new node to your anchor. Each node can only be exploded once
-                    until you reload.
+                    <strong>AI Generation</strong>), a slider for how many new concepts (
+                    <strong>2–6</strong>, default <strong>4</strong>), and{' '}
+                    <strong>Explode subgraph</strong>. The server loads Wikipedia text, returns a
+                    small fully linked cluster, and bridges every new node to your anchor. Each
+                    node can only be exploded once until you reload.
                   </p>
                   <h3>Add Relationship</h3>
                   <p>

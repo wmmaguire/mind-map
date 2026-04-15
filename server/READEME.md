@@ -292,7 +292,7 @@ Relevant code: **`server/server.js`**, **`server/lib/generateBranchRequest.js`**
 
 **Goal:** from **one** concept, add a small batch of related nodes whose topology is a **clique** among the new nodes plus **bridge** links from each new node back to the anchor. Wikipedia **summary/extract** grounds the model; **`ensureExplosionTopology`** enforces edges.
 
-1. Client sends **`POST /api/explode-node`** with **`targetNodeId`**, **`existingGraphNodes`** (same shape as generate-node), optional **`numNodes`** (**4–8**, default **5**), optional **`generationContext`** (max **2000** characters, same as generate-node).
+1. Client sends **`POST /api/explode-node`** with **`targetNodeId`**, **`existingGraphNodes`** (same shape as generate-node), optional **`numNodes`** (**2–6**, default **4**), optional **`generationContext`** (max **2000** characters, same as generate-node).
 2. Server resolves text via **`fetchWikipediaExtract`** / **`wikipediaOpensearchFirstUrl`** when **`wikiUrl`** is missing or empty (**`server/lib/repairAnalyzeGraphWikiUrls.js`**).
 3. OpenAI returns JSON **`nodes`** / **`links`**; **`parseGraphJsonFromCompletion`** parses it. **`runExplodeNodeCore`** (**`server/lib/explodeNode.js`**) validates ids and labels (**`validateNewNodesAgainstExisting`**), then applies topology.
 4. **`applySynthesizedRelationships`**, **`enrichGraphNodesWithThumbnails`**, and **`ensureGraphLinkStrength`** run before the JSON response. The client may set **`explosionExpandedAt`** on the anchor after merge so the same node is not exploded again until reload.

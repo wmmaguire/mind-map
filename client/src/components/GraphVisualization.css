@@ -89,6 +89,32 @@ svg {
   font-family: inherit;
 }
 
+.graph-tooltip-explode-count-wrap {
+  margin: 8px 0 6px;
+}
+
+.graph-tooltip-explode-count-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.graph-tooltip-explode-count {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  accent-color: #3b82f6;
+}
+
+.graph-tooltip-explode-count-value {
+  min-width: 1.25rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .graph-tooltip-explode-btn {
   display: inline-flex;
   align-items: center;
