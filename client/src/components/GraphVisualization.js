@@ -27,6 +27,9 @@ import './GraphVisualization.css';
 /** How long to keep orange “new in this step” styling after a history scrub (no D3 transition). */
 const PLAYBACK_STEP_HIGHLIGHT_MS = 1300;
 
+/** Matches `forceManyBody().strength(...)` on the graph simulation in this file. */
+const COMMUNITY_SIM_CHARGE_DEFAULT = -200;
+
 /** GitHub #82: consecutive ids must share a link (undirected) for branch extrapolation. */
 function pathHasConsecutiveGraphLinks(pathIds, links) {
   if (!Array.isArray(pathIds) || pathIds.length < 2 || !Array.isArray(links)) {
@@ -137,6 +140,8 @@ function GraphVisualization({
   const explodeStretchTimerStopRef = useRef(null);
   /** `updateVisualization` rebinds this; tick must run for explode scale (sim cools and stops otherwise). */
   const communityForceSimulationRef = useRef(null);
+  /** Saved simulation params while explode gentle-reheat is active (velocityDecay + charge). */
+  const explodeSimRestoreRef = useRef(null);
 
   const stopExplodeNodeStretchAnimation = () => {
     explodeStretchRef.current.active = false;
@@ -149,6 +154,22 @@ function GraphVisualization({
     if (typeof stop === 'function') {
       stop();
       explodeStretchTimerStopRef.current = null;
+    }
+    const sim = communityForceSimulationRef.current;
+    const r = explodeSimRestoreRef.current;
+    explodeSimRestoreRef.current = null;
+    if (sim && r) {
+      try {
+        sim.velocityDecay(r.velocityDecay);
+        if (r.chargeTweaked) {
+          const ch = sim.force('charge');
+          if (ch && typeof ch.strength === 'function') {
+            ch.strength(COMMUNITY_SIM_CHARGE_DEFAULT);
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
     }
     try {
       communityForceSimulationRef.current?.alphaTarget(0);
@@ -192,9 +213,28 @@ function GraphVisualization({
     const sim = communityForceSimulationRef.current;
     if (sim) {
       try {
-        sim.alphaTarget(0.18).alpha(Math.max(sim.alpha(), 0.34)).restart();
+        // Disjoint-style gentle reheat: high velocityDecay, mild many-body, low alphaTarget
+        // (see https://observablehq.com/@d3/disjoint-force-directed-graph ).
+        const explodeCharge = -52;
+        const explodeVelocityDecay = 0.86;
+        const explodeAlphaTarget = 0.055;
+        const explodeAlphaMin = 0.2;
+        explodeSimRestoreRef.current = {
+          velocityDecay: sim.velocityDecay(),
+          chargeTweaked: false,
+        };
+        sim.velocityDecay(explodeVelocityDecay);
+        const ch = sim.force('charge');
+        if (ch && typeof ch.strength === 'function') {
+          ch.strength(explodeCharge);
+          explodeSimRestoreRef.current.chargeTweaked = true;
+        }
+        sim
+          .alphaTarget(explodeAlphaTarget)
+          .alpha(Math.max(sim.alpha(), explodeAlphaMin))
+          .restart();
       } catch (_) {
-        /* ignore */
+        explodeSimRestoreRef.current = null;
       }
     }
   };
@@ -830,7 +870,7 @@ function GraphVisualization({
       .force('link', d3.forceLink(processedLinks)
         .id(d => d.id)
         .distance(100))
-      .force('charge', d3.forceManyBody().strength(-200))
+      .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(50));
 
