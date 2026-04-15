@@ -154,14 +154,9 @@ function GraphVisualization({
   /** Skip merge/split while applying programmatic fit (zoom-out would otherwise re-cluster). */
   const skipZoomClusteringRef = useRef(false);
   const resetCanvasViewRef = useRef(null);
-  /** Live D3 force on/off — ref avoids remounting the whole graph when toggling (#playback strip). */
-  const forceLayoutEnabledRef = useRef(true);
-  /** Set at end of D3 init; used to stop/restart simulation when physics toggles. */
-  const layoutRuntimeRef = useRef(null);
 
   const { sessionId } = useSession();
   const { graphSearchBarVisible, forceLayoutEnabled } = useGraphChromeUi();
-  forceLayoutEnabledRef.current = forceLayoutEnabled;
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -1374,7 +1369,7 @@ function GraphVisualization({
 
     // Drag event handlers
     function dragstarted(event, d) {
-      if (forceLayoutEnabledRef.current && !event.active) {
+      if (forceLayoutEnabled && !event.active) {
         simulation.alphaTarget(0.3).restart();
       }
       d.fx = d.x;
@@ -1386,7 +1381,7 @@ function GraphVisualization({
     function dragged(event, d) {
       d.fx = event.x;
       d.fy = event.y;
-      if (!forceLayoutEnabledRef.current) {
+      if (!forceLayoutEnabled) {
         const dx = event.x - d._prevDragX;
         const dy = event.y - d._prevDragY;
         d._prevDragX = event.x;
@@ -1402,7 +1397,7 @@ function GraphVisualization({
     }
 
     function dragended(event, d) {
-      if (forceLayoutEnabledRef.current && !event.active) {
+      if (forceLayoutEnabled && !event.active) {
         simulation.alphaTarget(0);
       }
       d.fx = null;
@@ -1754,7 +1749,7 @@ function GraphVisualization({
           .id(d => d.id))
         .on('tick', runLayoutTick);
 
-      if (forceLayoutEnabledRef.current) {
+      if (forceLayoutEnabled) {
         simulation.alpha(0.3).restart();
       } else {
         simulation.stop();
@@ -1898,12 +1893,6 @@ function GraphVisualization({
     updateVisualization();
     updateHighlighting();
 
-    layoutRuntimeRef.current = {
-      simulation,
-      g,
-      paintForceGraphPositions,
-    };
-
     // Cleanup
     return () => {
       if (playbackEaseHighlightTimerRef.current) {
@@ -1915,7 +1904,6 @@ function GraphVisualization({
         minimapRafRef.current = null;
       }
       simulation.stop();
-      layoutRuntimeRef.current = null;
       tooltip.remove();
       zoomBehaviorRef.current = null;
       updateHighlightingRef.current = null;
@@ -1925,19 +1913,7 @@ function GraphVisualization({
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken]);
-
-  useEffect(() => {
-    const rt = layoutRuntimeRef.current;
-    if (!rt?.simulation) return;
-    if (forceLayoutEnabled) {
-      rt.simulation.alpha(0.3).restart();
-    } else {
-      rt.simulation.stop();
-      rt.simulation.alphaTarget(0);
-      rt.paintForceGraphPositions(rt.g);
-    }
-  }, [forceLayoutEnabled]);
+  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken, forceLayoutEnabled]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();
