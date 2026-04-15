@@ -51,6 +51,14 @@ function pathHasConsecutiveGraphLinks(pathIds, links) {
   return true;
 }
 
+/** Community `d` is the anchor or contains it (single-node or merged). */
+function communityDatumContainsGraphNodeId(d, nodeId) {
+  if (!d || nodeId == null || nodeId === '') return false;
+  const tid = String(nodeId);
+  if (String(d.id) === tid) return true;
+  return Array.isArray(d.nodes) && d.nodes.some((n) => n && String(n.id) === tid);
+}
+
 function GraphVisualization({
   data,
   onDataUpdate,
@@ -117,6 +125,64 @@ function GraphVisualization({
     setPreset: setGuidancePreset,
     setCustom: setGuidanceCustomText,
   };
+  /** While POST /api/explode-node is in flight: random stretch on anchor node (read in sim tick). */
+  const explodeStretchRef = useRef({
+    active: false,
+    nodeId: null,
+    sx: 1,
+    sy: 1,
+    tx: 1,
+    ty: 1,
+  });
+  const explodeStretchTimerStopRef = useRef(null);
+
+  const stopExplodeNodeStretchAnimation = () => {
+    explodeStretchRef.current.active = false;
+    explodeStretchRef.current.nodeId = null;
+    explodeStretchRef.current.sx = 1;
+    explodeStretchRef.current.sy = 1;
+    explodeStretchRef.current.tx = 1;
+    explodeStretchRef.current.ty = 1;
+    const stop = explodeStretchTimerStopRef.current;
+    if (typeof stop === 'function') {
+      stop();
+      explodeStretchTimerStopRef.current = null;
+    }
+  };
+
+  const startExplodeNodeStretchAnimation = (targetIdStr) => {
+    stopExplodeNodeStretchAnimation();
+    const tid = String(targetIdStr);
+    explodeStretchRef.current.active = true;
+    explodeStretchRef.current.nodeId = tid;
+    explodeStretchRef.current.sx = 1;
+    explodeStretchRef.current.sy = 1;
+    explodeStretchRef.current.tx = 0.76 + Math.random() * 0.4;
+    explodeStretchRef.current.ty = 0.76 + Math.random() * 0.4;
+
+    const pickTargets = () => {
+      explodeStretchRef.current.tx = 0.68 + Math.random() * 0.52;
+      explodeStretchRef.current.ty = 0.68 + Math.random() * 0.52;
+    };
+
+    const timer = d3.timer(() => {
+      const st = explodeStretchRef.current;
+      if (!st.active) {
+        timer.stop();
+        return;
+      }
+      const k = 0.09 + Math.sin(Date.now() / 650) * 0.04;
+      st.sx += (st.tx - st.sx) * k;
+      st.sy += (st.ty - st.sy) * k;
+      if (Math.abs(st.sx - st.tx) < 0.03 && Math.abs(st.sy - st.ty) < 0.03) {
+        pickTargets();
+      }
+    });
+    explodeStretchTimerStopRef.current = () => {
+      timer.stop();
+    };
+  };
+
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
   const [showGraphActionsHelp, setShowGraphActionsHelp] = useState(false);
@@ -1992,8 +2058,20 @@ function GraphVisualization({
             .attr('x2', d => d.target.x || 0)
             .attr('y2', d => d.target.y || 0);
 
-          nodes
-            .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+          nodes.attr('transform', (d) => {
+            const tx = d.x || 0;
+            const ty = d.y || 0;
+            const ex = explodeStretchRef.current;
+            if (
+              ex &&
+              ex.active &&
+              ex.nodeId != null &&
+              communityDatumContainsGraphNodeId(d, ex.nodeId)
+            ) {
+              return `translate(${tx},${ty}) scale(${ex.sx},${ex.sy})`;
+            }
+            return `translate(${tx},${ty})`;
+          });
 
           // Keep cluster chips anchored to the live community centroid as forces run.
           if (chips) {
@@ -2178,6 +2256,7 @@ function GraphVisualization({
 
     // Cleanup
     return () => {
+      stopExplodeNodeStretchAnimation();
       if (playbackEaseHighlightTimerRef.current) {
         window.clearTimeout(playbackEaseHighlightTimerRef.current);
         playbackEaseHighlightTimerRef.current = null;
@@ -2506,6 +2585,7 @@ function GraphVisualization({
       return;
     }
     setExplodeInProgress(true);
+    startExplodeNodeStretchAnimation(targetIdStr);
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
     let operationError = null;
@@ -2547,6 +2627,7 @@ function GraphVisualization({
       operationError = getApiErrorMessage(e);
       window.alert(`Explode subgraph failed: ${getApiErrorMessage(e)}`);
     } finally {
+      stopExplodeNodeStretchAnimation();
       setExplodeInProgress(false);
       await trackOperation(
         'GENERATE',
