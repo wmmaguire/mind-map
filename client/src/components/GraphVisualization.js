@@ -158,11 +158,6 @@ function GraphVisualization({
   const forceLayoutEnabledRef = useRef(true);
   /** Set at end of D3 init; used to stop/restart simulation when physics toggles. */
   const layoutRuntimeRef = useRef(null);
-  /**
-   * When physics is off, base node id → last x/y so playback scrubs keep screen positions
-   * instead of resetting to snapshot defaults (#playback + frozen layout).
-   */
-  const preservedPlaybackNodePositionsRef = useRef(new Map());
 
   const { sessionId } = useSession();
   const { graphSearchBarVisible, forceLayoutEnabled } = useGraphChromeUi();
@@ -396,10 +391,6 @@ function GraphVisualization({
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
 
-    if (forceLayoutEnabledRef.current) {
-      preservedPlaybackNodePositionsRef.current.clear();
-    }
-
     const svg = d3.select(svgRef.current);
     const reduceMotion =
       typeof window !== 'undefined' &&
@@ -414,9 +405,6 @@ function GraphVisualization({
       lastPlaybackFadeTokenRef.current = 0;
       playbackPrevCommunityIdsRef.current = null;
       playbackPrevLinkKeysRef.current = null;
-      if (!forceLayoutEnabledRef.current) {
-        preservedPlaybackNodePositionsRef.current.clear();
-      }
     }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
@@ -451,26 +439,6 @@ function GraphVisualization({
       });
       return communities;
     };
-
-    /** Reapply last screen positions to matching node ids (physics off + playback handoff). */
-    function applyPreservedPlaybackPositions(communities) {
-      if (forceLayoutEnabledRef.current) return;
-      const m = preservedPlaybackNodePositionsRef.current;
-      if (!m.size) return;
-      for (const c of communities.values()) {
-        for (const n of c.nodes || []) {
-          const p = m.get(String(n.id));
-          if (p) {
-            n.x = p.x;
-            n.y = p.y;
-          }
-        }
-        if (c.nodes?.length) {
-          c.x = d3.mean(c.nodes, nn => nn.x || 0);
-          c.y = d3.mean(c.nodes, nn => nn.y || 0);
-        }
-      }
-    }
 
     // Merge closest communities based on graph connectivity
     const mergeCommunities = (currentCommunities) => {
@@ -611,7 +579,6 @@ function GraphVisualization({
     svg.attr('height', height);
     // Always initialize communities when the component mounts or data changes
     communitiesRef.current = initializeCommunities();
-    applyPreservedPlaybackPositions(communitiesRef.current);
 
     // Modify the zoom behavior
     const g = svg
@@ -1849,7 +1816,6 @@ function GraphVisualization({
     function resetCanvasToFullView() {
       if (!svgRef.current || !data?.nodes?.length) return;
       communitiesRef.current = initializeCommunities();
-      applyPreservedPlaybackPositions(communitiesRef.current);
       mergeThresholdRef.current = 0.8;
       splitThresholdRef.current = 1.2;
       previousZoomRef.current = 1;
@@ -1949,19 +1915,6 @@ function GraphVisualization({
         minimapRafRef.current = null;
       }
       simulation.stop();
-      if (forceLayoutEnabledRef.current) {
-        preservedPlaybackNodePositionsRef.current.clear();
-      } else if (communitiesRef.current?.size) {
-        const m = preservedPlaybackNodePositionsRef.current;
-        m.clear();
-        for (const c of communitiesRef.current.values()) {
-          for (const n of c.nodes || []) {
-            if (n?.id != null && Number.isFinite(n.x) && Number.isFinite(n.y)) {
-              m.set(String(n.id), { x: n.x, y: n.y });
-            }
-          }
-        }
-      }
       layoutRuntimeRef.current = null;
       tooltip.remove();
       zoomBehaviorRef.current = null;
