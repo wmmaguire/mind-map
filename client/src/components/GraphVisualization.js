@@ -1703,8 +1703,9 @@ function GraphVisualization({
 
       // GitHub #81: cluster/community thumbnail chip anchored to most-connected node.
       const clusterThumbs = visibleElements.filter((c) => Array.isArray(c.nodes) && c.nodes.length > 1);
+      let chips = null;
       if (clusterThumbs.length) {
-        const chips = g
+        chips = g
           .append('g')
           .attr('class', 'cluster-thumb-layer')
           .selectAll('g.cluster-thumb')
@@ -1801,6 +1802,11 @@ function GraphVisualization({
 
           nodes
             .attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
+
+          // Keep cluster chips anchored to the live community centroid as forces run.
+          if (chips) {
+            chips.attr('transform', (d) => `translate(${d.x || 0},${d.y || 0})`);
+          }
         });
 
       simulation.alpha(0.3).restart();
