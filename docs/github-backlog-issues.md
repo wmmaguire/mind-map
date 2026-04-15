@@ -133,7 +133,53 @@ Refs: #20 #46 #32 #64
 
 **Note:** **#62** — **Graph expansion modes:** dropdown to choose **manual generate** (current **`/api/generate-node`**) vs **multi-cycle randomized growth** (parameterized AI nodes per cycle, connections per node, cycle count; random attachment to existing nodes). Supersedes the cancelled **#37** budget-preview experiment; see GitHub **#62** for acceptance criteria and open questions.
 
-**Note:** **#68** / **#69** — **#68 (Apr 2026, partial ship on branch `issue-68-random-growth-strategy`):** UI label **Community evolution** (API still **`expansionAlgorithm: "randomizedGrowth"`**). Shipped: **`anchorStrategy`** slider (**random** / **lowCommunity** / **highCommunity**), **`existingGraphLinks`** for clustering-aware pools, optional **prune** (**`enableDeletions`**, **`deletionsPerCycle`**), default **`deleteStrategy`** = inverse of **`anchorStrategy`**, **`deletedNodeIds`** in responses, **`mergeGenerateResult`** client merge, unit tests (**`randomExpansionLinks`**, **`randomGrowthPrune`**, **`generateNodeBudget`**). **Still on #68 or follow-on tickets:** consolidated backlog **#87** (*Community evolution phase 2* — reproducible RNG, graph-safe prune, `dryRun` UI, operations/telemetry, E2E, richer metrics). **#69** remains **Explosion** mode (zoom-triggered fully-connected subgraph). See `https://github.com/wmmaguire/mind-map/issues/68`, `https://github.com/wmmaguire/mind-map/issues/87`, and `https://github.com/wmmaguire/mind-map/issues/69`. **Related:** *Backlog: Node image / Wikipedia thumbnail* at end of this file.
+**Note:** **#68** / **#69** — **#68 (Apr 2026, partial ship on branch `issue-68-random-growth-strategy`):** UI label **Community evolution** (API still **`expansionAlgorithm: "randomizedGrowth"`**). Shipped: **`anchorStrategy`** slider (**random** / **lowCommunity** / **highCommunity**), **`existingGraphLinks`** for clustering-aware pools, optional **prune** (**`enableDeletions`**, **`deletionsPerCycle`**), default **`deleteStrategy`** = inverse of **`anchorStrategy`**, **`deletedNodeIds`** in responses, **`mergeGenerateResult`** client merge, unit tests (**`randomExpansionLinks`**, **`randomGrowthPrune`**, **`generateNodeBudget`**). **Still on #68 or follow-on tickets:** consolidated backlog **#87** (*Community evolution phase 2* — reproducible RNG, graph-safe prune, `dryRun` UI, operations/telemetry, E2E, richer metrics). **#69 (Apr 2026, branch `issue-69-explode-node`):** **`POST /api/explode-node`** + tooltip **Explode** (Wikipedia-backed dense subgraph from one anchor); see *Explode subgraph (#69)* below and **`server/READEME.md`** §5c. Refs: `https://github.com/wmmaguire/mind-map/issues/68`, `https://github.com/wmmaguire/mind-map/issues/87`, `https://github.com/wmmaguire/mind-map/issues/69`. **Related:** *Backlog: Node image / Wikipedia thumbnail* at end of this file.
+
+### Explode subgraph (#69) — shipped slice + follow-ups (Apr 2026, branch `issue-69-explode-node`)
+
+**Shipped (server):** **`POST /api/explode-node`** — body **`targetNodeId`**, **`existingGraphNodes`**, optional **`numNodes`** (**2–6**, default **4**), optional **`generationContext`** (same cap as generate-node). **`runExplodeNodeCore`** (**`server/lib/explodeNode.js`**) validates new ids/labels (**`validateNewNodesAgainstExisting`**), enforces **explosion topology** (clique among new nodes + bridge edges to anchor), Wikipedia extract when **`wikiUrl`** missing (**`repairAnalyzeGraphWikiUrls`** path), **`parseGraphJsonFromCompletion`**, **`applySynthesizedRelationships`**, thumbnails, **`ensureGraphLinkStrength`**. Tests: **`server/lib/explodeNode.test.mjs`**. Related: **`generateBranch`**, **`generateBranchRequest`**, **`linkStrength`**, **`graphNodeIdValidation`**, **`fixGraphNodesIdIndex`**, Mongo index script **`drop-graph-nodes-id-unique-index.js`** as applicable to graph model.
+
+**Shipped (client):** Primary control **Explode** on the **selected-node tooltip** (**`GraphVisualization`**); duplicate entry removed from **Actions → AI Generation**. Tooltip: **`numNodes`** range **2–6**, shared **guidance** preset + custom text (**`generationGuidance.js`**, **`GenerationGuidanceFields`**). **`mergeGenerateNodeResponse`** merges API result; anchor may get **`explosionExpandedAt`** so repeat explode is blocked until reload. While the request runs: **stretch/warp** visual + **disjoint-style** community sim reheat (**`COMMUNITY_SIM_*_EXPLODE`** tuning). **`GraphVisualization.test.js`** covers tooltip control and read-only hiding. **`pickCommunityAnchorNode`** / **`clusterAnchor.js`** support cluster-chip anchoring (#81).
+
+**Follow-ups (outside this ticket — add comments on open issues; file new GitHub issues if missing):**
+
+1. **E2E / RTL** — Full flow: select node → tooltip Explode → assert **`POST /api/explode-node`** and graph delta (**#24**); read-only share: assert control hidden (**#39**).
+2. **Telemetry** — **`POST /api/operations`** payload consistency for **`GENERATE`** / **`expansionAlgorithm: explosion`** (duration, error shape, selected anchor id); dashboard queries (**#16**).
+3. **Error UX** — Replace **`window.alert`** on explode failure with non-blocking toast/banner (**#50**, **#40**).
+4. **Playback / layout** — Saved **`x`/`y`** and library scrub: optional follow-up to reduce force-layout drift or respect persisted coordinates without breaking interactive edit mode; prior **read-only sim freeze** experiment was reverted — needs a narrower design if revisited (**#36**, **#86**).
+5. **Quota / cost** — Burst **OpenAI** calls (explode + branch + multi-cycle) — product limits or UI copy (**#37**, ops).
+6. **`explosionExpandedAt`** — Document persistence in **`Graph.payload`** for multi-session “already expanded” semantics; optional server enforcement (**#69**).
+7. **D3 lifecycle** — **`useEffect`** dependency and simulation cleanup audits (**#51**).
+8. **a11y** — Tooltip explode controls (slider, preset) + busy state (**#57**).
+
+**Suggested GitHub comments (paste on issue):**
+
+- **#69** — *Apr 2026: Shipped on `issue-69-explode-node` — `POST /api/explode-node`, `explodeNode.js`, tooltip Explode + numNodes 2–6 + guidance; stretch animation + sim reheat; `explosionExpandedAt` gate. Docs: `server/READEME.md` §5c, `client/README.md`, `docs/github-backlog-issues.md` (Explode subgraph section). Follow-ups listed there (E2E #24, telemetry #16, error UX #50, playback #36/#86, etc.).*
+- **#27** — *Apr 2026: Explode is tooltip-only (not duplicated under Actions AI Generation).*
+- **#39** — *Apr 2026: Share read-only hides Explode; confirm acceptance in E2E #24.*
+- **#36** — *Apr 2026: Explode merge uses same playback timestamps as other generates; optional future: calmer layout when scrubbing saved graphs (see backlog Explode follow-up #4).*
+- **#51** — *Apr 2026: Explode adds sim reheat + stretch animation paths — include in D3 effect audit.*
+- **#68** — *Apr 2026: #69 shipped as separate API (`/api/explode-node`); community evolution remains `randomizedGrowth` on `/api/generate-node`.*
+- **#24** — *Apr 2026: Backlog — E2E/RTL: tooltip Explode happy path + read-only negative.*
+
+### Backlog: Explode subgraph — phase 2 (suggested new issue if not merged into #69)
+
+**Title:** `Backlog: Explode subgraph — telemetry, E2E, and layout polish`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026)
+#69 shipped `POST /api/explode-node` and client tooltip Explode. Follow-ups: operations shape, browser E2E, non-blocking errors, optional playback/layout behavior when `readOnly` or scrubbing.
+
+## Scope
+1. Integration / E2E tests (#24).
+2. `GraphOperation` / `UserActivity` details for explode (#16).
+3. Toast vs `window.alert` on failure (#50).
+4. Optional: persist or server-enforce `explosionExpandedAt`; rate limits (#37).
+
+Refs: #69 #24 #16 #50 #36 #86 #37
+```
 
 **Note:** **#81** — **Cluster thumbnail chips** (merged community view): each cluster renders one chip near its centroid, anchored to the **most-connected node** within the cluster (within-cluster degree). Clicking the chip focuses/zooms to that anchor. Follow-ups (overlap/collision, better heuristics incl. **#80**, perf, focus semantics, overlay rendering, a11y): **#91**.
 
@@ -708,7 +754,7 @@ Refs: #27 #29 #37 #62 #69 #21 #48
 **On #69 — comment body:**
 
 ```markdown
-**Context (Apr 2026):** **Explosion** / Wikipedia-backed subgraph work will create many **`wikiUrl`** nodes; thumbnail resolution should be **batched + cached** server-side (same backlog as *Optional node thumbnail*).
+**Context (Apr 2026):** **Explosion** / Wikipedia-backed subgraph work will create many **`wikiUrl`** nodes; thumbnail resolution should be **batched + cached** server-side (same backlog as *Optional node thumbnail*). **Update:** #69 shipped (`issue-69-explode-node`) — see `docs/github-backlog-issues.md` section *Explode subgraph (#69)* for shipped scope and follow-ups (E2E #24, telemetry #16, etc.).
 ```
 
 **On #21 — comment body:**
