@@ -213,6 +213,11 @@ export function validateGenerateNodeRequest(body) {
   let connectionsPerNewNode = null;
   let numCycles = null;
   let existingGraphNodeIds = null;
+  let anchorStrategy = 0;
+  let enableDeletions = false;
+  let deletionsPerCycle = 0;
+  let deleteStrategy = 0;
+  let existingGraphLinks = [];
 
   if (expansionAlgorithm === 'randomizedGrowth') {
     const cpn = parseInt(body.connectionsPerNewNode, 10);
@@ -253,6 +258,105 @@ export function validateGenerateNodeRequest(body) {
     }
     numCycles = nc;
 
+    const rawStrat = Number(body.anchorStrategy);
+    if (body.anchorStrategy !== undefined && body.anchorStrategy !== null && body.anchorStrategy !== '') {
+      if (!Number.isFinite(rawStrat) || rawStrat < -1 || rawStrat > 1) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_ANCHOR_STRATEGY',
+          error: 'anchorStrategy must be a number between -1 and 1',
+        };
+      }
+      anchorStrategy = rawStrat;
+    }
+
+    enableDeletions =
+      body.enableDeletions === true ||
+      body.enableDeletions === 1 ||
+      body.enableDeletions === '1' ||
+      body.enableDeletions === 'true';
+
+    if (enableDeletions) {
+      const dpc = parseInt(body.deletionsPerCycle, 10);
+      if (!Number.isFinite(dpc) || dpc < 1 || dpc > 8) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_DELETIONS_PER_CYCLE',
+          error: 'deletionsPerCycle must be an integer between 1 and 8 when enableDeletions is true',
+        };
+      }
+      deletionsPerCycle = dpc;
+    }
+
+    const rawDelStrat = body.deleteStrategy;
+    if (
+      rawDelStrat !== undefined &&
+      rawDelStrat !== null &&
+      rawDelStrat !== ''
+    ) {
+      const ds = Number(rawDelStrat);
+      if (!Number.isFinite(ds) || ds < -1 || ds > 1) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_DELETE_STRATEGY',
+          error: 'deleteStrategy must be a number between -1 and 1',
+        };
+      }
+      deleteStrategy = ds;
+    } else {
+      deleteStrategy = anchorStrategy;
+    }
+
+    if (body.existingGraphLinks !== undefined && body.existingGraphLinks !== null) {
+      if (!Array.isArray(body.existingGraphLinks)) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_EXISTING_GRAPH_LINKS',
+          error: 'existingGraphLinks must be an array',
+        };
+      }
+      if (body.existingGraphLinks.length > 20000) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'EXISTING_GRAPH_LINKS_TOO_LARGE',
+          error: 'existingGraphLinks cannot exceed 20000 entries',
+        };
+      }
+      for (let i = 0; i < body.existingGraphLinks.length; i += 1) {
+        const l = body.existingGraphLinks[i];
+        if (!l || typeof l !== 'object') {
+          return {
+            ok: false,
+            status: 400,
+            code: 'INVALID_EXISTING_GRAPH_LINK',
+            error: `existingGraphLinks[${i}] must be an object with source and target`,
+          };
+        }
+        const s =
+          typeof l.source === 'object' && l.source != null
+            ? l.source.id
+            : l.source;
+        const t =
+          typeof l.target === 'object' && l.target != null
+            ? l.target.id
+            : l.target;
+        if (s == null || t == null || String(s) === '' || String(t) === '') {
+          return {
+            ok: false,
+            status: 400,
+            code: 'INVALID_EXISTING_GRAPH_LINK',
+            error: `existingGraphLinks[${i}] must have non-empty source and target`,
+          };
+        }
+      }
+      existingGraphLinks = body.existingGraphLinks;
+    }
+
     if (!dryRun) {
       const ids = body.existingGraphNodeIds;
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -288,6 +392,30 @@ export function validateGenerateNodeRequest(body) {
           details: { minNodes: connectionsPerNewNode }
         };
       }
+
+      const minNodesAfterPrune = Math.max(connectionsPerNewNode + 2, 4);
+      if (enableDeletions) {
+        if (existingGraphNodeIds.length - deletionsPerCycle < minNodesAfterPrune) {
+          return {
+            ok: false,
+            status: 400,
+            code: 'PRUNE_GRAPH_TOO_SMALL',
+            error: `Graph is too small to delete ${deletionsPerCycle} node(s) per cycle (need at least ${minNodesAfterPrune} nodes after pruning; currently ${existingGraphNodeIds.length})`,
+            details: { minNodesAfterPrune, current: existingGraphNodeIds.length }
+          };
+        }
+        const anchorCount = new Set(selectedNodes.map((n) => String(n.id))).size;
+        const deletable = existingGraphNodeIds.length - anchorCount;
+        if (deletable < deletionsPerCycle) {
+          return {
+            ok: false,
+            status: 400,
+            code: 'INSUFFICIENT_NODES_FOR_PRUNE',
+            error: 'Not enough non-anchor nodes to satisfy deletionsPerCycle',
+            details: { deletable, deletionsPerCycle }
+          };
+        }
+      }
     }
   }
 
@@ -304,6 +432,11 @@ export function validateGenerateNodeRequest(body) {
       ? {
           connectionsPerNewNode,
           numCycles,
+          anchorStrategy,
+          enableDeletions,
+          deletionsPerCycle,
+          deleteStrategy,
+          existingGraphLinks,
           ...(existingGraphNodeIds ? { existingGraphNodeIds } : {})
         }
       : {})
@@ -325,11 +458,18 @@ export function buildGenerateNodeDryRunPreview(v) {
       numNodesPerCycle: numNodes,
       numCycles: nc,
       connectionsPerNewNode: cpn,
+      anchorStrategy: v.anchorStrategy ?? 0,
+      enableDeletions: Boolean(v.enableDeletions),
+      deletionsPerCycle: v.enableDeletions ? (v.deletionsPerCycle ?? 0) : 0,
+      deleteStrategy: v.deleteStrategy ?? v.anchorStrategy ?? 0,
+      existingGraphLinksIncluded: Array.isArray(v.existingGraphLinks) && v.existingGraphLinks.length > 0,
       selectedCount,
       estimatedTotalNewNodes: numNodes * nc,
       estimatedNewLinks: numNodes * nc * cpn,
       attachmentRule:
-        'Uniform random attachment to nodes present before each new node’s links (same batch grows the pool in API response order).',
+        (v.anchorStrategy ?? 0) === 0
+          ? 'Uniform random attachment to nodes present before each new node’s links (same batch grows the pool in API response order).'
+          : 'Degree-biased attachment (send existingGraphLinks for local degree; slider -1 = low-degree bias, +1 = high-degree bias).',
       caps: {
         maxNewNodes: caps.maxNewNodes,
         maxSelected: caps.maxSelected,

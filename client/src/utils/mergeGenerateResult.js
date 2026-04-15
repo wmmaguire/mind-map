@@ -2,11 +2,23 @@
  * Merge POST /api/generate-node `data` into the current graph (positions + link objects).
  */
 
-export function mergeGenerateNodeResponse(currentData, generatedPatch, width, height) {
+/**
+ * @param {{ deletedNodeIds?: string[] }} [opts]
+ */
+export function mergeGenerateNodeResponse(
+  currentData,
+  generatedPatch,
+  width,
+  height,
+  opts = {}
+) {
+  const deleted = new Set((opts.deletedNodeIds || []).map(String));
+
   const nodeMap = new Map();
 
   currentData.nodes.forEach(node => {
     const stringId = String(node.id);
+    if (deleted.has(stringId)) return;
     nodeMap.set(stringId, { ...node, id: stringId });
   });
 
@@ -37,22 +49,35 @@ export function mergeGenerateNodeResponse(currentData, generatedPatch, width, he
     nodeMap.set(String(node.id), processedNode);
   });
 
-  const processedLinks = currentData.links.map(link => {
-    const sourceId =
-      typeof link.source === 'object'
-        ? String(link.source.id)
-        : String(link.source);
-    const targetId =
-      typeof link.target === 'object'
-        ? String(link.target.id)
-        : String(link.target);
+  const processedLinks = currentData.links
+    .filter(link => {
+      const sourceId =
+        typeof link.source === 'object'
+          ? String(link.source.id)
+          : String(link.source);
+      const targetId =
+        typeof link.target === 'object'
+          ? String(link.target.id)
+          : String(link.target);
+      return !deleted.has(sourceId) && !deleted.has(targetId);
+    })
+    .map(link => {
+      const sourceId =
+        typeof link.source === 'object'
+          ? String(link.source.id)
+          : String(link.source);
+      const targetId =
+        typeof link.target === 'object'
+          ? String(link.target.id)
+          : String(link.target);
 
-    return {
-      ...link,
-      source: nodeMap.get(sourceId),
-      target: nodeMap.get(targetId)
-    };
-  });
+      return {
+        ...link,
+        source: nodeMap.get(sourceId),
+        target: nodeMap.get(targetId)
+      };
+    })
+    .filter(link => link.source && link.target);
 
   generatedPatch.links.forEach(link => {
     const sourceId =

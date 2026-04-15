@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildRandomExpansionLinks,
-  RANDOM_EXPANSION_RELATIONSHIP
+  RANDOM_EXPANSION_RELATIONSHIP,
+  pickDistinctByDegreeStrategy,
+  clampStrategy,
 } from './randomExpansionLinks.js';
 
 test('buildRandomExpansionLinks uses growing pool in batch order', () => {
@@ -36,4 +38,45 @@ test('buildRandomExpansionLinks throws when pool too small', () => {
     () => buildRandomExpansionLinks(['a'], ['x'], 2, () => 0.5),
     /Not enough nodes to attach/
   );
+});
+
+test('clampStrategy clamps to [-1,1]', () => {
+  assert.equal(clampStrategy(2), 1);
+  assert.equal(clampStrategy(-9), -1);
+  assert.equal(clampStrategy(0.3), 0.3);
+});
+
+test('pickDistinctByDegreeStrategy favors high-degree when strategy=1 and rng small', () => {
+  const deg = new Map([
+    ['hub', 10],
+    ['leaf', 0],
+  ]);
+  const pick = pickDistinctByDegreeStrategy(
+    ['hub', 'leaf'],
+    1,
+    () => 1e-9,
+    1,
+    deg
+  );
+  assert.equal(pick[0], 'hub');
+});
+
+test('buildRandomExpansionLinks degree bias: first new node prefers hub', () => {
+  const links = buildRandomExpansionLinks(
+    ['new1'],
+    ['hub', 'leaf', 'mid'],
+    1,
+    () => 1e-9,
+    {
+      anchorStrategy: 1,
+      initialLinkPairs: [
+        { source: 'hub', target: 'leaf' },
+        { source: 'hub', target: 'mid' },
+        { source: 'leaf', target: 'mid' },
+      ],
+    }
+  );
+  assert.equal(links.length, 1);
+  assert.equal(links[0].source, 'new1');
+  assert.equal(links[0].target, 'hub');
 });

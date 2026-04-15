@@ -22,7 +22,11 @@ import {
   validateGenerateNodeRequest,
   buildGenerateNodeDryRunPreview
 } from './lib/generateNodeBudget.js';
-import { buildRandomExpansionLinks } from './lib/randomExpansionLinks.js';
+import {
+  buildRandomExpansionLinks,
+  normalizeGraphLinkPairs,
+} from './lib/randomExpansionLinks.js';
+import { pickRandomGrowthDeletes } from './lib/randomGrowthPrune.js';
 import { fetchWikipediaExtract, normalizeConceptLabel } from './lib/wikipediaExtract.js';
 import {
   synthesizeLinkRelationships,
@@ -517,6 +521,7 @@ app.post('/api/generate-node', async (req, res) => {
 
   try {
     const { selectedNodes } = validated;
+    let deletedNodeIds = [];
     const existingGraphNodes = validated.existingGraphNodes || [];
     const numNodesToGenerate = validated.numNodes;
     const timestamp = Date.now(); // Get current timestamp
@@ -733,12 +738,56 @@ app.post('/api/generate-node', async (req, res) => {
 
     if (validated.expansionAlgorithm === 'randomizedGrowth') {
       const orderedNewIds = newData.nodes.map(node => String(node.id));
+      const allExistingIds = validated.existingGraphNodeIds.map(String);
+      const rawPairs = normalizeGraphLinkPairs(validated.existingGraphLinks || []);
+      const idSet = new Set(allExistingIds);
+      const fullExistingLinkPairs = rawPairs.filter(
+        (e) => idSet.has(String(e.source)) && idSet.has(String(e.target))
+      );
+
+      if (validated.enableDeletions && validated.deletionsPerCycle > 0) {
+        try {
+          deletedNodeIds = pickRandomGrowthDeletes({
+            existingIds: allExistingIds,
+            anchorIds: selectedNodes.map((n) => String(n.id)),
+            newBatchIds: orderedNewIds,
+            undirectedEdges: fullExistingLinkPairs,
+            count: validated.deletionsPerCycle,
+            deleteStrategy: validated.deleteStrategy,
+            random: Math.random,
+            minNodesAfterDelete: Math.max(
+              validated.connectionsPerNewNode + 2,
+              4
+            ),
+          });
+        } catch (pruneErr) {
+          console.error('Random growth prune failed:', pruneErr);
+          return res.status(400).json({
+            success: false,
+            error: pruneErr.message || 'Prune selection failed',
+            code: pruneErr.code || 'PRUNE_FAILED',
+          });
+        }
+      }
+
+      const deletedSet = new Set(deletedNodeIds.map(String));
+      const residualPoolIds = allExistingIds.filter((id) => !deletedSet.has(id));
+      const residualSet = new Set(residualPoolIds);
+      const initialLinkPairsForAttach = fullExistingLinkPairs.filter(
+        (e) =>
+          residualSet.has(String(e.source)) && residualSet.has(String(e.target))
+      );
+
       try {
         newData.links = buildRandomExpansionLinks(
           orderedNewIds,
-          validated.existingGraphNodeIds,
+          residualPoolIds,
           validated.connectionsPerNewNode,
-          Math.random
+          Math.random,
+          {
+            anchorStrategy: validated.anchorStrategy ?? 0,
+            initialLinkPairs: initialLinkPairsForAttach,
+          }
         );
       } catch (attachErr) {
         console.error('Random expansion attachment failed:', attachErr);
@@ -758,7 +807,11 @@ app.post('/api/generate-node', async (req, res) => {
       console.log('Validation passed (randomizedGrowth):', {
         newNodes: newData.nodes.length,
         totalLinks: newData.links.length,
-        connectionsPerNewNode: validated.connectionsPerNewNode
+        connectionsPerNewNode: validated.connectionsPerNewNode,
+        anchorStrategy: validated.anchorStrategy ?? 0,
+        enableDeletions: Boolean(validated.enableDeletions),
+        deletionsPerCycle: validated.deletionsPerCycle ?? 0,
+        deletedNodeIds: deletedNodeIds.length,
       });
     } else {
       // Manual: drop edges not between a new node and a selected anchor (model often adds extras).
@@ -858,7 +911,12 @@ app.post('/api/generate-node', async (req, res) => {
 
     return res.json({
       success: true,
-      data: newData
+      data: newData,
+      ...(validated.expansionAlgorithm === 'randomizedGrowth' &&
+      Array.isArray(deletedNodeIds) &&
+      deletedNodeIds.length > 0
+        ? { deletedNodeIds }
+        : {}),
     });
 
   } catch (error) {

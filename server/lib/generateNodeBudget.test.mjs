@@ -158,3 +158,46 @@ test('validateGenerateNodeRequest randomizedGrowth rejects missing selected in p
   assert.equal(v.ok, false);
   assert.equal(v.code, 'EXISTING_IDS_MISSING_SELECTED');
 });
+
+test('validateGenerateNodeRequest rejects anchorStrategy out of range', () => {
+  const v = validateGenerateNodeRequest({
+    expansionAlgorithm: 'randomizedGrowth',
+    dryRun: true,
+    numNodes: 1,
+    connectionsPerNewNode: 2,
+    numCycles: 1,
+    anchorStrategy: 2,
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'INVALID_ANCHOR_STRATEGY');
+});
+
+test('validateGenerateNodeRequest prune graph too small', () => {
+  const v = validateGenerateNodeRequest({
+    expansionAlgorithm: 'randomizedGrowth',
+    numNodes: 1,
+    connectionsPerNewNode: 3,
+    existingGraphNodeIds: ['a', 'b', 'c', 'd'],
+    enableDeletions: true,
+    deletionsPerCycle: 3,
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'PRUNE_GRAPH_TOO_SMALL');
+});
+
+test('validateGenerateNodeRequest accepts anchorStrategy and dry-run preview', () => {
+  const v = validateGenerateNodeRequest({
+    expansionAlgorithm: 'randomizedGrowth',
+    dryRun: true,
+    numNodes: 2,
+    connectionsPerNewNode: 2,
+    numCycles: 2,
+    anchorStrategy: -0.5,
+    existingGraphLinks: [{ source: 'a', target: 'b' }],
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.anchorStrategy, -0.5);
+  const p = buildGenerateNodeDryRunPreview(v);
+  assert.equal(p.anchorStrategy, -0.5);
+  assert.equal(p.existingGraphLinksIncluded, true);
+});

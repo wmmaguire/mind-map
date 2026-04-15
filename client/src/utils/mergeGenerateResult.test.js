@@ -37,4 +37,25 @@ describe('mergeGenerateNodeResponse', () => {
     expect(out.links[0].timestamp).toEqual(expect.any(Number));
     expect(out.links[0].createdAt).toEqual(out.links[0].timestamp);
   });
+
+  it('removes deleted nodes and their links before merging patch', () => {
+    const current = {
+      nodes: [
+        { id: 'a', label: 'A', x: 0, y: 0 },
+        { id: 'b', label: 'B', x: 10, y: 10 },
+      ],
+      links: [{ source: 'a', target: 'b', relationship: 'r' }],
+    };
+    const patch = {
+      nodes: [{ id: 'c', label: 'C' }],
+      links: [{ source: 'c', target: 'a', relationship: 'new' }],
+    };
+    const out = mergeGenerateNodeResponse(current, patch, width, height, {
+      deletedNodeIds: ['b'],
+    });
+    expect(out.nodes.map(n => n.id).sort()).toEqual(['a', 'c']);
+    expect(out.links).toHaveLength(1);
+    expect(out.links[0].target.id).toBe('a');
+    expect(out.links[0].source.id).toBe('c');
+  });
 });

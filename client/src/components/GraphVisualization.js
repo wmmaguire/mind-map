@@ -51,6 +51,10 @@ function GraphVisualization({
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
   const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
   const [rgNumCycles, setRgNumCycles] = useState(2);
+  /** GitHub #68: attachment bias for randomized growth (-1 low-degree … +1 hub). */
+  const [rgAnchorStrategy, setRgAnchorStrategy] = useState(0);
+  const [rgPruneDuringGrowth, setRgPruneDuringGrowth] = useState(false);
+  const [rgDeletionsPerCycle, setRgDeletionsPerCycle] = useState(1);
   /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
   const [guidancePreset, setGuidancePreset] = useState('none');
   const [guidanceCustomText, setGuidanceCustomText] = useState('');
@@ -65,7 +69,7 @@ function GraphVisualization({
       ? {
         title: 'Randomized AI growth',
         description:
-          'Runs multiple cycles. Each cycle adds a batch of AI nodes, then attaches each new node to a fixed number of randomly selected existing nodes (uniform).'
+          'Runs multiple cycles. Each cycle adds AI nodes with random links to the current graph. Use the strategy slider to bias attachment toward low- or high-degree nodes (when link data is sent), and optionally prune non-anchor nodes between cycles.'
       }
       : {
         title: 'Manual AI generate',
@@ -1880,7 +1884,10 @@ function GraphVisualization({
         selectedNodesPayload.map(n => `${n.label} (${n.id})`)
       );
 
-      const runOneGenerateRequest = async (nodesSnapshot, existingGraphNodeIds) => {
+      const runOneGenerateRequest = async (graphPayload) => {
+        const nodesSnapshot = graphPayload?.nodes || graphPayload || [];
+        const linksSnapshot = graphPayload?.links || [];
+        const existingGraphNodeIds = (nodesSnapshot || []).map(n => String(n.id));
         const json = {
           selectedNodes: selectedNodesPayload,
           numNodes: numNodesToAdd,
@@ -1895,6 +1902,15 @@ function GraphVisualization({
           json.expansionAlgorithm = 'randomizedGrowth';
           json.connectionsPerNewNode = rgConnectionsPerNewNode;
           json.existingGraphNodeIds = existingGraphNodeIds;
+          json.anchorStrategy = rgAnchorStrategy;
+          json.existingGraphLinks = linksSnapshot.map(l => ({
+            source: typeof l.source === 'object' ? l.source.id : l.source,
+            target: typeof l.target === 'object' ? l.target.id : l.target,
+          }));
+          if (rgPruneDuringGrowth) {
+            json.enableDeletions = true;
+            json.deletionsPerCycle = rgDeletionsPerCycle;
+          }
         }
         const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
         if (g) {
@@ -1907,7 +1923,10 @@ function GraphVisualization({
       };
 
       if (expansionAlgorithm === 'manual') {
-        const result = await runOneGenerateRequest(data.nodes);
+        const result = await runOneGenerateRequest({
+          nodes: data.nodes,
+          links: data.links,
+        });
 
         if (!result.success) {
           operationStatus = 'FAILURE';
@@ -1944,11 +1963,7 @@ function GraphVisualization({
           }
           setGenerateProgress({ current: c, total: totalCycles });
 
-          const existingGraphNodeIds = working.nodes.map(n => String(n.id));
-          const result = await runOneGenerateRequest(
-            working.nodes,
-            existingGraphNodeIds
-          );
+          const result = await runOneGenerateRequest(working);
 
           if (!result.success) {
             operationStatus = 'FAILURE';
@@ -1964,7 +1979,12 @@ function GraphVisualization({
             working,
             result.data,
             width,
-            height
+            height,
+            {
+              deletedNodeIds: Array.isArray(result.deletedNodeIds)
+                ? result.deletedNodeIds
+                : [],
+            }
           );
 
           if (onDataUpdate) {
@@ -1996,6 +2016,18 @@ function GraphVisualization({
           connectionsPerNewNode:
             expansionAlgorithm === 'randomizedGrowth'
               ? rgConnectionsPerNewNode
+              : undefined,
+          anchorStrategy:
+            expansionAlgorithm === 'randomizedGrowth'
+              ? rgAnchorStrategy
+              : undefined,
+          pruneDuringGrowth:
+            expansionAlgorithm === 'randomizedGrowth'
+              ? rgPruneDuringGrowth
+              : undefined,
+          deletionsPerCycle:
+            expansionAlgorithm === 'randomizedGrowth' && rgPruneDuringGrowth
+              ? rgDeletionsPerCycle
               : undefined,
           selectedNodes: sourceIdSnapshot.map(id => {
             const node = data.nodes.find(n => String(n.id) === String(id));
@@ -2413,6 +2445,29 @@ function GraphVisualization({
     };
   }
 
+  let pruneValidationMessage = null;
+  if (
+    showGenerateForm &&
+    expansionAlgorithm === 'randomizedGrowth' &&
+    rgPruneDuringGrowth &&
+    rgDeletionsPerCycle > 0
+  ) {
+    const minAfter = Math.max(rgConnectionsPerNewNode + 2, 4);
+    if (data.nodes.length - rgDeletionsPerCycle < minAfter) {
+      pruneValidationMessage = `Pruning would leave fewer than ${minAfter} nodes. Lower deletions per cycle or add more nodes.`;
+    } else {
+      const anchorSet = new Set(
+        (generateFormAnchorIds || []).map((id) => String(id))
+      );
+      const deletable = data.nodes.filter(
+        (n) => !anchorSet.has(String(n.id))
+      ).length;
+      if (deletable < rgDeletionsPerCycle) {
+        pruneValidationMessage = `Need at least ${rgDeletionsPerCycle} deletable (non-anchor) node(s); highlighted anchors are never removed.`;
+      }
+    }
+  }
+
   const generateFormValidationMessage =
     showGenerateForm &&
     expansionAlgorithm === 'manual' &&
@@ -2422,7 +2477,7 @@ function GraphVisualization({
         expansionAlgorithm === 'randomizedGrowth' &&
         data.nodes.length < rgConnectionsPerNewNode
         ? `Randomized growth needs at least ${rgConnectionsPerNewNode} node(s) on the graph for random attachment (current: ${data.nodes.length}). Add nodes or lower connections per new node.`
-        : null;
+        : pruneValidationMessage;
   const generateFormErrorDisplay =
     generateFormValidationMessage || generateSubmitError;
 
@@ -2951,6 +3006,70 @@ function GraphVisualization({
                       }}
                     />
                   </label>
+                  <label className="graph-generate-strategy">
+                    <span className="graph-generate-strategy__label">
+                      Attachment strategy (degree bias)
+                    </span>
+                    <span className="graph-generate-strategy__ticks">
+                      <span>Low-degree</span>
+                      <span>Uniform</span>
+                      <span>Hub / high-degree</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="-1"
+                      max="1"
+                      step="0.05"
+                      value={rgAnchorStrategy}
+                      onChange={e => {
+                        setRgAnchorStrategy(parseFloat(e.target.value) || 0);
+                        setGenerateSubmitError(null);
+                      }}
+                      disabled={isGenerating}
+                      aria-valuemin={-1}
+                      aria-valuemax={1}
+                      aria-valuenow={rgAnchorStrategy}
+                      aria-label="Random attachment degree bias"
+                    />
+                    <span className="graph-generate-strategy__value">
+                      {rgAnchorStrategy === 0
+                        ? '0 (uniform)'
+                        : rgAnchorStrategy.toFixed(2)}
+                    </span>
+                  </label>
+                  <label className="graph-generate-prune-check">
+                    <input
+                      type="checkbox"
+                      checked={rgPruneDuringGrowth}
+                      onChange={e => {
+                        setRgPruneDuringGrowth(e.target.checked);
+                        setGenerateSubmitError(null);
+                      }}
+                      disabled={isGenerating}
+                    />
+                    Prune during growth (remove non-anchor nodes between cycles)
+                  </label>
+                  {rgPruneDuringGrowth && (
+                    <label>
+                      Deletions per cycle:
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        value={rgDeletionsPerCycle}
+                        onChange={e => {
+                          setRgDeletionsPerCycle(
+                            Math.min(
+                              8,
+                              Math.max(1, parseInt(e.target.value, 10) || 1)
+                            )
+                          );
+                          setGenerateSubmitError(null);
+                        }}
+                        disabled={isGenerating}
+                      />
+                    </label>
+                  )}
                 </>
               )}
               {generateProgress && expansionAlgorithm === 'randomizedGrowth' && (
