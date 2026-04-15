@@ -289,10 +289,10 @@ export async function executeGenerateBranch(openai, validated) {
       ...n,
       timestamp: n.timestamp ?? ts
     }));
-    newData.links = (newData.links || []).map(l => ({
-      ...l,
-      timestamp: l.timestamp ?? ts
-    }));
+    // Ignore model-proposed links: branch extrapolation should only attach to the current
+    // frontier node, plus optional server-added cross-links into the memory window.
+    // This prevents the model from wiring new nodes back into early path nodes.
+    newData.links = [];
 
     const newIds = (newData.nodes || []).map(n => String(n.id));
     if (newIds.length === 0) {
@@ -303,14 +303,13 @@ export async function executeGenerateBranch(openai, validated) {
       };
     }
 
-    if (!newNodesConnectToFrontier(newData.links, newIds, frontierId)) {
-      return {
-        ok: false,
-        error: 'Each new node must have at least one link touching the frontier',
-        code: 'BRANCH_FRONTIER_CONNECTIVITY',
-        details: JSON.stringify({ frontierId, newIds, links: newData.links })
-      };
-    }
+    // Deterministic frontier attachment: each new node grows off the most recent node (frontier).
+    newData.links = newIds.map((nid) => ({
+      source: nid,
+      target: String(frontierId),
+      relationship: 'Branch extrapolation (frontier attachment)',
+      timestamp: ts,
+    }));
 
     const existingAccum = [
       ...validated.existingGraphNodes,
