@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { GUIDANCE_PRESET_SELECT_OPTIONS } from '../utils/generationGuidance';
 import './GenerationGuidanceFields.css';
 
 /**
@@ -37,16 +38,11 @@ function GenerationGuidanceFields({
         disabled={disabled}
         aria-describedby={helpId}
       >
-        <option value="none">None</option>
-        <option value="awe">Awe</option>
-        <option value="simpleton">Simpleton</option>
-        <option value="happy">Happy</option>
-        <option value="nostalgia">Nostalgia</option>
-        <option value="profound">Profound</option>
-        <option value="sexy">Sexy</option>
-        <option value="shock">Shock</option>
-        <option value="weird">Weird</option>
-        <option value="custom">Custom</option>
+        {GUIDANCE_PRESET_SELECT_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
       </select>
       {preset === 'custom' && (
         <textarea

@@ -1,3 +1,17 @@
+/** Preset dropdown: value (API / state) and label (UI). Kept in sync with `GenerationGuidanceFields`. */
+export const GUIDANCE_PRESET_SELECT_OPTIONS = [
+  ['none', 'None'],
+  ['awe', 'Awe'],
+  ['simpleton', 'Simpleton'],
+  ['happy', 'Happy'],
+  ['nostalgia', 'Nostalgia'],
+  ['profound', 'Profound'],
+  ['sexy', 'Sexy'],
+  ['shock', 'Shock'],
+  ['weird', 'Weird'],
+  ['custom', 'Custom'],
+];
+
 /** Preset guidance strings (e.g. POST /api/generate-node `generationContext`, POST /api/analyze `context`). */
 
 export const GUIDANCE_PRESET_TEXT = {

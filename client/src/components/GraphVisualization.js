@@ -5,7 +5,10 @@ import { apiRequest, getApiErrorMessage } from '../api/http';
 import { useSession } from '../context/SessionContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
-import { resolveGenerationContext } from '../utils/generationGuidance';
+import {
+  resolveGenerationContext,
+  GUIDANCE_PRESET_SELECT_OPTIONS,
+} from '../utils/generationGuidance';
 import {
   nodesMatchingLabelQuery,
   createFocusZoomTransform,
@@ -94,6 +97,20 @@ function GraphVisualization({
   /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
   const [guidancePreset, setGuidancePreset] = useState('none');
   const [guidanceCustomText, setGuidanceCustomText] = useState('');
+  /** Same preset/custom as AI Generation modal; tooltip reads this without widening graph effect deps. */
+  const guidanceForExplodeTooltipRef = useRef({ preset: 'none', custom: '' });
+  guidanceForExplodeTooltipRef.current = {
+    preset: guidancePreset,
+    custom: guidanceCustomText,
+  };
+  const setGuidanceForExplodeTooltipRef = useRef({
+    setPreset: () => {},
+    setCustom: () => {},
+  });
+  setGuidanceForExplodeTooltipRef.current = {
+    setPreset: setGuidancePreset,
+    setCustom: setGuidanceCustomText,
+  };
   const [generateProgress, setGenerateProgress] = useState(null);
   const randomizedGrowthCancelRef = useRef(false);
   const [showGraphActionsHelp, setShowGraphActionsHelp] = useState(false);
@@ -747,6 +764,13 @@ function GraphVisualization({
         .replace(/</g, '&lt;');
     }
 
+    function escapeHtmlText(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
     function explodeTooltipActionsHtml(anchorNode) {
       if (readOnly || typeof onDataUpdate !== 'function' || !anchorNode) return '';
       const fromData = data.nodes.find((n) => String(n.id) === String(anchorNode.id));
@@ -755,21 +779,61 @@ function GraphVisualization({
         return '<p class="graph-tooltip-explode-note">Subgraph already expanded for this concept.</p>';
       }
       const safe = escapeHtmlAttr(String(fromData.id));
+      const cur = guidanceForExplodeTooltipRef.current;
+      let optionsHtml = '';
+      for (const [val, label] of GUIDANCE_PRESET_SELECT_OPTIONS) {
+        const sel = val === cur.preset ? ' selected' : '';
+        optionsHtml += `<option value="${escapeHtmlAttr(val)}"${sel}>${escapeHtmlText(
+          label
+        )}</option>`;
+      }
+      const customDisplay = cur.preset === 'custom' ? 'block' : 'none';
+      const customBody = escapeHtmlText(cur.custom || '');
       return (
         '<div class="graph-tooltip-explode-wrap">' +
+        '<div class="graph-tooltip-explode-guidance">' +
+        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-preset">' +
+        'Guidance (optional)</label>' +
+        '<select id="graph-tooltip-explode-preset" class="graph-tooltip-explode-preset" ' +
+        'aria-label="Generation guidance preset for explode subgraph" ' +
+        'data-testid="graph-tooltip-explode-preset">' +
+        optionsHtml +
+        '</select>' +
+        `<div class="graph-tooltip-explode-custom-wrap" style="display:${customDisplay}">` +
+        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-custom">' +
+        'Custom text</label>' +
+        '<textarea id="graph-tooltip-explode-custom" class="graph-tooltip-explode-custom" rows="2" ' +
+        'maxlength="2000" aria-label="Custom generation guidance for explode subgraph" ' +
+        'data-testid="graph-tooltip-explode-custom">' +
+        customBody +
+        '</textarea></div></div>' +
+        '<p class="graph-tooltip-explode-hint">Same presets as <strong>AI Generation</strong>; applies when you tap Explode.</p>' +
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
         `data-node-id="${safe}" aria-label="Explode subgraph from this concept">` +
-        '💥 Explode subgraph</button>' +
-        '<p class="graph-tooltip-explode-hint">Adds a small Wikipedia-backed cluster linked here.</p></div>'
+        '💥 Explode subgraph</button></div>'
       );
     }
 
     const wrapForExplode = graphCanvasWrapRef.current;
-    let onTooltipExplodeClick = null;
+    let onTooltipWrapInteraction = null;
     if (wrapForExplode) {
-      onTooltipExplodeClick = (e) => {
+      onTooltipWrapInteraction = (e) => {
         const tgt = e.target;
+        if (e.type === 'change' && tgt?.classList?.contains('graph-tooltip-explode-preset')) {
+          if (!wrapForExplode.contains(tgt)) return;
+          const v = tgt.value;
+          setGuidanceForExplodeTooltipRef.current.setPreset(v);
+          const customWrap = wrapForExplode.querySelector('.graph-tooltip-explode-custom-wrap');
+          if (customWrap) customWrap.style.display = v === 'custom' ? 'block' : 'none';
+          return;
+        }
+        if (e.type === 'input' && tgt?.classList?.contains('graph-tooltip-explode-custom')) {
+          if (!wrapForExplode.contains(tgt)) return;
+          setGuidanceForExplodeTooltipRef.current.setCustom(tgt.value);
+          return;
+        }
+        if (e.type !== 'click') return;
         const btn =
           tgt && typeof tgt.closest === 'function'
             ? tgt.closest('[data-tooltip-explode="1"]')
@@ -782,7 +846,9 @@ function GraphVisualization({
           void handleExplodeNodeRef.current?.(rawId);
         }
       };
-      wrapForExplode.addEventListener('click', onTooltipExplodeClick);
+      wrapForExplode.addEventListener('click', onTooltipWrapInteraction);
+      wrapForExplode.addEventListener('change', onTooltipWrapInteraction);
+      wrapForExplode.addEventListener('input', onTooltipWrapInteraction);
     }
 
     function positionCanvasTooltipNearTarget(targetEl) {
@@ -2078,8 +2144,10 @@ function GraphVisualization({
         window.clearTimeout(playbackEaseHighlightTimerRef.current);
         playbackEaseHighlightTimerRef.current = null;
       }
-      if (wrapForExplode && onTooltipExplodeClick) {
-        wrapForExplode.removeEventListener('click', onTooltipExplodeClick);
+      if (wrapForExplode && onTooltipWrapInteraction) {
+        wrapForExplode.removeEventListener('click', onTooltipWrapInteraction);
+        wrapForExplode.removeEventListener('change', onTooltipWrapInteraction);
+        wrapForExplode.removeEventListener('input', onTooltipWrapInteraction);
       }
       if (minimapRafRef.current) {
         cancelAnimationFrame(minimapRafRef.current);
@@ -2417,6 +2485,7 @@ function GraphVisualization({
         })),
       };
       if (g) json.generationContext = g;
+      json.guidancePreset = guidancePreset;
       const result = await apiRequest('/api/explode-node', { method: 'POST', json });
       if (!result.success) {
         operationStatus = 'FAILURE';
@@ -2454,6 +2523,7 @@ function GraphVisualization({
             id: node.id,
             label: node.label,
           })),
+          guidancePreset,
         },
         startTime,
         operationStatus === 'FAILURE' ? new Error(operationError) : null
@@ -3031,9 +3101,11 @@ function GraphVisualization({
                   <h3>Explode subgraph (#69)</h3>
                   <p>
                     Select one concept on the graph: the <strong>node details</strong> card
-                    includes <strong>Explode subgraph</strong>. The server loads Wikipedia text,
-                    returns a small fully linked cluster, and bridges every new node to your
-                    anchor. Each node can only be exploded once until you reload.
+                    includes <strong>Guidance (optional)</strong> (same presets as{' '}
+                    <strong>AI Generation</strong>) and <strong>Explode subgraph</strong>. The
+                    server loads Wikipedia text, returns a small fully linked cluster, and
+                    bridges every new node to your anchor. Each node can only be exploded once
+                    until you reload.
                   </p>
                   <h3>Add Relationship</h3>
                   <p>

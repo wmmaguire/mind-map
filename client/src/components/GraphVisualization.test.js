@@ -210,6 +210,7 @@ describe('GraphVisualization graph action menu', () => {
     await waitFor(() => {
       expect(screen.getByTestId('graph-tooltip-explode-btn')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('graph-tooltip-explode-preset')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Explode subgraph from this concept/i })
     ).toBeInTheDocument();
