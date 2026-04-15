@@ -380,6 +380,9 @@ function GraphVisualization({
   const playbackPrevLinkKeysRef = useRef(null);
   const lastPlaybackFadeTokenRef = useRef(0);
   const playbackEaseHighlightTimerRef = useRef(null);
+  /** GitHub #86: highlight the delta for the current scrub step. */
+  const playbackStepHotNodeIdsRef = useRef(new Set());
+  const playbackStepHotLinkKeysRef = useRef(new Set());
 
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
@@ -403,6 +406,8 @@ function GraphVisualization({
       lastPlaybackFadeTokenRef.current = 0;
       playbackPrevCommunityIdsRef.current = null;
       playbackPrevLinkKeysRef.current = null;
+      playbackStepHotNodeIdsRef.current = new Set();
+      playbackStepHotLinkKeysRef.current = new Set();
     }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
@@ -1301,6 +1306,8 @@ function GraphVisualization({
       const matchIds = getSearchMatchIds();
 
       const radiusForNode = d => {
+        const hot = playbackStepHotNodeIdsRef.current;
+        const isHot = hot && hot.size && hot.has(String(d.id));
         if (selectedNodeIds.current.has(d.id)) return 25;
         const mergedR =
           d && d.nodes && d.nodes.length > 1
@@ -1313,18 +1320,25 @@ function GraphVisualization({
         if (datumMatchesSearch(d, matchIds)) {
           return Math.min((d && d.nodes && d.nodes.length > 1 ? mergedR : 20) + 3, 45);
         }
+        if (isHot) {
+          return Math.min((d && d.nodes && d.nodes.length > 1 ? bigMergedR : 20) + 4, 55);
+        }
         return d && d.nodes && d.nodes.length > 1 ? bigMergedR : 20;
       };
 
       const strokeForNode = d => {
         if (selectedNodeIds.current.has(d.id)) return '#f1c40f';
         if (datumMatchesSearch(d, matchIds)) return searchHighlightStroke;
+        const hot = playbackStepHotNodeIdsRef.current;
+        if (hot && hot.size && hot.has(String(d.id))) return '#f39c12';
         return '#fff';
       };
 
       const strokeWidthForNode = d => {
         if (selectedNodeIds.current.has(d.id)) return 4;
         if (datumMatchesSearch(d, matchIds)) return 3;
+        const hot = playbackStepHotNodeIdsRef.current;
+        if (hot && hot.size && hot.has(String(d.id))) return 4;
         return 2;
       };
 
@@ -1363,6 +1377,8 @@ function GraphVisualization({
           .style('stroke-opacity', l => {
             const picked = selectedLinkKeyRef.current;
             if (picked && linkKey(l) === picked) return 1;
+            const hot = playbackStepHotLinkKeysRef.current;
+            if (hot && hot.size && hot.has(linkKeyForProcessedCommunityLink(l))) return 1;
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1374,6 +1390,8 @@ function GraphVisualization({
           .style('stroke', l => {
             const picked = selectedLinkKeyRef.current;
             if (picked && linkKey(l) === picked) return highlightedColor;
+            const hot = playbackStepHotLinkKeysRef.current;
+            if (hot && hot.size && hot.has(linkKeyForProcessedCommunityLink(l))) return '#f39c12';
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1386,6 +1404,8 @@ function GraphVisualization({
           .style('stroke-width', l => {
             const picked = selectedLinkKeyRef.current;
             if (picked && linkKey(l) === picked) return 5;
+            const hot = playbackStepHotLinkKeysRef.current;
+            if (hot && hot.size && hot.has(linkKeyForProcessedCommunityLink(l))) return 4;
             const { sid, tid } = linkEndpointIds(l);
             const selHit =
               selectedNodeIds.current.has(sid) || selectedNodeIds.current.has(tid);
@@ -1935,6 +1955,23 @@ function GraphVisualization({
             processedLinks
           );
           if (newComm.size || newLk.size) {
+            // Flash the delta for this playback step: newly visible communities/links.
+            playbackStepHotNodeIdsRef.current = new Set(
+              Array.from(newComm).map(String)
+            );
+            playbackStepHotLinkKeysRef.current = new Set(Array.from(newLk));
+            // Also hot-highlight endpoints of newly visible links.
+            processedLinks.forEach((pl) => {
+              const k = linkKeyForProcessedCommunityLink(pl);
+              if (!newLk.has(k)) return;
+              if (pl?.source?.id != null) {
+                playbackStepHotNodeIdsRef.current.add(String(pl.source.id));
+              }
+              if (pl?.target?.id != null) {
+                playbackStepHotNodeIdsRef.current.add(String(pl.target.id));
+              }
+            });
+
             nodes.each(function easeNewCommunity(d) {
               if (!newComm.has(String(d.id))) return;
               const el = d3.select(this);
@@ -1959,6 +1996,8 @@ function GraphVisualization({
             }
             playbackEaseHighlightTimerRef.current = window.setTimeout(() => {
               playbackEaseHighlightTimerRef.current = null;
+              playbackStepHotNodeIdsRef.current = new Set();
+              playbackStepHotLinkKeysRef.current = new Set();
               updateHighlighting();
             }, EASE_SCRUB_MS + 24);
           }
