@@ -11,6 +11,7 @@ import {
   createFocusZoomTransform,
 } from '../utils/graphDiscovery';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
+import { pickCommunityAnchorNode } from '../utils/clusterAnchor';
 import {
   buildCommunityIdSet,
   newCommunityIdsForPlaybackTransition,
@@ -682,6 +683,15 @@ function GraphVisualization({
 
         previousZoomRef.current = currentZoom;
       });
+
+    function focusOnNodeId(nodeId, k = 1.6) {
+      const node = data.nodes.find((n) => String(n.id) === String(nodeId));
+      if (!node) return;
+      const nx = node.x != null ? node.x : width / 2;
+      const ny = node.y != null ? node.y : height / 2;
+      const t = createFocusZoomTransform(nx, ny, width, height, k);
+      d3.select(svgRef.current).transition().duration(450).call(zoom.transform, t);
+    }
 
     svg.call(zoom);
     zoomBehaviorRef.current = zoom;
@@ -1690,6 +1700,87 @@ function GraphVisualization({
           }
           return d.nodes[0]?.label || 'Unknown';
         });
+
+      // GitHub #81: cluster/community thumbnail chip anchored to most-connected node.
+      const clusterThumbs = visibleElements.filter((c) => Array.isArray(c.nodes) && c.nodes.length > 1);
+      if (clusterThumbs.length) {
+        const chips = g
+          .append('g')
+          .attr('class', 'cluster-thumb-layer')
+          .selectAll('g.cluster-thumb')
+          .data(clusterThumbs, (d) => d.id)
+          .enter()
+          .append('g')
+          .attr('class', 'cluster-thumb')
+          .attr('transform', (d) => `translate(${d.x || 0},${d.y || 0})`)
+          .style('cursor', 'pointer')
+          .on('click', (event, d) => {
+            event.stopPropagation();
+            const { node: anchor } = pickCommunityAnchorNode(d, data.links);
+            if (anchor?.id != null) focusOnNodeId(anchor.id, 1.75);
+          });
+
+        chips.each(function renderChip(d) {
+          const chip = d3.select(this);
+          const { node: anchor } = pickCommunityAnchorNode(d, data.links);
+          const label = String(anchor?.label || d.label || 'Cluster');
+          const thumbUrl =
+            anchor && isSafeThumbnailUrlForTooltip(anchor.thumbnailUrl)
+              ? anchor.thumbnailUrl
+              : null;
+
+          const padX = 8;
+          const padY = 5;
+          const textX = thumbUrl ? 26 : 8;
+          const approxW = Math.min(190, Math.max(90, textX + label.length * 6.2));
+          const h = 28;
+
+          // Background
+          chip
+            .append('rect')
+            .attr('x', -approxW / 2)
+            .attr('y', -h / 2)
+            .attr('rx', 10)
+            .attr('ry', 10)
+            .attr('width', approxW)
+            .attr('height', h)
+            .attr('fill', 'rgba(15, 23, 42, 0.75)')
+            .attr('stroke', 'rgba(148, 163, 184, 0.6)')
+            .attr('stroke-width', 1);
+
+          if (thumbUrl) {
+            const clipId = `cluster-chip-clip-${String(d.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            chip
+              .append('defs')
+              .append('clipPath')
+              .attr('id', clipId)
+              .append('circle')
+              .attr('cx', -approxW / 2 + padX + 9)
+              .attr('cy', 0)
+              .attr('r', 9);
+
+            chip
+              .append('image')
+              .attr('href', thumbUrl)
+              .attr('x', -approxW / 2 + padX)
+              .attr('y', -9)
+              .attr('width', 18)
+              .attr('height', 18)
+              .attr('clip-path', `url(#${clipId})`)
+              .attr('preserveAspectRatio', 'xMidYMid slice')
+              .attr('pointer-events', 'none');
+          }
+
+          chip
+            .append('text')
+            .attr('x', -approxW / 2 + textX)
+            .attr('y', 4)
+            .attr('fill', '#e2e8f0')
+            .attr('font-size', 12)
+            .attr('font-weight', 650)
+            .text(label.length > 24 ? `${label.slice(0, 24)}…` : label);
+        });
+      }
 
       // Update simulation with proper handling of both single nodes and communities
       simulation
