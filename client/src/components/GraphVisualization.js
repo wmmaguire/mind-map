@@ -2785,21 +2785,6 @@ function GraphVisualization({
                     ▼
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="generate-button graph-action-menu__action"
-                  aria-label="Open Extrapolate branch form"
-                  onClick={() =>
-                    onMenuPickGenerateWithAlgorithm('branchExtrapolation')
-                  }
-                >
-                  <span className="graph-action-menu__action-icon" aria-hidden>
-                    🌿
-                  </span>
-                  <span className="graph-action-menu__action-label">
-                    Extrapolate branch…
-                  </span>
-                </button>
               </div>
             )}
           </section>
