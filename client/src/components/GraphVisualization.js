@@ -1508,7 +1508,61 @@ function GraphVisualization({
         .attr('class', 'link')
         .attr('stroke', '#999')
         .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.6);
+        .attr('stroke-opacity', 0.6)
+        .style('cursor', 'pointer')
+        .on('click', (event, d) => {
+          if (!d) return;
+          event?.stopPropagation?.();
+
+          // Ensure the clicked link itself is highlighted via the existing linkKey logic.
+          selectedLinkKeyRef.current = linkKey(d);
+
+          // Highlight both endpoint communities (works for merged view)
+          selectedNodeIds.current.clear();
+          selectedNodeIds.current.add(String(d.source?.id));
+          selectedNodeIds.current.add(String(d.target?.id));
+
+          // Also highlight the underlying raw endpoints when available (works for split view / singletons)
+          const raw = d.originalLink;
+          if (raw) {
+            const { sid, tid } = linkEndpointIds(raw);
+            selectedNodeIds.current.add(String(sid));
+            selectedNodeIds.current.add(String(tid));
+          }
+
+          selectedNodeId.current = d.source?.id != null ? String(d.source.id) : null;
+          setSelectedNodes(
+            visibleElements.filter(n => selectedNodeIds.current.has(String(n.id)))
+          );
+          updateHighlighting();
+
+          const sourceLabel = d.source?.label || 'Unnamed Node';
+          const targetLabel = d.target?.label || 'Unnamed Node';
+          const relationship = d.relationship || raw?.relationship || 'related to';
+          const strengthNum =
+            raw && typeof raw.strength === 'number' && Number.isFinite(raw.strength)
+              ? Math.max(0, Math.min(1, raw.strength))
+              : null;
+          const strengthLabel =
+            strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
+
+          const tooltipContent = `
+            <strong>${sourceLabel}</strong>
+            <br/>
+            ${relationship}
+            <br/>
+            <strong>${targetLabel}</strong>
+            <br/>
+            <span style="opacity:0.85">Strength: ${strengthLabel}</span>
+          `;
+
+          d3.select('.tooltip')
+            .transition()
+            .duration(200)
+            .style('opacity', 0.9);
+          tooltip.html(tooltipContent);
+          scheduleTooltipPosition(event.currentTarget);
+        });
 
       // Draw nodes using visible elements but preserve original node data
       const nodes = g.selectAll('.node')
