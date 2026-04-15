@@ -411,10 +411,11 @@ function GraphVisualization({
     }
 
     // Fade out the previous render root instead of hard-clearing the SVG.
+    // Keep it around during playback scrubs so we can highlight removals (last-step deltas).
     const prevRoot = svg.select('g.graph-root');
     if (!prevRoot.empty()) {
       if (FADE_MS > 0 && !skipPlaybackRootCrossfade) {
-        prevRoot.transition().duration(FADE_MS).style('opacity', 0).remove();
+        prevRoot.classed('graph-root--prev', true).style('pointer-events', 'none');
       } else {
         prevRoot.remove();
       }
@@ -583,9 +584,8 @@ function GraphVisualization({
     // Always initialize communities when the component mounts or data changes
     communitiesRef.current = initializeCommunities();
 
-    // This effect can re-run (e.g. Escape clears selection). Ensure we don't append a
-    // second graph layer on top of the previous one.
-    svg.selectAll('g.graph-root').remove();
+    // Note: we do not hard-remove `g.graph-root` here because playback scrub keeps a
+    // previous root around briefly for crossfade + removal highlighting.
 
     // Modify the zoom behavior
     const g = svg
@@ -1946,6 +1946,16 @@ function GraphVisualization({
       ) {
         lastPlaybackFadeTokenRef.current = playbackScrubToken;
         if (EASE_SCRUB_MS > 0) {
+          const removedComm = prevCommIds
+            ? new Set(
+              Array.from(prevCommIds).filter((id) => !buildCommunityIdSet(visibleElements).has(id))
+            )
+            : new Set();
+          const currLinkKeys = new Set(processedLinks.map(linkKeyForProcessedCommunityLink));
+          const removedLk = prevLinkKeys
+            ? new Set(Array.from(prevLinkKeys).filter((k) => !currLinkKeys.has(k)))
+            : new Set();
+
           const newComm = newCommunityIdsForPlaybackTransition(
             prevCommIds,
             visibleElements
@@ -1954,7 +1964,7 @@ function GraphVisualization({
             prevLinkKeys,
             processedLinks
           );
-          if (newComm.size || newLk.size) {
+          if (newComm.size || newLk.size || removedComm.size || removedLk.size) {
             // Flash the delta for this playback step: newly visible communities/links.
             playbackStepHotNodeIdsRef.current = new Set(
               Array.from(newComm).map(String)
@@ -1971,6 +1981,27 @@ function GraphVisualization({
                 playbackStepHotNodeIdsRef.current.add(String(pl.target.id));
               }
             });
+
+            // If this step removes nodes/links, highlight them on the previous root while it fades.
+            const prevLayer = svg.select('g.graph-root--prev');
+            if (!prevLayer.empty() && (removedComm.size || removedLk.size)) {
+              prevLayer.selectAll('.node').each(function highlightRemovedNode(d) {
+                if (!d || !removedComm.has(String(d.id))) return;
+                const el = d3.select(this);
+                el.style('opacity', 1);
+                el.selectAll('circle.graph-node-disc, circle.graph-node-ring')
+                  .style('stroke', '#f39c12')
+                  .style('stroke-width', 4);
+              });
+              prevLayer.selectAll('line.link').each(function highlightRemovedLink(d) {
+                const k = linkKeyForProcessedCommunityLink(d);
+                if (!removedLk.has(k)) return;
+                const el = d3.select(this);
+                el.style('opacity', 1)
+                  .style('stroke', '#f39c12')
+                  .style('stroke-width', 4);
+              });
+            }
 
             nodes.each(function easeNewCommunity(d) {
               if (!newComm.has(String(d.id))) return;
@@ -2002,6 +2033,16 @@ function GraphVisualization({
             }, EASE_SCRUB_MS + 24);
           }
         }
+      }
+
+      // Fade out any previous root we kept (playback scrubs).
+      const prevLayer = svg.select('g.graph-root--prev');
+      if (!prevLayer.empty()) {
+        prevLayer
+          .transition()
+          .duration(FADE_MS)
+          .style('opacity', 0)
+          .remove();
       }
     };
 
