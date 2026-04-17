@@ -24,9 +24,16 @@ import {
 } from '../utils/graphDiscovery';
 import {
   computeGraphInsights,
+  computeInsightNotableCentralities,
   buildGraphInsightAssessPayload,
   INSIGHT_ASSESS_TONE_OPTIONS,
+  INSIGHT_ASSESS_LENGTH_OPTIONS,
+  INSIGHT_ASSESS_GUIDING_FOCUS_GROUPS,
+  INSIGHT_CENTRALITY_METRICS_HELP,
+  formatInsightCentralityScore,
+  getInsightAssessGuidingFocusPreview,
 } from '../utils/graphInsights';
+import { renderInsightMetricKatexHtml } from '../utils/insightMetricKatex';
 import { isSafeThumbnailUrlForTooltip } from '../utils/safeThumbnailUrl';
 import { pickCommunityAnchorNode } from '../utils/clusterAnchor';
 import {
@@ -347,12 +354,19 @@ function GraphVisualization({
   /** Insights panel: LLM assessment from centrality-notable nodes. */
   const [insightsAssessTone, setInsightsAssessTone] = useState('jung');
   const [insightsAssessCustomTone, setInsightsAssessCustomTone] = useState('');
+  const [insightsAssessGuidingFocus, setInsightsAssessGuidingFocus] =
+    useState('all');
+  const [insightsAssessLength, setInsightsAssessLength] = useState('low');
+  const [insightsAssessCustomGuiding, setInsightsAssessCustomGuiding] =
+    useState('');
   const [insightsAssessment, setInsightsAssessment] = useState('');
   const [insightsAssessLoading, setInsightsAssessLoading] = useState(false);
   const [insightsAssessError, setInsightsAssessError] = useState(null);
-  /** Top by degree list: minimized (collapsed) by default. */
-  const [insightsTopByDegreeExpanded, setInsightsTopByDegreeExpanded] =
+  /** Notable-by-centrality block: minimized (collapsed) by default. */
+  const [insightsNotableCentralitiesExpanded, setInsightsNotableCentralitiesExpanded] =
     useState(false);
+  /** Which centrality metric help dialog is open (`null` = closed). */
+  const [insightsMetricHelpKey, setInsightsMetricHelpKey] = useState(null);
   /** Transient Copy / Save feedback under the assessment toolbar. */
   const [insightsAssessActionFeedback, setInsightsAssessActionFeedback] =
     useState(null);
@@ -406,6 +420,7 @@ function GraphVisualization({
     setDiscoveryQuery('');
     discoveryQueryRef.current = '';
     setDiscoveryFocusIndex(0);
+    setInsightsMetricHelpKey(null);
   }, []);
 
   const captureGraphActionSnapshot = useCallback(() => {
@@ -601,6 +616,28 @@ function GraphVisualization({
     return computeGraphInsights(data || { nodes: [], links: [] });
   }, [insightsPanelVisible, data]);
 
+  const insightNotableCentralities = useMemo(() => {
+    if (!insightsPanelVisible || !data?.nodes?.length) return null;
+    return computeInsightNotableCentralities(data, 3);
+  }, [insightsPanelVisible, data]);
+
+  useEffect(() => {
+    if (!insightsPanelVisible) {
+      setInsightsMetricHelpKey(null);
+    }
+  }, [insightsPanelVisible]);
+
+  useEffect(() => {
+    if (!insightsMetricHelpKey) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setInsightsMetricHelpKey(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [insightsMetricHelpKey]);
+
   const focusInsightNodeById = useCallback(
     (nodeId) => {
       if (!data?.nodes?.length) return;
@@ -630,9 +667,19 @@ function GraphVisualization({
   );
 
   const handleInsightsAssess = useCallback(async () => {
-    if (!data?.nodes?.length) return;
+    if (!data?.nodes?.length) {
+      setInsightsAssessError('No concepts in the graph to assess.');
+      return;
+    }
     if (insightsAssessTone === 'custom' && insightsAssessCustomTone.trim().length < 8) {
       setInsightsAssessError('Custom voice: enter at least 8 characters.');
+      return;
+    }
+    if (
+      insightsAssessGuidingFocus === 'custom' &&
+      insightsAssessCustomGuiding.trim().length < 8
+    ) {
+      setInsightsAssessError('What the assessment should answer: enter at least 8 characters.');
       return;
     }
     setInsightsAssessLoading(true);
@@ -642,10 +689,15 @@ function GraphVisualization({
       const payload = buildGraphInsightAssessPayload(data, 6);
       const body = {
         tone: insightsAssessTone,
+        guidingFocus: insightsAssessGuidingFocus,
+        assessmentLength: insightsAssessLength,
         ...payload,
       };
       if (insightsAssessTone === 'custom') {
         body.customTone = insightsAssessCustomTone.trim();
+      }
+      if (insightsAssessGuidingFocus === 'custom') {
+        body.customGuidingQuestions = insightsAssessCustomGuiding.trim();
       }
       const res = await apiRequest('/api/graph-insights-assess', {
         method: 'POST',
@@ -654,9 +706,12 @@ function GraphVisualization({
       if (!res.success) {
         throw new Error(res.details || res.error || 'Assessment failed');
       }
-      setInsightsAssessment(
-        typeof res.assessment === 'string' ? res.assessment : ''
-      );
+      const text =
+        typeof res.assessment === 'string' ? res.assessment.trim() : '';
+      if (!text) {
+        throw new Error('The server returned an empty assessment. Try again.');
+      }
+      setInsightsAssessment(text);
       setInsightsAssessActionFeedback(null);
     } catch (err) {
       setInsightsAssessment('');
@@ -664,7 +719,14 @@ function GraphVisualization({
     } finally {
       setInsightsAssessLoading(false);
     }
-  }, [data, insightsAssessTone, insightsAssessCustomTone]);
+  }, [
+    data,
+    insightsAssessTone,
+    insightsAssessCustomTone,
+    insightsAssessGuidingFocus,
+    insightsAssessLength,
+    insightsAssessCustomGuiding,
+  ]);
 
   const copyInsightsAssessment = useCallback(async () => {
     const text = insightsAssessment;
@@ -3724,15 +3786,32 @@ function GraphVisualization({
           data-testid="graph-insights-panel"
         >
           <div className="graph-insights-panel__header-row">
-            <div className="graph-insights-panel__header">Network snapshot</div>
             <div className="graph-insights-panel__assess-controls">
-              <label htmlFor="insights-assess-tone" className="graph-insights-panel__assess-label">
-                Voice
-              </label>
+              <select
+                id="insights-assess-guiding-focus"
+                className="graph-insights-panel__assess-select graph-insights-panel__assess-select--guiding"
+                data-testid="graph-insights-assess-guiding-focus"
+                aria-label="Question"
+                value={insightsAssessGuidingFocus}
+                onChange={(e) => setInsightsAssessGuidingFocus(e.target.value)}
+                disabled={insightsAssessLoading}
+              >
+                {INSIGHT_ASSESS_GUIDING_FOCUS_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <option value="custom">Custom question</option>
+              </select>
               <select
                 id="insights-assess-tone"
                 className="graph-insights-panel__assess-select"
                 data-testid="graph-insights-assess-tone"
+                aria-label="Perspective"
                 value={insightsAssessTone}
                 onChange={(e) => setInsightsAssessTone(e.target.value)}
                 disabled={insightsAssessLoading}
@@ -3743,18 +3822,65 @@ function GraphVisualization({
                   </option>
                 ))}
               </select>
+              <select
+                id="insights-assess-length"
+                className="graph-insights-panel__assess-select graph-insights-panel__assess-select--length"
+                data-testid="graph-insights-assess-length"
+                aria-label="Length"
+                value={insightsAssessLength}
+                onChange={(e) => setInsightsAssessLength(e.target.value)}
+                disabled={insightsAssessLoading}
+              >
+                {INSIGHT_ASSESS_LENGTH_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className="graph-insights-panel__assess-submit"
                 data-testid="graph-insights-assess"
-                onClick={() => handleInsightsAssess()}
-                disabled={insightsAssessLoading || !graphInsights.nodeCount}
-                title="Generate an interpretive summary from notable nodes (degree, betweenness, closeness, eigenvector); uses OpenAI on the server."
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleInsightsAssess();
+                }}
+                disabled={insightsAssessLoading || !graphInsights?.nodeCount}
+                title={
+                  insightsAssessLoading
+                    ? 'Assessment in progress…'
+                    : !graphInsights?.nodeCount
+                      ? 'Add concepts to the graph before assessing.'
+                      : 'Generate an interpretive summary from notable nodes (degree, betweenness, closeness, eigenvector); uses OpenAI on the server.'
+                }
               >
-                {insightsAssessLoading ? 'Assessing…' : 'Assess graph'}
+                {insightsAssessLoading ? 'Assessing…' : 'Assess'}
               </button>
             </div>
           </div>
+          {(() => {
+            const guidingPreview = getInsightAssessGuidingFocusPreview(
+              insightsAssessGuidingFocus
+            );
+            if (!guidingPreview) return null;
+            return (
+              <div
+                className="graph-insights-panel__guiding-preview"
+                role="region"
+                aria-label="Question text for this assessment"
+                aria-live="polite"
+                data-testid="graph-insights-guiding-preview"
+              >
+                <div className="graph-insights-panel__guiding-preview-label">
+                  Question used
+                </div>
+                <div className="graph-insights-panel__guiding-preview-body">
+                  {guidingPreview}
+                </div>
+              </div>
+            );
+          })()}
           {insightsAssessTone === 'custom' ? (
             <div className="graph-insights-panel__custom-tone-wrap">
               <label htmlFor="insights-assess-custom" className="graph-insights-panel__assess-label">
@@ -3769,6 +3895,27 @@ function GraphVisualization({
                 placeholder="e.g. Dry academic sociology; or playful podcast banter; avoid inventing facts…"
                 value={insightsAssessCustomTone}
                 onChange={(e) => setInsightsAssessCustomTone(e.target.value)}
+                disabled={insightsAssessLoading}
+              />
+            </div>
+          ) : null}
+          {insightsAssessGuidingFocus === 'custom' ? (
+            <div className="graph-insights-panel__custom-tone-wrap">
+              <label
+                htmlFor="insights-assess-custom-guiding"
+                className="graph-insights-panel__assess-label"
+              >
+                What the assessment should answer
+              </label>
+              <textarea
+                id="insights-assess-custom-guiding"
+                className="graph-insights-panel__custom-tone"
+                data-testid="graph-insights-assess-custom-guiding"
+                rows={3}
+                maxLength={4000}
+                placeholder="e.g. Emphasize how the map evades a single center; or trace a motif of dependency between three named nodes…"
+                value={insightsAssessCustomGuiding}
+                onChange={(e) => setInsightsAssessCustomGuiding(e.target.value)}
                 disabled={insightsAssessLoading}
               />
             </div>
@@ -3875,55 +4022,177 @@ function GraphVisualization({
               <dd>{graphInsights.isolateCount}</dd>
             </div>
           </dl>
-          {graphInsights.topByDegree.length ? (
-            <div
-              className={`graph-insights-panel__top${
-                insightsTopByDegreeExpanded
-                  ? ' graph-insights-panel__top--expanded'
-                  : ' graph-insights-panel__top--collapsed'
-              }`}
-            >
-              <button
-                type="button"
-                className="graph-insights-panel__top-toggle"
-                data-testid="graph-insights-top-by-degree-toggle"
-                onClick={() => setInsightsTopByDegreeExpanded((v) => !v)}
-                aria-expanded={insightsTopByDegreeExpanded}
-                aria-controls="insights-top-by-degree-list"
-                id="insights-top-by-degree-heading"
+          {graphInsights.nodeCount > 0 && insightNotableCentralities ? (
+            <>
+              <div
+                className={`graph-insights-panel__top${
+                  insightsNotableCentralitiesExpanded
+                    ? ' graph-insights-panel__top--expanded'
+                    : ' graph-insights-panel__top--collapsed'
+                }`}
               >
-                <span className="graph-insights-panel__top-chevron" aria-hidden>
-                  {insightsTopByDegreeExpanded ? '▼' : '▶'}
-                </span>
-                <span className="graph-insights-panel__top-title">Top by degree</span>
-                <span className="graph-insights-panel__top-meta">
-                  ({graphInsights.topByDegree.length})
-                </span>
-              </button>
-              {insightsTopByDegreeExpanded ? (
-                <ul
-                  id="insights-top-by-degree-list"
-                  className="graph-insights-panel__top-list"
-                  aria-labelledby="insights-top-by-degree-heading"
+                <button
+                  type="button"
+                  className="graph-insights-panel__top-toggle"
+                  data-testid="graph-insights-notable-centralities-toggle"
+                  onClick={() => setInsightsNotableCentralitiesExpanded((v) => !v)}
+                  aria-expanded={insightsNotableCentralitiesExpanded}
+                  aria-controls="insights-notable-centralities-body"
+                  id="insights-notable-centralities-heading"
                 >
-                  {graphInsights.topByDegree.map((row) => (
-                    <li key={row.id} className="graph-insights-panel__top-row">
-                      <span className="graph-insights-panel__top-label" title={row.label}>
-                        {row.label}
-                      </span>
-                      <span className="graph-insights-panel__top-deg">{row.degree}</span>
-                      <button
-                        type="button"
-                        className="graph-insights-panel__focus"
-                        onClick={() => focusInsightNodeById(row.id)}
-                      >
-                        Focus
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                  <span className="graph-insights-panel__top-chevron" aria-hidden>
+                    {insightsNotableCentralitiesExpanded ? '▼' : '▶'}
+                  </span>
+                  <span className="graph-insights-panel__top-title">
+                    Notable by centrality
+                  </span>
+                  <span className="graph-insights-panel__top-meta">(top 3 each)</span>
+                </button>
+                {insightsNotableCentralitiesExpanded ? (
+                  <div
+                    id="insights-notable-centralities-body"
+                    className="graph-insights-panel__cmetrics"
+                    aria-labelledby="insights-notable-centralities-heading"
+                  >
+                    {INSIGHT_CENTRALITY_METRICS_HELP.map((meta) => {
+                      const rows = insightNotableCentralities[meta.key] || [];
+                      return (
+                        <section
+                          key={meta.key}
+                          className="graph-insights-panel__cmetric"
+                          aria-label={`${meta.name} (top ${rows.length})`}
+                        >
+                          <div className="graph-insights-panel__cmetric-head">
+                            <a
+                              href="#"
+                              className="graph-insights-panel__cmetric-title"
+                              id={`insights-cmetric-heading-${meta.key}`}
+                              data-testid={`graph-insights-centrality-help-${meta.key}`}
+                              aria-haspopup="dialog"
+                              aria-label={`Open help: what ${meta.name} means in this list`}
+                              title={`Open help — what ${meta.name} means`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setInsightsMetricHelpKey(meta.key);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === ' ' || e.key === 'Spacebar') {
+                                  e.preventDefault();
+                                  setInsightsMetricHelpKey(meta.key);
+                                }
+                              }}
+                            >
+                              <span className="graph-insights-panel__cmetric-title-wrap">
+                                <span className="graph-insights-panel__cmetric-title-text">
+                                  {meta.name}
+                                </span>
+                                <span
+                                  className="graph-insights-panel__cmetric-title-hint"
+                                  aria-hidden="true"
+                                >
+                                  ?
+                                </span>
+                              </span>
+                            </a>
+                          </div>
+                          <ul
+                            className="graph-insights-panel__cmetric-list"
+                            aria-labelledby={`insights-cmetric-heading-${meta.key}`}
+                          >
+                            {rows.map((row) => (
+                              <li
+                                key={`${meta.key}-${row.id}`}
+                                className="graph-insights-panel__top-row-item"
+                              >
+                                <button
+                                  type="button"
+                                  className="graph-insights-panel__top-row"
+                                  onClick={() => focusInsightNodeById(row.id)}
+                                  aria-label={`Focus ${row.label} on graph`}
+                                >
+                                  <span
+                                    className="graph-insights-panel__top-label"
+                                    title={row.label}
+                                  >
+                                    {row.label}
+                                  </span>
+                                  <span className="graph-insights-panel__top-deg">
+                                    {formatInsightCentralityScore(meta.key, row.score)}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              {insightsMetricHelpKey ? (
+                <div
+                  className="modal-overlay graph-insights-panel__metric-help-overlay"
+                  role="presentation"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setInsightsMetricHelpKey(null);
+                    }
+                  }}
+                >
+                  <div
+                    className="modal-content graph-insights-panel__metric-help-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={`insights-metric-help-title-${insightsMetricHelpKey}`}
+                    onClick={(ev) => ev.stopPropagation()}
+                  >
+                    {(() => {
+                      const hm = INSIGHT_CENTRALITY_METRICS_HELP.find(
+                        (m) => m.key === insightsMetricHelpKey
+                      );
+                      if (!hm) return null;
+                      const titleId = `insights-metric-help-title-${hm.key}`;
+                      return (
+                        <>
+                          <h2 id={titleId}>{hm.name}</h2>
+                          <dl className="graph-insights-panel__metric-help-dl">
+                            <div className="graph-insights-panel__metric-help-row">
+                              <dt>Intuition</dt>
+                              <dd>{hm.topicRoleIntuition}</dd>
+                            </div>
+                            <div className="graph-insights-panel__metric-help-row graph-insights-panel__metric-help-row--calc">
+                              <dt>Calculation</dt>
+                              <dd>
+                                {/* KaTeX HTML: static writtenFormula strings from graphInsights only (no user input). */}
+                                <div
+                                  className="graph-insights-panel__metric-help-formula-written graph-insights-panel__metric-help-formula-written--katex"
+                                  role="math"
+                                  aria-label={`${hm.name} (typeset formula)`}
+                                  dangerouslySetInnerHTML={{
+                                    __html: renderInsightMetricKatexHtml(hm.writtenFormula),
+                                  }}
+                                />
+                                <div className="graph-insights-panel__metric-help-prose">
+                                  {hm.calculationFormula}
+                                </div>
+                              </dd>
+                            </div>
+                          </dl>
+                          <div className="modal-buttons">
+                            <button
+                              type="button"
+                              onClick={() => setInsightsMetricHelpKey(null)}
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
               ) : null}
-            </div>
+            </>
           ) : null}
         </div>
       ) : null}

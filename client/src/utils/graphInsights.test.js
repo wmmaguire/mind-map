@@ -4,6 +4,11 @@ import {
   computeInsightNotableCentralities,
   buildGraphInsightAssessPayload,
   INSIGHT_ASSESS_TONE_OPTIONS,
+  INSIGHT_ASSESS_LENGTH_OPTIONS,
+  INSIGHT_ASSESS_GUIDING_FOCUS_OPTIONS,
+  getInsightAssessGuidingFocusPreview,
+  INSIGHT_CENTRALITY_METRICS_HELP,
+  formatInsightCentralityScore,
 } from './graphInsights';
 
 describe('graphInsights (#83)', () => {
@@ -108,7 +113,26 @@ describe('graphInsights (#83)', () => {
     };
     const n = computeInsightNotableCentralities(g, 3);
     expect(n.betweenness[0].label).toBe('B');
+    expect(n.betweenness[0].id).toBe('b');
     expect(n.betweenness[0].score).toBeGreaterThan(0);
+  });
+
+  it('INSIGHT_CENTRALITY_METRICS_HELP lists four keys in assess order', () => {
+    expect(INSIGHT_CENTRALITY_METRICS_HELP).toHaveLength(4);
+    expect(INSIGHT_CENTRALITY_METRICS_HELP.map((x) => x.key).join(',')).toBe(
+      'degree,betweenness,closeness,eigenvector'
+    );
+    for (const m of INSIGHT_CENTRALITY_METRICS_HELP) {
+      expect(typeof m.calculationFormula).toBe('string');
+      expect(m.calculationFormula.length).toBeGreaterThan(20);
+      expect(typeof m.writtenFormula).toBe('string');
+      expect(m.writtenFormula.length).toBeGreaterThan(15);
+    }
+  });
+
+  it('formatInsightCentralityScore formats degree as integer', () => {
+    expect(formatInsightCentralityScore('degree', 10)).toBe('10');
+    expect(formatInsightCentralityScore('betweenness', 0.25)).toBe('0.2500');
   });
 
   it('buildGraphInsightAssessPayload includes four centrality lists', () => {
@@ -126,9 +150,45 @@ describe('graphInsights (#83)', () => {
     expect(p.notableNodes.closeness.length).toBeGreaterThan(0);
     expect(p.notableNodes.eigenvector.length).toBeGreaterThan(0);
     expect(p.notableNodes.degree.some((r) => r.description === 'alpha')).toBe(true);
+    expect(p.notableNodes.degree[0].id).toBeDefined();
   });
 
   it('INSIGHT_ASSESS_TONE_OPTIONS includes custom', () => {
     expect(INSIGHT_ASSESS_TONE_OPTIONS.some((o) => o.id === 'custom')).toBe(true);
+  });
+
+  it('INSIGHT_ASSESS_LENGTH_OPTIONS matches server assessmentLength ids', () => {
+    expect(INSIGHT_ASSESS_LENGTH_OPTIONS.map((o) => o.id).join(',')).toBe(
+      'low,medium,high'
+    );
+  });
+
+  it('INSIGHT_ASSESS_GUIDING_FOCUS_OPTIONS matches server guidingFocus ids', () => {
+    expect(INSIGHT_ASSESS_GUIDING_FOCUS_OPTIONS.map((o) => o.id).join(',')).toBe(
+      'all,structure,theme,direction,network_all,flow,resilience,emergence,custom'
+    );
+  });
+
+  it('getInsightAssessGuidingFocusPreview returns preset copy for structure and all', () => {
+    expect(getInsightAssessGuidingFocusPreview('custom')).toBe(null);
+    const one = getInsightAssessGuidingFocusPreview('structure');
+    expect(one).toContain('Symptomatic structure');
+    expect(one).toContain('load-bearing');
+    const all = getInsightAssessGuidingFocusPreview('all');
+    expect(all).toContain('1.');
+    expect(all).toContain('2.');
+    expect(all).toContain('3.');
+    expect(all).toContain('Theme and meaning');
+    expect(all).toContain('Direction and inspiration');
+  });
+
+  it('getInsightAssessGuidingFocusPreview returns network lens copy', () => {
+    const na = getInsightAssessGuidingFocusPreview('network_all');
+    expect(na).toContain('Flow and spread');
+    expect(na).toContain('Resilience and vulnerability');
+    expect(na).toContain('Emergence and growth');
+    expect(getInsightAssessGuidingFocusPreview('flow')).toContain('bottlenecks');
+    expect(getInsightAssessGuidingFocusPreview('resilience')).toContain('hinged');
+    expect(getInsightAssessGuidingFocusPreview('emergence')).toContain('Emergence and growth');
   });
 });

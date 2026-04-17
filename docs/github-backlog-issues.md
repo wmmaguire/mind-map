@@ -192,24 +192,34 @@ Refs: #20 #46 #32 #64
 - **`client/src/utils/graphInsights.js`** — **`computeGraphInsights`**, **`graphInsightNodeId`**: undirected **multigraph** (parallel links increase degree), optional **`link.strength`** for weighted degree; **density**, **components**, degree **min/median/max**, **average local clustering** (k≥2), **isolates**, **top 10 by degree**. Tests: **`graphInsights.test.js`**.
 - **`GraphChromeUiContext`** — **`insightsPanelVisible`**, **`toggleInsightsPanel`**, **`setInsightsPanelVisible`**; **`localStorage`** **`mindmap.chrome.insightsPanelVisible`** (default **off**).
 - **`GuestIdentityBanner`** — **View → Insights** (`menuitemcheckbox`) in both chrome variants.
-- **`GraphVisualization`** — **Network snapshot** panel (`role="region"`, **`data-testid="graph-insights-panel"`**): metrics; **Top by degree** collapsible (minimized by default); **Assess graph** → **`POST /api/graph-insights-assess`**; assessment **Copy** / **Save** / **Close**. **Focus** per row = same path as discovery **Focus next** (**#94**). Metrics **memoized** while the panel is visible.
+- **`GraphVisualization`** — **Network snapshot** panel (`role="region"`, **`data-testid="graph-insights-panel"`**): metrics; **Notable by centrality** (top 3 per degree / betweenness / closeness / eigenvector) collapsible (minimized by default) + **?** help per metric; **Assess graph** → **`POST /api/graph-insights-assess`**; assessment **Copy** / **Save** / **Close**. **Focus** per row = same path as discovery **Focus next** (**#94**). Metrics **memoized** while the panel is visible.
 
 **Shipped (post–v1 snapshot, same branch / PR stack):**
 
-- **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; **psychoanalytic** framing with **three guiding questions** (symptomatic structure; theme/meaning; projected thematic direction / inspiration); output **2–3 short paragraphs**; `max_tokens` **1100**; system message stresses **speculative** reading vs clinical diagnosis; metrics guide reasoning **without** foregrounding technical centrality names. Uses **`OPENAI_ANALYZE_MODEL`**.
-- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, voice dropdown (Jung / Freud / Murakami / **Alex Jones** parody `jones` / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Top by degree** **collapsed by default** (disclosure toggle).
+- **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; **interpretive** (psychoanalytic-style) **or** **network-lens** prompts via **`guidingFocus`**; optional **`assessmentLength`** **`low`** \| **`medium`** \| **`high`** (default **`low`**) scales output paragraphs and **`max_tokens`** (**550** / **1100** / **2200**); metrics guide reasoning **without** foregrounding technical centrality names. Uses **`OPENAI_ANALYZE_MODEL`**.
+- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, **`INSIGHT_CENTRALITY_METRICS_HELP`** (help dialog copy, keep in sync with server metric table), **`INSIGHT_ASSESS_LENGTH_OPTIONS`**, voice dropdown (Jung / Freud / Murakami / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Notable by centrality** block **collapsed by default** (disclosure toggle).
 - **`GraphTitleContext`** — context object **exported** for safe **`useContext`** in **`GraphVisualization`** when tests omit the provider.
+
+**Apr 2026 — assess prompt: two-phase grounding + extension (same `graphInsightsAssess.js` / client preset copy):**
+
+- **User message** includes an explicit **reading structure**: **(A)** ground **factual claims about the map** in named labels and payload text; **(B)** allow **speculative extension** (associations, analogies, adjacent ideas) when **clearly marked** as inference—not as nodes present in the JSON.
+- **Guiding questions** (interpretive + network lens) and **output** instructions were **softened** from “never leave the data” to **anchor → associate**, **prioritize** map claims, **explicit analogy** to outside ideas where relevant, **hypothetical next steps** framed as inference.
+- **Framing, voice/translation, system message, data preamble, and claims paragraph** distinguish **factual** map claims from **interpretive extension**; client **`INSIGHT_GUIDING_QUESTION_BODY`** / **`INSIGHT_NETWORK_GUIDING_QUESTION_BODY`** in **`graphInsights.js`** stay aligned with server strings (see file header comments).
+- **Removed** prior **Alex Jones** (`jones`) tone preset from **`TONE_IDS`** / UI (parity with **`#97`** tone list).
 
 **Follow-ups outside the assess prompt / voice slice (still backlog):**
 
 | Topic | Notes | Track on |
 | --- | --- | --- |
 | **Client ↔ server tone ids** | Contract test or shared source so **`INSIGHT_ASSESS_TONE_OPTIONS`** and **`TONE_IDS`** cannot drift (avoids **400** `INVALID_TONE`) | **#97** |
+| **Guiding-question / prompt string parity** | Same drift risk as tones: server **`GUIDING_*_TEXT`** vs client **`INSIGHT_*_GUIDING_QUESTION_BODY`** — optional shared module or snapshot test | *Backlog draft:* **Insights assess — strict mode & evaluation** (below) |
+| **Optional “strict in-map only” mode** | API flag + prompt branch (or separate system block) for users who want **no** off-graph extension; optional Insights UI toggle | *Backlog draft:* **Insights assess — strict mode & evaluation** (below) |
+| **Quality / safety** | Review whether labeled extension meets product bar; optional user feedback (“too speculative”) telemetry | **#96** or *backlog draft* |
 | **LLM assess product polish** | Rate limits, **`UserActivity`** audit, response cache, persist text with graph, iOS clipboard, `aria-live` | **#96** (unchanged) |
 | **Metrics / playback / scale** | Diameter, extra centralities, patterns, playback-linked trends, workers — unchanged by prompt work | **#83** / **#95** |
 | **Ops** | Restart API after **`graphInsightsAssess.js`** deploy so validation + prompt changes load | deploy runbook |
 
-GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizing this assess update; **#97** opened for tone-id parity.
+GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizing earlier assess updates; **#97** opened for tone-id parity. **Paste suggested comments below** for the two-phase prompt slice (local **`gh`** was unauthenticated when docs were updated—run **`gh auth login`** or add comments in the web UI).
 
 **Still on epic #83 / child backlog #95 (outside current slice):**
 
@@ -228,7 +238,7 @@ GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizi
 
 **Suggested GitHub comments (Apr 2026, post–#83 v1):**
 
-- **#83** — *Phase 1 merged on `issue-83-graph-insights`: View→Insights, `graphInsights.js`, panel + Focus (discovery parity). Remaining epic items + scale work tracked in body + **#95**.* *(Apr 2026: assess prompt + **`jones`** tone — see issue comment thread.)*
+- **#83** — *Phase 1 merged on `issue-83-graph-insights`: View→Insights, `graphInsights.js`, panel + Focus (discovery parity). Remaining epic items + scale work tracked in body + **#95**.* *(Apr 2026: assess prompt + voice presets — see issue comment thread.)*
 - **#73** — *Insights Focus reuses discovery zoom/focus refs; future “metric → highlight neighborhood” belongs here alongside N-hop / lenses.*
 - **#70** — *#83 proposed playback **metric trends**; v1 is snapshot-only. Consider `computeGraphInsights(buildGraphAtPlaybackTime(...))` per step with caching.*
 - **#74** — *Insights toggle is per-browser `localStorage` for share viewers too; product may want default-off or hidden chrome for read-only.*
@@ -236,6 +246,33 @@ GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizi
 - **#94** — *Insights **Focus** matches **Focus next** (no `setSelectedNodes`); decoupling D3 deps allows syncing React selection if needed.*
 - **#57** — *New insights region + focus buttons: follow up with live region on Focus, keyboard traversal of top list.*
 - **#95** / **#96** / **#97** — *Assess narrative changes and tone parity: see issue comments (Apr 2026) and **#97**.*
+
+**Suggested GitHub comments (Apr 2026, assess two-phase grounding + extension + tone list):**
+
+- **#83** — *Apr 2026: `server/lib/graphInsightsAssess.js` assess prompt now uses an explicit **two-phase reading**—**(A)** ground factual claims about the map in the JSON, **(B)** optional speculative extension when clearly marked. Interpretive + network-lens guiding questions and output instructions updated; **`assessmentLength`** scales paragraphs/`max_tokens`. Client `INSIGHT_GUIDING_QUESTION_BODY` / `INSIGHT_NETWORK_GUIDING_QUESTION_BODY` in `graphInsights.js` stay aligned with server. **`jones`** tone removed from **`TONE_IDS`** / UI. Docs: `docs/github-backlog-issues.md` (this section), `server/READEME.md`, `client/README.md`, `docs/status.md`. Follow-ups: optional strict-only mode, prompt parity tests, evaluation—see *Backlog: Insights assess — strict mode & evaluation* in this file.*
+- **#95** — *Apr 2026: Insights phase-2 / scale work unchanged by prompt wording; assess still snapshot metrics + LLM narrative. Two-phase prompt may affect how users read “insights vs graph” — note if playback-linked or comparative metrics need different copy later.*
+- **#96** — *Apr 2026: Assess responses may include more off-map association (still anchored); rate limits, audit, cache, persistence, `aria-live` for assessment completion remain on #96. Optional: user feedback on “too speculative / too dry.”*
+- **#97** — *Apr 2026: Tone allowlist is Jung / Freud / Murakami / Thompson / Custom (**`jones`** removed). Consider extending the same “no drift” idea to **guiding question** strings (server vs client) via shared source or tests.*
+
+### Backlog: Insights assess — strict mode, evaluation, prompt contracts
+
+**Title:** `Backlog: Graph insights assess — optional strict mode, evaluation, guiding-question parity`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026)
+`POST /api/graph-insights-assess` prompts now invite **grounded-then-extension** readings. Some users may want **strict in-map only** assessments; others may want confidence that client preview text matches server prompts.
+
+## Scope (pick any)
+1. **Product:** optional API field (e.g. `extensionMode: "default" | "strict"`) and/or Insights UI toggle; **strict** branch tightens user/system prompts to minimize off-graph prose.
+2. **Quality:** lightweight feedback (thumbs / optional text) on assessment usefulness or “too speculative.”
+3. **Engineering:** contract or snapshot tests so **`INSIGHT_GUIDING_QUESTION_BODY`** / **`INSIGHT_NETWORK_GUIDING_QUESTION_BODY`** cannot drift from **`graphInsightsAssess.js`** (similar motivation to **#97** for **`TONE_IDS`**).
+
+Refs: #83 #96 #97
+```
+
+Create manually on GitHub if not already filed; **do not** duplicate if merged into **#96** or **#97**.
 
 ### Backlog: Decouple D3 graph effect from React `selectedNodes` — **GitHub #94**
 
