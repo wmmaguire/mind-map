@@ -96,8 +96,8 @@ export function getInsightAssessGuidingFocusPreview(focus) {
 
 /** Voice presets for POST /api/graph-insights-assess (ids must match server). */
 export const INSIGHT_ASSESS_TONE_OPTIONS = [
-  { id: 'jung', label: 'Carl Jung' },
   { id: 'freud', label: 'Sigmund Freud' },
+  { id: 'palahniuk', label: 'Chuck Palahniuk' },
   { id: 'murakami', label: 'Haruki Murakami' },
   { id: 'thompson', label: 'Hunter S. Thompson' },
   { id: 'custom', label: 'Custom' },

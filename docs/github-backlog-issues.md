@@ -197,7 +197,7 @@ Refs: #20 #46 #32 #64
 **Shipped (post–v1 snapshot, same branch / PR stack):**
 
 - **`POST /api/graph-insights-assess`** — **`server/lib/graphInsightsAssess.js`**: validated JSON body; OpenAI narrative; **interpretive** (psychoanalytic-style) **or** **network-lens** prompts via **`guidingFocus`**; optional **`assessmentLength`** **`low`** \| **`medium`** \| **`high`** (default **`low`**) scales output paragraphs and **`max_tokens`** (**550** / **1100** / **2200**); metrics guide reasoning **without** foregrounding technical centrality names. Uses **`OPENAI_ANALYZE_MODEL`**.
-- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, **`INSIGHT_CENTRALITY_METRICS_HELP`** (help dialog copy, keep in sync with server metric table), **`INSIGHT_ASSESS_LENGTH_OPTIONS`**, voice dropdown (Jung / Freud / Murakami / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Notable by centrality** block **collapsed by default** (disclosure toggle).
+- **Client:** **`buildGraphInsightAssessPayload`**, **`computeInsightNotableCentralities`**, **`INSIGHT_CENTRALITY_METRICS_HELP`** (help dialog copy, keep in sync with server metric table), **`INSIGHT_ASSESS_LENGTH_OPTIONS`**, voice dropdown (Freud default / Palahniuk / Murakami / Thompson / Custom), **Copy** / **Save** (`.txt` via **`GraphTitleContext`** slug when mounted) / **Close**; **Notable by centrality** block **collapsed by default** (disclosure toggle).
 - **`GraphTitleContext`** — context object **exported** for safe **`useContext`** in **`GraphVisualization`** when tests omit the provider.
 
 **Apr 2026 — assess prompt: two-phase grounding + extension (same `graphInsightsAssess.js` / client preset copy):**
@@ -206,6 +206,7 @@ Refs: #20 #46 #32 #64
 - **Guiding questions** (interpretive + network lens) and **output** instructions were **softened** from “never leave the data” to **anchor → associate**, **prioritize** map claims, **explicit analogy** to outside ideas where relevant, **hypothetical next steps** framed as inference.
 - **Framing, voice/translation, system message, data preamble, and claims paragraph** distinguish **factual** map claims from **interpretive extension**; client **`INSIGHT_GUIDING_QUESTION_BODY`** / **`INSIGHT_NETWORK_GUIDING_QUESTION_BODY`** in **`graphInsights.js`** stay aligned with server strings (see file header comments).
 - **Removed** prior **Alex Jones** (`jones`) tone preset from **`TONE_IDS`** / UI (parity with **`#97`** tone list).
+- **Carl Jung** (`jung`) replaced by **Chuck Palahniuk** (`palahniuk`); **Sigmund Freud** (`freud`) is the **default** tone in **`GraphVisualization`** state and listed first in **`INSIGHT_ASSESS_TONE_OPTIONS`**.
 
 **Follow-ups outside the assess prompt / voice slice (still backlog):**
 
@@ -249,10 +250,10 @@ GitHub comments were added (Apr 2026) on **#83**, **#95**, and **#96** summarizi
 
 **Suggested GitHub comments (Apr 2026, assess two-phase grounding + extension + tone list):**
 
-- **#83** — *Apr 2026: `server/lib/graphInsightsAssess.js` assess prompt now uses an explicit **two-phase reading**—**(A)** ground factual claims about the map in the JSON, **(B)** optional speculative extension when clearly marked. Interpretive + network-lens guiding questions and output instructions updated; **`assessmentLength`** scales paragraphs/`max_tokens`. Client `INSIGHT_GUIDING_QUESTION_BODY` / `INSIGHT_NETWORK_GUIDING_QUESTION_BODY` in `graphInsights.js` stay aligned with server. **`jones`** tone removed from **`TONE_IDS`** / UI. Docs: `docs/github-backlog-issues.md` (this section), `server/READEME.md`, `client/README.md`, `docs/status.md`. Follow-ups: optional strict-only mode, prompt parity tests, evaluation—see *Backlog: Insights assess — strict mode & evaluation* in this file.*
+- **#83** — *Apr 2026: `server/lib/graphInsightsAssess.js` assess prompt now uses an explicit **two-phase reading**—**(A)** ground factual claims about the map in the JSON, **(B)** optional speculative extension when clearly marked. Interpretive + network-lens guiding questions and output instructions updated; **`assessmentLength`** scales paragraphs/`max_tokens`. Client `INSIGHT_GUIDING_QUESTION_BODY` / `INSIGHT_NETWORK_GUIDING_QUESTION_BODY` in `graphInsights.js` stay aligned with server. **`jones`** removed; **`jung`** replaced by **`palahniuk`** (Chuck Palahniuk); **Freud** is default tone in the UI. Docs: `docs/github-backlog-issues.md` (this section), `server/READEME.md`, `client/README.md`, `docs/status.md`. Follow-ups: optional strict-only mode, prompt parity tests, evaluation—see *Backlog: Insights assess — strict mode & evaluation* in this file.*
 - **#95** — *Apr 2026: Insights phase-2 / scale work unchanged by prompt wording; assess still snapshot metrics + LLM narrative. Two-phase prompt may affect how users read “insights vs graph” — note if playback-linked or comparative metrics need different copy later.*
 - **#96** — *Apr 2026: Assess responses may include more off-map association (still anchored); rate limits, audit, cache, persistence, `aria-live` for assessment completion remain on #96. Optional: user feedback on “too speculative / too dry.”*
-- **#97** — *Apr 2026: Tone allowlist is Jung / Freud / Murakami / Thompson / Custom (**`jones`** removed). Consider extending the same “no drift” idea to **guiding question** strings (server vs client) via shared source or tests.*
+- **#97** — *Apr 2026: Tone allowlist is Freud / Palahniuk / Murakami / Thompson / Custom (**`jones`** removed; **`jung`** replaced by **`palahniuk`**). Consider extending the same “no drift” idea to **guiding question** strings (server vs client) via shared source or tests.*
 
 ### Backlog: Insights assess — strict mode, evaluation, prompt contracts
 

@@ -352,7 +352,7 @@ function GraphVisualization({
   const [discoveryQuery, setDiscoveryQuery] = useState('');
   const [discoveryFocusIndex, setDiscoveryFocusIndex] = useState(0);
   /** Insights panel: LLM assessment from centrality-notable nodes. */
-  const [insightsAssessTone, setInsightsAssessTone] = useState('jung');
+  const [insightsAssessTone, setInsightsAssessTone] = useState('freud');
   const [insightsAssessCustomTone, setInsightsAssessCustomTone] = useState('');
   const [insightsAssessGuidingFocus, setInsightsAssessGuidingFocus] =
     useState('all');
