@@ -23,22 +23,14 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
-.landing-eyebrow {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #357abd;
-}
-
 .landing-hero-title {
   margin: 0 0 0.85rem;
   font-size: clamp(1.75rem, 3.5vw, 2.5rem);
   line-height: 1.15;
   font-weight: 800;
-  color: #0f172a;
+  color: #357abd;
   letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 
 .landing-hero-tagline {

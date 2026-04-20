@@ -117,9 +117,9 @@ const FEATURE_CARDS = [
   },
   {
     id: 'assess',
-    title: 'Read it back to yourself',
+    title: 'Gleam insights',
     body:
-      'Assess produces a two-phase reading — claims grounded in the graph, with clearly marked speculative extension — in a voice of your choosing.',
+      'Assess produces a two-phase reading — claims grounded in the graph, with clearly marked speculative extensions to encourage creative discovery.',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden focusable="false">
         <path
@@ -150,14 +150,12 @@ export default function LandingPage() {
     <div className="landing-container">
       <div className="content landing-content">
         <section className="landing-hero" aria-labelledby="landing-hero-title">
-          <p className="landing-eyebrow">Mindmap</p>
           <h1 id="landing-hero-title" className="landing-hero-title">
-            See the shape of your thinking.
+            MindMap
           </h1>
           <p className="landing-hero-tagline">
-            Turn your writing, transcripts, and recorded conversations into an
-            interactive concept graph — then read it back to yourself to
-            surface what your sources are quietly saying.
+            Turn your writing and recorded conversations into an
+            interactive concept graph.  Explore it, expand it and reveal the shape of your thinking.
           </p>
           <div className="landing-cta landing-cta--hero">
             <button
@@ -254,12 +252,10 @@ export default function LandingPage() {
             Why it matters
           </h2>
           <p className="landing-reflection-body">
-            Unstructured, free-flowing thinking expands in many directions at
-            once and binds them in memorable ways. The network of thoughts
-            takes on a life of its own — self-organizing, self-emergent.
-            Reflecting on the loose associations that push and pull those
-            concepts is how a hidden motive quietly guiding a conversation
-            finally becomes visible.
+            Unstructured, free-flowing conversations often expand in many profound directions. This network of thought
+            takes on a life of its own: self-organizing and self-emergent.
+            Reflecting on the loose associations that push and pull these
+            concepts is how to surface the hidden motives that inspire the power of ideas.
           </p>
           <p className="landing-reflection-questions">
             <span>“What were we talking about again? How did we get here?”</span>
