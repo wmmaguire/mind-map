@@ -35,9 +35,12 @@ test('renders app title', () => {
       </SessionProvider>
     </BrowserRouter>
   );
-  expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/MindMap/i).length).toBeGreaterThan(0);
   expect(screen.getByRole('heading', { name: /^How it works$/i })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /^get started$/i })).toBeInTheDocument();
+  // Landing page (#76) now ships hero + bottom CTAs, so multiple "Get Started" buttons exist.
+  expect(
+    screen.getAllByRole('button', { name: /^get started$/i }).length
+  ).toBeGreaterThanOrEqual(1);
 });
 
 test('shows guest identity banner', async () => {
