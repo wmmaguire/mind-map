@@ -42,85 +42,19 @@ svg {
   color: #357abd;
 }
 
+/* --- Tooltip action buttons (Extend + Explode) --- */
+/* Parameters for both actions are collected in dedicated React modals
+ * (`.graph-tooltip-modal`); the tooltip only surfaces the launch buttons. */
 .graph-tooltip-explode-wrap {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #e2e8f0;
 }
 
-.graph-tooltip-explode-guidance {
-  margin-top: 0;
-  margin-bottom: 8px;
-}
-
-.graph-tooltip-explode-guidance-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 4px;
-}
-
-.graph-tooltip-explode-preset {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 13px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  margin-bottom: 6px;
-}
-
-.graph-tooltip-explode-custom-wrap {
-  margin-bottom: 4px;
-}
-
-.graph-tooltip-explode-custom {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  resize: vertical;
-  min-height: 48px;
-  font-family: inherit;
-}
-
-.graph-tooltip-explode-count-wrap {
-  margin: 8px 0 6px;
-}
-
-.graph-tooltip-explode-count-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.graph-tooltip-explode-count {
-  flex: 1;
-  min-width: 0;
-  height: 6px;
-  accent-color: #3b82f6;
-}
-
-.graph-tooltip-explode-count-value {
-  min-width: 1.25rem;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .graph-tooltip-explode-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -144,6 +78,99 @@ svg {
   border-top: 1px solid #e2e8f0;
   font-size: 12px;
   color: #64748b;
+}
+
+.graph-tooltip-extend-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.graph-tooltip-extend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #064e3b;
+  background: #d1fae5;
+  border: 1px solid #059669;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.graph-tooltip-extend-btn:hover {
+  background: #a7f3d0;
+  border-color: #047857;
+}
+
+.graph-tooltip-extend-btn:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+
+.graph-tooltip-extend-btn:disabled,
+.graph-tooltip-explode-btn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* --- Extend / Explode modals (opened from tooltip buttons) --- */
+.graph-tooltip-modal__anchor {
+  color: #1d4ed8;
+  word-break: break-word;
+}
+
+.graph-tooltip-modal__desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.graph-tooltip-modal__form .form-group {
+  margin-bottom: 12px;
+}
+
+.graph-tooltip-modal__kind {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  border: none;
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.graph-tooltip-modal__kind legend {
+  font-weight: 600;
+  color: #334155;
+  padding: 0;
+  margin-right: 4px;
+}
+
+.graph-tooltip-modal__kind-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+}
+
+.graph-tooltip-modal__kind-opt input {
+  margin: 0;
+}
+
+.graph-tooltip-modal__primary {
+  /* Match the button color/shape from the tooltip for visual continuity. */
+  margin-bottom: 0;
 }
 
 /* Position set in JS: just left of clicked node/link (clamped inside canvas) */
@@ -1160,13 +1187,45 @@ svg .graph-node-hit {
   margin-bottom: 8px;
 }
 
+/**
+ * Insights "Assess" control bar. Four widgets share this row:
+ *   1. Question (guiding-focus select)
+ *   2. Reflective ↔ Discovery balance slider
+ *   3. Length select
+ *   4. Assess submit button
+ *
+ * Layout is mobile-first: widgets stack vertically with the Length select
+ * and the Assess button sharing the final row (tap target stays aligned
+ * with the last input). At ≥ 720px everything collapses into a single
+ * elegant row via grid-template-areas, with column widths tuned so no
+ * control gets starved while the balance slider keeps enough room for
+ * both end labels + the readout.
+ */
 .graph-insights-panel__assess-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'question question'
+    'balance  balance'
+    'length   submit';
+  column-gap: 10px;
+  row-gap: 10px;
   align-items: center;
-  gap: 8px;
   position: relative;
   z-index: 1;
+}
+
+@media (min-width: 720px) {
+  .graph-insights-panel__assess-controls {
+    grid-template-columns:
+      minmax(200px, 1.3fr)
+      minmax(220px, 1.4fr)
+      minmax(170px, 0.8fr)
+      auto;
+    grid-template-areas: 'question balance length submit';
+    column-gap: 12px;
+    row-gap: 8px;
+  }
 }
 
 .graph-insights-panel__guiding-preview {
@@ -1202,25 +1261,77 @@ svg .graph-node-hit {
 
 .graph-insights-panel__assess-select {
   font-size: 13px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
   background: #fff;
-  min-width: 168px;
+  /* min-width: 0 lets the grid column govern sizing without intrinsic overflow. */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .graph-insights-panel__assess-select--guiding {
-  min-width: 200px;
+  grid-area: question;
 }
 
 .graph-insights-panel__assess-select--length {
-  min-width: 210px;
+  grid-area: length;
+}
+
+/**
+ * Reflection ↔ Discovery slider + readout. Takes the `balance` grid area;
+ * the anchor labels flank the `<input type="range">` and a live band
+ * readout (Strongly reflective / Leaning reflective / Balanced / Leaning
+ * discovery / Strongly discovery) sits directly beneath.
+ */
+.graph-insights-panel__assess-balance {
+  grid-area: balance;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  /* min-width: 0 needed so the slider can shrink inside a narrow grid cell
+     (without it, the intrinsic min-width of the inner range input would
+     push the column wider than 1fr allows). */
+  min-width: 0;
+}
+
+.graph-insights-panel__assess-balance-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+  min-width: 0;
+}
+
+.graph-insights-panel__assess-balance-end {
+  font-weight: 500;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.graph-insights-panel__assess-balance-range {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  accent-color: #4a90e2;
+}
+
+.graph-insights-panel__assess-balance-readout {
+  font-size: 11px;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .graph-insights-panel__assess-submit {
+  grid-area: submit;
   position: relative;
   z-index: 2;
-  padding: 6px 12px;
+  padding: 8px 16px;
   font-size: 13px;
   border-radius: 6px;
   border: 1px solid #6b21a8;
@@ -1228,6 +1339,19 @@ svg .graph-node-hit {
   color: #fff;
   cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
+  min-height: 36px;
+  /* Keeps the submit button a comfortable tap target on mobile (paired
+     with the Length select on the last row) and aligns its visual weight
+     with the row of selects at desktop widths. */
+  justify-self: stretch;
+}
+
+@media (min-width: 720px) {
+  .graph-insights-panel__assess-submit {
+    justify-self: end;
+    min-width: 88px;
+  }
 }
 
 .graph-insights-panel__assess-submit:hover:not(:disabled) {

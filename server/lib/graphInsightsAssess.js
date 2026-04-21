@@ -2,7 +2,7 @@
  * POST /api/graph-insights-assess — LLM narrative from centrality-notable nodes (GitHub #83 extension).
  */
 
-const TONE_IDS = ['freud', 'palahniuk', 'murakami', 'thompson', 'custom'];
+const TONE_IDS = ['freud', 'palahniuk', 'murakami', 'thompson', 'delanda', 'custom'];
 
 const TONE_SYSTEM_HINTS = {
   freud:
@@ -13,12 +13,55 @@ const TONE_SYSTEM_HINTS = {
     'Adopt a spare, dream-adjacent tone inspired by Haruki Murakami: quiet images, subtle uncanny links between concepts—still factual about the graph structure.',
   thompson:
     'Adopt a vivid, first-person-leaning energy inspired by Hunter S. Thompson: punchy, satirical, high-color prose—without inventing facts not supported by the node summaries.',
+  delanda:
+    'Adopt a lucid, systems-oriented voice inspired by Manuel DeLanda: read the graph as an assemblage of heterogeneous components linked by material, causal, and expressive relations; favor flat ontology (concrete entities over abstract essences), emergent properties from interactions between nodes, phase transitions / thresholds where the network shifts regime, and non-linear dynamics (attractors, feedback, bifurcations) when the structure invites them. Prefer concrete terms like "assemblage", "territorialization / deterritorialization", "coupling", "capacity", "population of cases" over vague abstractions. Describe the graph as a historical, contingent process rather than a fixed essence. Stay grounded in the supplied node descriptions and topology—use these frames as an interpretive lens, not to import unsupported facts or name-drop citations.',
 };
 
 const MAX_CUSTOM_TONE_LEN = 4000;
 const MAX_CUSTOM_GUIDING_LEN = 4000;
 const MAX_DESCRIPTION_LEN = 800;
 const MAX_NOTABLE_PER_METRIC = 12;
+
+/**
+ * `reflectionBalance` — numeric slider (0..100) biasing the assessment between
+ * pure reflection (describe the explicit structure / patterns already in the
+ * graph) and discovery (speculate on the emergent / projected directions the
+ * graph may grow into). 0 = fully reflective, 100 = fully discovery, 50 =
+ * balanced. Clamped into range; non-numeric rejected as INVALID_REFLECTION_BALANCE.
+ */
+const REFLECTION_BALANCE_MIN = 0;
+const REFLECTION_BALANCE_MAX = 100;
+const REFLECTION_BALANCE_DEFAULT = 50;
+
+/**
+ * Turn a 0..100 slider value into a single prompt directive that shifts the
+ * model's emphasis. Five discrete bands keep the prompt stable and cache
+ * friendly; numeric value is still passed to the model for fine-grained cues.
+ */
+function buildReflectionBalanceDirective(n) {
+  const v = Math.max(
+    REFLECTION_BALANCE_MIN,
+    Math.min(REFLECTION_BALANCE_MAX, Number(n) || REFLECTION_BALANCE_DEFAULT)
+  );
+  let band;
+  if (v <= 20) {
+    band =
+      '**Strongly reflective.** Focus almost exclusively on the explicit structure, patterns, and relationships already present in the graph. Keep speculation about unstated or emergent directions to an absolute minimum — at most a single short hedge, clearly marked.';
+  } else if (v <= 40) {
+    band =
+      '**Leaning reflective.** Primarily describe the explicit structure and patterns in the graph. Brief, clearly-marked speculative extensions are allowed only where they follow obviously from the explicit evidence.';
+  } else if (v <= 60) {
+    band =
+      '**Balanced.** Give roughly equal weight to (a) describing the explicit structure and patterns in the graph and (b) speculating on emergent or projected directions the graph may grow into. Clearly distinguish the two modes as you move between them.';
+  } else if (v <= 80) {
+    band =
+      '**Leaning discovery.** Spend more of the response projecting emergent directions, plausible next themes, and the trajectory the graph is headed toward. Briefly anchor each speculation in explicit evidence from the graph before extending.';
+  } else {
+    band =
+      '**Strongly discovery.** Emphasize speculative projection of where this graph is evolving — the motifs that want to emerge, the adjacent concepts it is reaching for, the direction its shape implies. Anchor each major claim briefly in explicit evidence, then extrapolate; it is fine for most of the writing to be projective.';
+  }
+  return `**Reflection ↔ Discovery balance (user-selected, ${v}/100):** ${band}`;
+}
 
 /** Desired assessment length (`assessmentLength` on POST body). Defaults to `low`. */
 const ASSESSMENT_LENGTH_IDS = ['low', 'medium', 'high'];
@@ -400,6 +443,23 @@ export function validateGraphInsightsAssessRequest(body) {
     };
   }
 
+  let reflectionBalance = REFLECTION_BALANCE_DEFAULT;
+  if (body.reflectionBalance !== undefined && body.reflectionBalance !== null) {
+    const raw = Number(body.reflectionBalance);
+    if (!Number.isFinite(raw)) {
+      return {
+        ok: false,
+        status: 400,
+        error: `reflectionBalance must be a number between ${REFLECTION_BALANCE_MIN} and ${REFLECTION_BALANCE_MAX}`,
+        code: 'INVALID_REFLECTION_BALANCE',
+      };
+    }
+    reflectionBalance = Math.max(
+      REFLECTION_BALANCE_MIN,
+      Math.min(REFLECTION_BALANCE_MAX, Math.round(raw))
+    );
+  }
+
   let customGuidingQuestions = '';
   if (guidingFocus === 'custom') {
     customGuidingQuestions =
@@ -494,6 +554,7 @@ export function validateGraphInsightsAssessRequest(body) {
       customTone,
       guidingFocus,
       assessmentLength,
+      reflectionBalance,
       customGuidingQuestions,
       notableNodes: cleaned,
       graphSummary: summary,
@@ -547,11 +608,17 @@ export async function runGraphInsightsAssess(openai, validated) {
   const guidingFocusHint = buildGuidingFocusPrivateHint(validated.guidingFocus);
   const overlapParagraph = buildCrossMetricOverlapParagraph(validated.notableNodes);
 
+  const reflectionBalanceDirective = buildReflectionBalanceDirective(
+    validated.reflectionBalance
+  );
+
   const userContent = `${framingParagraph}
 
 ${guidingBlock}
 
 ${buildReadingPhasesParagraph(validated.assessmentLength)}
+
+${reflectionBalanceDirective}
 
 ${guidingFocusHint ? `${guidingFocusHint}\n\n` : ''}${buildDataScopeParagraph()}
 

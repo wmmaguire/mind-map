@@ -94,12 +94,42 @@ export function getInsightAssessGuidingFocusPreview(focus) {
   return null;
 }
 
+/**
+ * `reflectionBalance` slider — 0..100, default 50. Mirrors server-side
+ * `REFLECTION_BALANCE_*` constants in `server/lib/graphInsightsAssess.js`.
+ * 0 = strongly reflective (describe what's explicitly in the graph);
+ * 100 = strongly discovery (speculate on emergent / projected directions
+ * the graph may grow into). Kept as five discrete bands for readability.
+ */
+export const INSIGHT_ASSESS_REFLECTION_BALANCE_MIN = 0;
+export const INSIGHT_ASSESS_REFLECTION_BALANCE_MAX = 100;
+export const INSIGHT_ASSESS_REFLECTION_BALANCE_DEFAULT = 50;
+export const INSIGHT_ASSESS_REFLECTION_BALANCE_STEP = 5;
+
+export function formatInsightAssessReflectionBalance(n) {
+  const v = Math.max(
+    INSIGHT_ASSESS_REFLECTION_BALANCE_MIN,
+    Math.min(
+      INSIGHT_ASSESS_REFLECTION_BALANCE_MAX,
+      Number.isFinite(Number(n))
+        ? Math.round(Number(n))
+        : INSIGHT_ASSESS_REFLECTION_BALANCE_DEFAULT
+    )
+  );
+  if (v <= 20) return 'Strongly reflective';
+  if (v <= 40) return 'Leaning reflective';
+  if (v <= 60) return 'Balanced';
+  if (v <= 80) return 'Leaning discovery';
+  return 'Strongly discovery';
+}
+
 /** Voice presets for POST /api/graph-insights-assess (ids must match server). */
 export const INSIGHT_ASSESS_TONE_OPTIONS = [
   { id: 'freud', label: 'Sigmund Freud' },
   { id: 'palahniuk', label: 'Chuck Palahniuk' },
   { id: 'murakami', label: 'Haruki Murakami' },
   { id: 'thompson', label: 'Hunter S. Thompson' },
+  { id: 'delanda', label: 'Manuel DeLanda' },
   { id: 'custom', label: 'Custom' },
 ];
 

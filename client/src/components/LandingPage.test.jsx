@@ -20,7 +20,7 @@ describe('LandingPage (#76)', () => {
     renderLanding();
 
     expect(
-      screen.getByRole('heading', { level: 1, name: /see the shape/i })
+      screen.getByRole('heading', { level: 1, name: /^mindmap$/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /^how it works$/i })
@@ -38,7 +38,7 @@ describe('LandingPage (#76)', () => {
     expect(screen.getByRole('heading', { level: 3, name: /explore the canvas/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /edit, generate, explode/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /^see the shape$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /read it back to yourself/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /gleam insights/i })).toBeInTheDocument();
   });
 
   test('both Get Started CTAs navigate to /visualize', async () => {

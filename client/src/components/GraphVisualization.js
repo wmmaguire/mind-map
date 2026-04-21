@@ -13,10 +13,7 @@ import { useSession } from '../context/SessionContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import { GraphTitleContext } from '../context/GraphTitleContext';
 import { mergeGenerateNodeResponse } from '../utils/mergeGenerateResult';
-import {
-  resolveGenerationContext,
-  GUIDANCE_PRESET_SELECT_OPTIONS,
-} from '../utils/generationGuidance';
+import { resolveGenerationContext } from '../utils/generationGuidance';
 import {
   nodesMatchingLabelQuery,
   createFocusZoomTransform,
@@ -26,9 +23,13 @@ import {
   computeGraphInsights,
   computeInsightNotableCentralities,
   buildGraphInsightAssessPayload,
-  INSIGHT_ASSESS_TONE_OPTIONS,
   INSIGHT_ASSESS_LENGTH_OPTIONS,
   INSIGHT_ASSESS_GUIDING_FOCUS_GROUPS,
+  INSIGHT_ASSESS_REFLECTION_BALANCE_MIN,
+  INSIGHT_ASSESS_REFLECTION_BALANCE_MAX,
+  INSIGHT_ASSESS_REFLECTION_BALANCE_DEFAULT,
+  INSIGHT_ASSESS_REFLECTION_BALANCE_STEP,
+  formatInsightAssessReflectionBalance,
   INSIGHT_CENTRALITY_METRICS_HELP,
   formatInsightCentralityScore,
   getInsightAssessGuidingFocusPreview,
@@ -65,7 +66,7 @@ function buildNetworkAssessmentFilename(graphTitle) {
 /** Matches `forceManyBody().strength(...)` on the graph simulation in this file. */
 const COMMUNITY_SIM_CHARGE_DEFAULT = -200;
 /**
- * Softer forces while explode warp reheats the sim (disjoint-style; see startExplodeNodeStretchAnimation).
+ * Softer forces while the target stretch warp reheats the sim (disjoint-style; see startTargetStretchAnimation).
  * https://observablehq.com/@d3/disjoint-force-directed-graph
  */
 const COMMUNITY_SIM_VELOCITY_DECAY_EXPLODE = 0.86;
@@ -115,11 +116,19 @@ function pathHasConsecutiveGraphLinks(pathIds, links) {
 }
 
 /** Community `d` is the anchor or contains it (single-node or merged). */
-function communityDatumContainsGraphNodeId(d, nodeId) {
-  if (!d || nodeId == null || nodeId === '') return false;
-  const tid = String(nodeId);
-  if (String(d.id) === tid) return true;
-  return Array.isArray(d.nodes) && d.nodes.some((n) => n && String(n.id) === tid);
+/**
+ * Returns true if the community datum (or any of its member nodes for merged
+ * communities) matches ANY id in the Set. Used by the target stretch animation
+ * which may pulse multiple anchor nodes at once (manual AI generation,
+ * community evolution, extrapolate branch, extend, explode).
+ */
+function communityDatumContainsAnyGraphNodeId(d, idsSet) {
+  if (!d || !idsSet || idsSet.size === 0) return false;
+  if (idsSet.has(String(d.id))) return true;
+  return (
+    Array.isArray(d.nodes) &&
+    d.nodes.some((n) => n && idsSet.has(String(n.id)))
+  );
 }
 
 function GraphVisualization({
@@ -150,18 +159,29 @@ function GraphVisualization({
   const selectedLinkKeyRef = useRef(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  /** GitHub #69: POST /api/explode-node (Wikipedia-backed dense subgraph from one anchor). */
+  /**
+   * GitHub #69: POST /api/explode-node (Wikipedia-backed dense subgraph from one anchor).
+   * The tooltip only surfaces a button that opens `explodeModal`; all parameters
+   * (guidance preset, custom text, concepts-to-add slider) live inside that modal.
+   */
   const [explodeInProgress, setExplodeInProgress] = useState(false);
   const handleExplodeNodeRef = useRef(null);
-  /** Tooltip explode: how many new nodes the API adds (2–6). */
   const [explodeTooltipNumNodes, setExplodeTooltipNumNodes] = useState(4);
-  const explodeNumNodesForTooltipRef = useRef(4);
-  explodeNumNodesForTooltipRef.current = explodeTooltipNumNodes;
-  const setExplodeNumNodesForTooltipRef = useRef({ set: () => {} });
-  setExplodeNumNodesForTooltipRef.current = { set: setExplodeTooltipNumNodes };
+  const [explodeModal, setExplodeModal] = useState({ open: false, nodeId: null });
   const [numNodesToAdd, setNumNodesToAdd] = useState(2);
   /** GitHub #62: manual (single call, link to all highlights) vs community evolution */
   const [expansionAlgorithm, setExpansionAlgorithm] = useState('manual');
+  /**
+   * Tooltip "Extend" action — per-node single-anchor generation (POST /api/generate-node
+   * with `requiredAnchorId` = the tooltip node, plus ONE of `requiredRelationshipLabel`
+   * or `requiredConceptHint`). Tooltip shows just a button that opens `extendModal`;
+   * all parameters (constraint kind, text, guidance preset, custom text) live in the modal.
+   */
+  const [extendTooltipKind, setExtendTooltipKind] = useState('relationship');
+  const [extendTooltipText, setExtendTooltipText] = useState('');
+  const [extendInProgress, setExtendInProgress] = useState(false);
+  const handleExtendNodeRef = useRef(null);
+  const [extendModal, setExtendModal] = useState({ open: false, nodeId: null });
   const [rgConnectionsPerNewNode, setRgConnectionsPerNewNode] = useState(2);
   const [rgNumCycles, setRgNumCycles] = useState(2);
   /** GitHub #68: attachment bias for community evolution (-1 low-degree … +1 hub). */
@@ -171,53 +191,54 @@ function GraphVisualization({
   /** GitHub #82 — branch extrapolation (POST /api/generate-branch). */
   const [brIterations, setBrIterations] = useState(2);
   const [brMemoryK, setBrMemoryK] = useState(3);
+  /**
+   * Cross-links per iteration: deterministic back-edges from newly generated
+   * nodes into earlier memory-window nodes (server-side, after the LLM call).
+   * 0 keeps the default "frontier-only" attachment; higher values introduce
+   * topological back-references to the branch thread. Capped server-side
+   * (see `getGenerateBranchCaps().maxCrossLinksPerIteration`).
+   */
+  const [brCrossLinksPerIteration, setBrCrossLinksPerIteration] = useState(0);
   /** Guidance preset + optional custom text (sent as generationContext; max 2000 chars server-side). */
   const [guidancePreset, setGuidancePreset] = useState('none');
   const [guidanceCustomText, setGuidanceCustomText] = useState('');
-  /** Same preset/custom as AI Generation modal; tooltip reads this without widening graph effect deps. */
-  const guidanceForExplodeTooltipRef = useRef({ preset: 'none', custom: '' });
-  guidanceForExplodeTooltipRef.current = {
-    preset: guidancePreset,
-    custom: guidanceCustomText,
-  };
-  const setGuidanceForExplodeTooltipRef = useRef({
-    setPreset: () => {},
-    setCustom: () => {},
-  });
-  setGuidanceForExplodeTooltipRef.current = {
-    setPreset: setGuidancePreset,
-    setCustom: setGuidanceCustomText,
-  };
-  /** While POST /api/explode-node is in flight: random stretch on anchor node (read in sim tick). */
-  const explodeStretchRef = useRef({
+  /**
+   * While any generation request is in flight (Explode, Extend, Manual,
+   * Community evolution, Extrapolate branch), we pulse a random stretch on
+   * the **target** node(s) — the anchors the user is generating from.
+   * `nodeIds` is a Set so multiple anchors can animate in sync; the stretch
+   * scale is shared across them for a coordinated wobble. Read in the sim tick.
+   */
+  const targetStretchRef = useRef({
     active: false,
-    nodeId: null,
+    nodeIds: new Set(),
     sx: 1,
     sy: 1,
     tx: 1,
     ty: 1,
   });
-  const explodeStretchTimerStopRef = useRef(null);
-  /** `updateVisualization` rebinds this; tick must run for explode scale (sim cools and stops otherwise). */
+  const targetStretchTimerStopRef = useRef(null);
+  /** `updateVisualization` rebinds this; tick must run for stretch scale (sim cools and stops otherwise). */
   const communityForceSimulationRef = useRef(null);
-  /** Saved simulation params while explode gentle-reheat is active (velocityDecay + charge). */
-  const explodeSimRestoreRef = useRef(null);
+  /** Saved simulation params while the target stretch gentle-reheat is active (velocityDecay + charge). */
+  const targetStretchSimRestoreRef = useRef(null);
 
-  const stopExplodeNodeStretchAnimation = () => {
-    explodeStretchRef.current.active = false;
-    explodeStretchRef.current.nodeId = null;
-    explodeStretchRef.current.sx = 1;
-    explodeStretchRef.current.sy = 1;
-    explodeStretchRef.current.tx = 1;
-    explodeStretchRef.current.ty = 1;
-    const stop = explodeStretchTimerStopRef.current;
+  const stopTargetStretchAnimation = () => {
+    const st = targetStretchRef.current;
+    st.active = false;
+    st.nodeIds = new Set();
+    st.sx = 1;
+    st.sy = 1;
+    st.tx = 1;
+    st.ty = 1;
+    const stop = targetStretchTimerStopRef.current;
     if (typeof stop === 'function') {
       stop();
-      explodeStretchTimerStopRef.current = null;
+      targetStretchTimerStopRef.current = null;
     }
     const sim = communityForceSimulationRef.current;
-    const r = explodeSimRestoreRef.current;
-    explodeSimRestoreRef.current = null;
+    const r = targetStretchSimRestoreRef.current;
+    targetStretchSimRestoreRef.current = null;
     if (sim && r) {
       try {
         sim.velocityDecay(r.velocityDecay);
@@ -238,23 +259,32 @@ function GraphVisualization({
     }
   };
 
-  const startExplodeNodeStretchAnimation = (targetIdStr) => {
-    stopExplodeNodeStretchAnimation();
-    const tid = String(targetIdStr);
-    explodeStretchRef.current.active = true;
-    explodeStretchRef.current.nodeId = tid;
-    explodeStretchRef.current.sx = 1;
-    explodeStretchRef.current.sy = 1;
-    explodeStretchRef.current.tx = 0.76 + Math.random() * 0.4;
-    explodeStretchRef.current.ty = 0.76 + Math.random() * 0.4;
+  /**
+   * Starts the pulse for one OR MANY target node ids. Accepts a single id
+   * (string | number) or an array of ids. Empty/nullish entries are filtered
+   * out. No-ops silently if the normalized set is empty.
+   */
+  const startTargetStretchAnimation = (ids) => {
+    stopTargetStretchAnimation();
+    const list = Array.isArray(ids) ? ids : [ids];
+    const normalized = list
+      .filter((id) => id != null && id !== '')
+      .map((id) => String(id));
+    if (normalized.length === 0) return;
+    const st = targetStretchRef.current;
+    st.active = true;
+    st.nodeIds = new Set(normalized);
+    st.sx = 1;
+    st.sy = 1;
+    st.tx = 0.76 + Math.random() * 0.4;
+    st.ty = 0.76 + Math.random() * 0.4;
 
     const pickTargets = () => {
-      explodeStretchRef.current.tx = 0.68 + Math.random() * 0.52;
-      explodeStretchRef.current.ty = 0.68 + Math.random() * 0.52;
+      st.tx = 0.68 + Math.random() * 0.52;
+      st.ty = 0.68 + Math.random() * 0.52;
     };
 
     const timer = d3.timer(() => {
-      const st = explodeStretchRef.current;
       if (!st.active) {
         timer.stop();
         return;
@@ -266,14 +296,14 @@ function GraphVisualization({
         pickTargets();
       }
     });
-    explodeStretchTimerStopRef.current = () => {
+    targetStretchTimerStopRef.current = () => {
       timer.stop();
     };
 
     const sim = communityForceSimulationRef.current;
     if (sim) {
       try {
-        explodeSimRestoreRef.current = {
+        targetStretchSimRestoreRef.current = {
           velocityDecay: sim.velocityDecay(),
           chargeTweaked: false,
         };
@@ -281,16 +311,33 @@ function GraphVisualization({
         const ch = sim.force('charge');
         if (ch && typeof ch.strength === 'function') {
           ch.strength(COMMUNITY_SIM_CHARGE_EXPLODE);
-          explodeSimRestoreRef.current.chargeTweaked = true;
+          targetStretchSimRestoreRef.current.chargeTweaked = true;
         }
         sim
           .alphaTarget(COMMUNITY_SIM_ALPHA_TARGET_EXPLODE)
           .alpha(Math.max(sim.alpha(), COMMUNITY_SIM_ALPHA_MIN_EXPLODE))
           .restart();
       } catch (_) {
-        explodeSimRestoreRef.current = null;
+        targetStretchSimRestoreRef.current = null;
       }
     }
+  };
+
+  /**
+   * Hide the on-canvas `.graph-canvas-tooltip` (the floating node-details popover
+   * rendered via D3 inside `graphCanvasWrapRef`). Called whenever a generation or
+   * edit submit fires (Extend, Explode, Apply, Add Concept, Add Relationship,
+   * Add connections) so the stale popover doesn't linger over the graph while
+   * the canvas redraws around the newly generated / mutated nodes. Also clears
+   * the selected-link highlight so a stale link tooltip can't reopen.
+   */
+  const hideCanvasTooltip = () => {
+    const mount = graphCanvasWrapRef.current;
+    const tipNode = mount ? mount.querySelector('.graph-canvas-tooltip') : null;
+    if (tipNode && tipNode.style) {
+      tipNode.style.opacity = '0';
+    }
+    selectedLinkKeyRef.current = null;
   };
 
   const [generateProgress, setGenerateProgress] = useState(null);
@@ -315,7 +362,7 @@ function GraphVisualization({
         : {
           title: 'Manual AI generate',
           description:
-            'One-shot generation. The model returns nodes and links, and each new node must connect to every highlighted node.'
+            'One-shot generation. The model returns nodes and links, and each new node must connect to every highlighted node.',
         };
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNodeData, setNewNodeData] = useState({
@@ -352,8 +399,23 @@ function GraphVisualization({
   const [discoveryQuery, setDiscoveryQuery] = useState('');
   const [discoveryFocusIndex, setDiscoveryFocusIndex] = useState(0);
   /** Insights panel: LLM assessment from centrality-notable nodes. */
-  const [insightsAssessTone, setInsightsAssessTone] = useState('freud');
-  const [insightsAssessCustomTone, setInsightsAssessCustomTone] = useState('');
+  /**
+   * Voice/tone for the Insights "Assess" LLM call. The picker UI was removed —
+   * every assessment uses the Manuel DeLanda systems / assemblage-theory frame
+   * (server-side `TONE_SYSTEM_HINTS.delanda`) since it pairs naturally with
+   * the graph/network lens. Kept as useState (rather than a bare constant) so
+   * the `handleInsightsAssess` `useCallback` deps array stays stable if the
+   * tone is ever surfaced again.
+   */
+  const [insightsAssessTone] = useState('delanda');
+  /**
+   * Reflection ↔ Discovery slider (0..100, default 50). Sent as
+   * `reflectionBalance` on POST /api/graph-insights-assess; the server maps
+   * the numeric value into one of five directive bands (see
+   * `buildReflectionBalanceDirective` in `server/lib/graphInsightsAssess.js`).
+   */
+  const [insightsAssessReflectionBalance, setInsightsAssessReflectionBalance] =
+    useState(INSIGHT_ASSESS_REFLECTION_BALANCE_DEFAULT);
   const [insightsAssessGuidingFocus, setInsightsAssessGuidingFocus] =
     useState('all');
   const [insightsAssessLength, setInsightsAssessLength] = useState('low');
@@ -671,10 +733,6 @@ function GraphVisualization({
       setInsightsAssessError('No concepts in the graph to assess.');
       return;
     }
-    if (insightsAssessTone === 'custom' && insightsAssessCustomTone.trim().length < 8) {
-      setInsightsAssessError('Custom voice: enter at least 8 characters.');
-      return;
-    }
     if (
       insightsAssessGuidingFocus === 'custom' &&
       insightsAssessCustomGuiding.trim().length < 8
@@ -691,11 +749,9 @@ function GraphVisualization({
         tone: insightsAssessTone,
         guidingFocus: insightsAssessGuidingFocus,
         assessmentLength: insightsAssessLength,
+        reflectionBalance: insightsAssessReflectionBalance,
         ...payload,
       };
-      if (insightsAssessTone === 'custom') {
-        body.customTone = insightsAssessCustomTone.trim();
-      }
       if (insightsAssessGuidingFocus === 'custom') {
         body.customGuidingQuestions = insightsAssessCustomGuiding.trim();
       }
@@ -722,9 +778,9 @@ function GraphVisualization({
   }, [
     data,
     insightsAssessTone,
-    insightsAssessCustomTone,
     insightsAssessGuidingFocus,
     insightsAssessLength,
+    insightsAssessReflectionBalance,
     insightsAssessCustomGuiding,
   ]);
 
@@ -1200,108 +1256,74 @@ function GraphVisualization({
         .replace(/</g, '&lt;');
     }
 
-    function escapeHtmlText(s) {
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    /**
+     * Tooltip Extend button only. Clicking opens `extendModal` (React-rendered), where
+     * the user picks constraint kind + text + guidance before submitting.
+     */
+    function extendTooltipFragmentHtml(fromData) {
+      const safe = escapeHtmlAttr(String(fromData.id));
+      return (
+        '<div class="graph-tooltip-extend-wrap" data-testid="graph-tooltip-extend-wrap">' +
+        '<button type="button" class="graph-tooltip-extend-btn" data-tooltip-extend="1" ' +
+        'data-testid="graph-tooltip-extend-btn" ' +
+        `data-node-id="${safe}" aria-label="Extend">` +
+        '🌳 Extend 🌳' +
+        '</button>' +
+        '</div>'
+      );
     }
 
+    /**
+     * Tooltip Explode button only. Clicking opens `explodeModal` (React-rendered), where
+     * the user picks guidance + concepts-to-add before submitting.
+     */
     function explodeTooltipActionsHtml(anchorNode) {
       if (readOnly || typeof onDataUpdate !== 'function' || !anchorNode) return '';
       const fromData = data.nodes.find((n) => String(n.id) === String(anchorNode.id));
       if (!fromData) return '';
+      const extendFrag = extendTooltipFragmentHtml(fromData);
       if (fromData.explosionExpandedAt != null) {
-        return '<p class="graph-tooltip-explode-note">Subgraph already expanded for this concept.</p>';
+        return (
+          '<div class="graph-tooltip-explode-wrap">' +
+          extendFrag +
+          '<p class="graph-tooltip-explode-note">Subgraph already expanded for this concept.</p>' +
+          '</div>'
+        );
       }
       const safe = escapeHtmlAttr(String(fromData.id));
-      const cur = guidanceForExplodeTooltipRef.current;
-      let optionsHtml = '';
-      for (const [val, label] of GUIDANCE_PRESET_SELECT_OPTIONS) {
-        const sel = val === cur.preset ? ' selected' : '';
-        optionsHtml += `<option value="${escapeHtmlAttr(val)}"${sel}>${escapeHtmlText(
-          label
-        )}</option>`;
-      }
-      const customDisplay = cur.preset === 'custom' ? 'block' : 'none';
-      const customBody = escapeHtmlText(cur.custom || '');
-      const countVal = Math.min(
-        6,
-        Math.max(2, Math.round(Number(explodeNumNodesForTooltipRef.current)) || 4)
-      );
       return (
         '<div class="graph-tooltip-explode-wrap">' +
+        extendFrag +
         '<button type="button" class="graph-tooltip-explode-btn" data-tooltip-explode="1" ' +
         'data-testid="graph-tooltip-explode-btn" ' +
         `data-node-id="${safe}" aria-label="Explode">` +
-        '💥 Explode 💥</button>' +
-        '<div class="graph-tooltip-explode-guidance">' +
-        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-preset">' +
-        'Guidance (optional)</label>' +
-        '<select id="graph-tooltip-explode-preset" class="graph-tooltip-explode-preset" ' +
-        'aria-label="Generation guidance preset for explode subgraph" ' +
-        'data-testid="graph-tooltip-explode-preset">' +
-        optionsHtml +
-        '</select>' +
-        `<div class="graph-tooltip-explode-custom-wrap" style="display:${customDisplay}">` +
-        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-custom">' +
-        'Custom text</label>' +
-        '<textarea id="graph-tooltip-explode-custom" class="graph-tooltip-explode-custom" rows="2" ' +
-        'maxlength="2000" aria-label="Custom generation guidance for explode subgraph" ' +
-        'data-testid="graph-tooltip-explode-custom">' +
-        customBody +
-        '</textarea></div></div>' +
-        '<div class="graph-tooltip-explode-count-wrap">' +
-        '<label class="graph-tooltip-explode-guidance-label" for="graph-tooltip-explode-count">' +
-        'Concepts to add</label>' +
-        '<div class="graph-tooltip-explode-count-row">' +
-        '<input type="range" id="graph-tooltip-explode-count" class="graph-tooltip-explode-count" ' +
-        'min="2" max="6" step="1" ' +
-        `value="${countVal}" ` +
-        'aria-valuemin="2" aria-valuemax="6" ' +
-        `aria-valuenow="${countVal}" ` +
-        'aria-label="Number of new concepts for explode subgraph" ' +
-        'data-testid="graph-tooltip-explode-count" />' +
-        `<span class="graph-tooltip-explode-count-value" data-testid="graph-tooltip-explode-count-value">${countVal}</span>` +
-        '</div></div></div>'
+        '💥 Explode 💥' +
+        '</button>' +
+        '</div>'
       );
     }
 
+    // Tooltip now renders only two buttons; parameters live in React modals.
+    // Delegated click opens the matching modal — no change/input listeners needed.
     const wrapForExplode = graphCanvasWrapRef.current;
     let onTooltipWrapInteraction = null;
     if (wrapForExplode) {
       onTooltipWrapInteraction = (e) => {
-        const tgt = e.target;
-        if (e.type === 'change' && tgt?.classList?.contains('graph-tooltip-explode-preset')) {
-          if (!wrapForExplode.contains(tgt)) return;
-          const v = tgt.value;
-          setGuidanceForExplodeTooltipRef.current.setPreset(v);
-          const customWrap = wrapForExplode.querySelector('.graph-tooltip-explode-custom-wrap');
-          if (customWrap) customWrap.style.display = v === 'custom' ? 'block' : 'none';
-          return;
-        }
-        if (e.type === 'input' && tgt?.classList?.contains('graph-tooltip-explode-custom')) {
-          if (!wrapForExplode.contains(tgt)) return;
-          setGuidanceForExplodeTooltipRef.current.setCustom(tgt.value);
-          return;
-        }
-        if (
-          (e.type === 'input' || e.type === 'change') &&
-          tgt?.classList?.contains('graph-tooltip-explode-count')
-        ) {
-          if (!wrapForExplode.contains(tgt)) return;
-          let n = Math.round(Number(tgt.value));
-          if (!Number.isFinite(n)) return;
-          n = Math.min(6, Math.max(2, n));
-          if (String(tgt.value) !== String(n)) tgt.value = String(n);
-          tgt.setAttribute('aria-valuenow', String(n));
-          explodeNumNodesForTooltipRef.current = n;
-          setExplodeNumNodesForTooltipRef.current.set(n);
-          const valEl = wrapForExplode.querySelector('.graph-tooltip-explode-count-value');
-          if (valEl) valEl.textContent = String(n);
-          return;
-        }
         if (e.type !== 'click') return;
+        const tgt = e.target;
+        const extendBtn =
+          tgt && typeof tgt.closest === 'function'
+            ? tgt.closest('[data-tooltip-extend="1"]')
+            : null;
+        if (extendBtn && wrapForExplode.contains(extendBtn)) {
+          e.preventDefault();
+          e.stopPropagation();
+          const rawId = extendBtn.getAttribute('data-node-id');
+          if (rawId != null && rawId !== '') {
+            setExtendModal({ open: true, nodeId: rawId });
+          }
+          return;
+        }
         const btn =
           tgt && typeof tgt.closest === 'function'
             ? tgt.closest('[data-tooltip-explode="1"]')
@@ -1311,12 +1333,10 @@ function GraphVisualization({
         e.stopPropagation();
         const rawId = btn.getAttribute('data-node-id');
         if (rawId != null && rawId !== '') {
-          void handleExplodeNodeRef.current?.(rawId);
+          setExplodeModal({ open: true, nodeId: rawId });
         }
       };
       wrapForExplode.addEventListener('click', onTooltipWrapInteraction);
-      wrapForExplode.addEventListener('change', onTooltipWrapInteraction);
-      wrapForExplode.addEventListener('input', onTooltipWrapInteraction);
     }
 
     function positionCanvasTooltipNearTarget(targetEl) {
@@ -2656,12 +2676,13 @@ function GraphVisualization({
           nodes.attr('transform', (d) => {
             const tx = simX(d);
             const ty = simY(d);
-            const ex = explodeStretchRef.current;
+            const ex = targetStretchRef.current;
             if (
               ex &&
               ex.active &&
-              ex.nodeId != null &&
-              communityDatumContainsGraphNodeId(d, ex.nodeId)
+              ex.nodeIds &&
+              ex.nodeIds.size > 0 &&
+              communityDatumContainsAnyGraphNodeId(d, ex.nodeIds)
             ) {
               return `translate(${tx},${ty}) scale(${ex.sx},${ex.sy})`;
             }
@@ -2854,15 +2875,13 @@ function GraphVisualization({
 
     // Cleanup
     return () => {
-      stopExplodeNodeStretchAnimation();
+      stopTargetStretchAnimation();
       if (playbackEaseHighlightTimerRef.current) {
         window.clearTimeout(playbackEaseHighlightTimerRef.current);
         playbackEaseHighlightTimerRef.current = null;
       }
       if (wrapForExplode && onTooltipWrapInteraction) {
         wrapForExplode.removeEventListener('click', onTooltipWrapInteraction);
-        wrapForExplode.removeEventListener('change', onTooltipWrapInteraction);
-        wrapForExplode.removeEventListener('input', onTooltipWrapInteraction);
       }
       if (minimapRafRef.current) {
         cancelAnimationFrame(minimapRafRef.current);
@@ -2939,6 +2958,14 @@ function GraphVisualization({
     randomizedGrowthCancelRef.current = false;
     // Close the modal immediately once Apply is valid; progress is shown via on-canvas chip.
     setShowGenerateForm(false);
+    // Also dismiss any lingering on-canvas node/link tooltip so the popover
+    // doesn't hover over nodes while the graph rebuilds around new content.
+    hideCanvasTooltip();
+    // Pulse the highlighted anchors (the "target" nodes the user is generating from)
+    // for the entire duration of the request. Works across all three AI Generation
+    // algorithms (manual, community evolution, extrapolate branch); if no nodes are
+    // highlighted (possible with community evolution), the helper silently no-ops.
+    startTargetStretchAnimation(sourceIdSnapshot);
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
     let operationError = null;
@@ -3008,6 +3035,7 @@ function GraphVisualization({
             branch: { pathNodeIds: sourceIdSnapshot.map(String) },
             iterations: brIterations,
             memoryK: brMemoryK,
+            crossLinksPerIteration: brCrossLinksPerIteration,
             nodesPerIteration: numNodesToAdd,
             ...(g ? { generationContext: g } : {})
           }
@@ -3133,6 +3161,7 @@ function GraphVisualization({
       operationError = getApiErrorMessage(error);
       alert('Error generating nodes: ' + getApiErrorMessage(error));
     } finally {
+      stopTargetStretchAnimation();
       generateSourceIdsRef.current = null;
       setIsGenerating(false);
       setGenerateProgress(null);
@@ -3151,6 +3180,10 @@ function GraphVisualization({
           numCyclesCompleted: cyclesCompleted,
           branchMemoryK:
             expansionAlgorithm === 'branchExtrapolation' ? brMemoryK : undefined,
+          branchCrossLinksPerIteration:
+            expansionAlgorithm === 'branchExtrapolation'
+              ? brCrossLinksPerIteration
+              : undefined,
           connectionsPerNewNode:
             expansionAlgorithm === 'randomizedGrowth'
               ? rgConnectionsPerNewNode
@@ -3189,21 +3222,16 @@ function GraphVisualization({
     if (readOnly || !onDataUpdate) return;
     const targetNode = data.nodes.find((n) => String(n.id) === String(targetIdStr));
     if (!targetNode) return;
-    if (targetNode.explosionExpandedAt != null) {
-      window.alert(
-        'This concept was already expanded. Pick another node or reload the graph.'
-      );
-      return;
-    }
     setExplodeInProgress(true);
-    startExplodeNodeStretchAnimation(targetIdStr);
+    startTargetStretchAnimation(targetIdStr);
     const startTime = Date.now();
     let operationStatus = 'SUCCESS';
     let operationError = null;
     let generatedNodes = [];
+    let rewiredLinkCount = 0;
     const numNodes = Math.min(
       6,
-      Math.max(2, Math.round(Number(explodeNumNodesForTooltipRef.current)) || 4)
+      Math.max(2, Math.round(Number(explodeTooltipNumNodes)) || 4)
     );
     try {
       const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
@@ -3226,19 +3254,104 @@ function GraphVisualization({
         throw new Error(operationError);
       }
       generatedNodes = result.data?.nodes || [];
-      const merged = mergeGenerateNodeResponse(data, result.data, width, height);
-      const tid = String(result.targetNodeId ?? targetIdStr);
-      const nodesMarked = merged.nodes.map((n) =>
-        String(n.id) === tid ? { ...n, explosionExpandedAt: Date.now() } : n
-      );
-      onDataUpdate({ ...merged, nodes: nodesMarked });
+
+      /**
+       * Purge-in-place: the exploded node is **replaced** by the freshly
+       * generated cluster. We (1) snapshot every external edge that touched
+       * the target in the original graph, (2) drop the target node via the
+       * merge's `deletedNodeIds` (which also filters both old edges on the
+       * target and the server's "bridge" edges from new nodes → anchor,
+       * since the anchor no longer exists), and (3) rewire each broken
+       * external edge by reattaching it to one of the new generated nodes
+       * round-robin, preserving the original relationship label + strength
+       * so the surrounding graph keeps its semantic wiring.
+       */
+      const targetIdSnapshot = String(targetIdStr);
+      const externalBrokenEdges = data.links
+        .map((l) => ({
+          source:
+            typeof l.source === 'object'
+              ? String(l.source.id)
+              : String(l.source),
+          target:
+            typeof l.target === 'object'
+              ? String(l.target.id)
+              : String(l.target),
+          relationship: l.relationship,
+          strength: l.strength,
+        }))
+        .filter(
+          (l) =>
+            (l.source === targetIdSnapshot || l.target === targetIdSnapshot) &&
+            !(l.source === targetIdSnapshot && l.target === targetIdSnapshot)
+        );
+
+      const merged = mergeGenerateNodeResponse(data, result.data, width, height, {
+        deletedNodeIds: [targetIdSnapshot],
+      });
+
+      const newNodeIds = generatedNodes.map((n) => String(n.id));
+      const rewiredLinks = [];
+      if (newNodeIds.length > 0 && externalBrokenEdges.length > 0) {
+        const tsBase = Date.now();
+        externalBrokenEdges.forEach((el, idx) => {
+          const externalId =
+            el.source === targetIdSnapshot ? el.target : el.source;
+          const pickId = newNodeIds[idx % newNodeIds.length];
+          const srcNode = merged.nodes.find((n) => String(n.id) === externalId);
+          const tgtNode = merged.nodes.find((n) => String(n.id) === pickId);
+          if (!srcNode || !tgtNode) return;
+          const ts = tsBase + idx + 1;
+          rewiredLinks.push({
+            source: srcNode,
+            target: tgtNode,
+            relationship: el.relationship || 'related',
+            ...(typeof el.strength === 'number' && Number.isFinite(el.strength)
+              ? { strength: Math.max(0, Math.min(1, el.strength)) }
+              : {}),
+            createdAt: ts,
+            timestamp: ts,
+          });
+        });
+      }
+      rewiredLinkCount = rewiredLinks.length;
+
+      onDataUpdate({
+        nodes: merged.nodes,
+        links: [...merged.links, ...rewiredLinks],
+      });
+
+      /**
+       * After purge-in-place, highlight the freshly generated cluster so the
+       * user can immediately see what replaced the anchor. We (a) drop the
+       * now-gone anchor from the ref + state selection sets, and (b) add the
+       * new node ids / node objects. `setSelectedNodes` triggers a D3
+       * re-render, but since `data` also just changed the effect was going
+       * to rebuild anyway — React batches the two updates into one rebuild.
+       */
+      selectedNodeIds.current.delete(targetIdSnapshot);
+      if (selectedNodeId.current != null && String(selectedNodeId.current) === targetIdSnapshot) {
+        selectedNodeId.current = null;
+      }
+      const newSelectionNodes = [];
+      newNodeIds.forEach((nid) => {
+        selectedNodeIds.current.add(nid);
+        const n = merged.nodes.find((x) => String(x.id) === nid);
+        if (n) newSelectionNodes.push(n);
+      });
+      setSelectedNodes((prev) => {
+        const kept = prev.filter((n) => String(n.id) !== targetIdSnapshot);
+        const keptIds = new Set(kept.map((n) => String(n.id)));
+        const additions = newSelectionNodes.filter((n) => !keptIds.has(String(n.id)));
+        return [...kept, ...additions];
+      });
     } catch (e) {
       console.error(e);
       operationStatus = 'FAILURE';
       operationError = getApiErrorMessage(e);
       window.alert(`Explode subgraph failed: ${getApiErrorMessage(e)}`);
     } finally {
-      stopExplodeNodeStretchAnimation();
+      stopTargetStretchAnimation();
       setExplodeInProgress(false);
       await trackOperation(
         'GENERATE',
@@ -3257,6 +3370,8 @@ function GraphVisualization({
             id: node.id,
             label: node.label,
           })),
+          deletedNodeIds: [String(targetNode.id)],
+          rewiredLinkCount,
           guidancePreset,
         },
         startTime,
@@ -3265,6 +3380,105 @@ function GraphVisualization({
     }
   };
   handleExplodeNodeRef.current = handleExplodeNode;
+
+  /**
+   * Extend: per-node single-anchor POST /api/generate-node. The tooltip node becomes
+   * `requiredAnchorId`, and at most ONE of `requiredRelationshipLabel` or
+   * `requiredConceptHint` is sent (mutual exclusivity enforced server-side). Reuses the
+   * shared guidance preset so tone stays consistent with Explode. Silent no-op if the
+   * target is missing; errors surface via window.alert (parity with Explode).
+   */
+  const handleExtendNode = async (targetIdStr) => {
+    if (readOnly || !onDataUpdate) return;
+    if (extendInProgress) return;
+    const targetNode = data.nodes.find((n) => String(n.id) === String(targetIdStr));
+    if (!targetNode) return;
+    const kind = extendTooltipKind === 'concept' ? 'concept' : 'relationship';
+    const textRaw = String(extendTooltipText || '').trim().slice(0, 200);
+    // Extend always adds exactly one concept — the tight, surgical counterpart to Explode.
+    const numNodes = 1;
+    setExtendInProgress(true);
+    startTargetStretchAnimation(targetNode.id);
+    const startTime = Date.now();
+    let operationStatus = 'SUCCESS';
+    let operationError = null;
+    let generatedNodes = [];
+    try {
+      const json = {
+        expansionAlgorithm: 'manual',
+        numNodes,
+        selectedNodes: [
+          {
+            id: targetNode.id,
+            label: targetNode.label || String(targetNode.id),
+            description: targetNode.description || '',
+            wikiUrl: targetNode.wikiUrl || targetNode.wikipediaUrl || '',
+          },
+        ],
+        existingGraphNodes: data.nodes.map((n) => ({
+          id: n.id,
+          label: n.label,
+          description: n.description || '',
+          wikiUrl: n.wikiUrl || n.wikipediaUrl || '',
+        })),
+        requiredAnchorId: targetNode.id,
+      };
+      if (textRaw) {
+        if (kind === 'concept') {
+          json.requiredConceptHint = textRaw;
+        } else {
+          json.requiredRelationshipLabel = textRaw;
+        }
+      }
+      const g = resolveGenerationContext(guidancePreset, guidanceCustomText);
+      if (g) json.generationContext = g;
+      json.guidancePreset = guidancePreset;
+      const result = await apiRequest('/api/generate-node', { method: 'POST', json });
+      if (!result.success) {
+        operationStatus = 'FAILURE';
+        operationError = result.details || result.error || 'Extend failed';
+        throw new Error(operationError);
+      }
+      generatedNodes = result.data?.nodes || [];
+      const merged = mergeGenerateNodeResponse(data, result.data, width, height);
+      onDataUpdate(merged);
+      // Clear the constraint text after a successful extend so the next click starts fresh.
+      setExtendTooltipText('');
+    } catch (e) {
+      console.error(e);
+      operationStatus = 'FAILURE';
+      operationError = getApiErrorMessage(e);
+      window.alert(`Extend failed: ${getApiErrorMessage(e)}`);
+    } finally {
+      stopTargetStretchAnimation();
+      setExtendInProgress(false);
+      await trackOperation(
+        'GENERATE',
+        {
+          expansionAlgorithm: 'manual',
+          numNodesRequested: numNodes,
+          numCyclesRequested: 1,
+          numCyclesCompleted: 1,
+          selectedNodes: [
+            {
+              id: targetNode.id,
+              label: targetNode.label || String(targetNode.id),
+            },
+          ],
+          generatedNodes: generatedNodes.map((node) => ({
+            id: node.id,
+            label: node.label,
+          })),
+          guidancePreset,
+          requiredAnchorId: String(targetNode.id),
+          requiredConstraintKind: textRaw ? kind : 'none',
+        },
+        startTime,
+        operationStatus === 'FAILURE' ? new Error(operationError) : null
+      );
+    }
+  };
+  handleExtendNodeRef.current = handleExtendNode;
 
   const handleAddNodeSubmit = async (e) => {
     e.preventDefault();
@@ -3300,6 +3514,7 @@ function GraphVisualization({
     onDataUpdate(newData);
     setShowAddForm(false);
     setNewNodeData({ label: '', description: '', wikiUrl: '' });
+    hideCanvasTooltip();
 
     await trackOperation('ADD_NODE', {
       addedNode: {
@@ -3353,6 +3568,7 @@ function GraphVisualization({
       links: [...data.links, ...newLinks],
     });
     setConnectNewNodeLinksForm(null);
+    hideCanvasTooltip();
 
     for (let i = 0; i < newLinks.length; i++) {
       const link = newLinks[i];
@@ -3409,6 +3625,7 @@ function GraphVisualization({
     // Reset states
     setRelationshipForm({ show: false, relationship: '' });
     setSelectedNodes([]);
+    hideCanvasTooltip();
 
     await trackOperation('ADD_RELATIONSHIP', {
       relationship: {
@@ -3807,21 +4024,58 @@ function GraphVisualization({
                 ))}
                 <option value="custom">Custom question</option>
               </select>
-              <select
-                id="insights-assess-tone"
-                className="graph-insights-panel__assess-select"
-                data-testid="graph-insights-assess-tone"
-                aria-label="Perspective"
-                value={insightsAssessTone}
-                onChange={(e) => setInsightsAssessTone(e.target.value)}
-                disabled={insightsAssessLoading}
+              <div
+                className="graph-insights-panel__assess-balance"
+                data-testid="graph-insights-assess-balance-wrap"
               >
-                {INSIGHT_ASSESS_TONE_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                <label
+                  htmlFor="insights-assess-reflection-balance"
+                  className="graph-insights-panel__assess-balance-label"
+                >
+                  <span className="graph-insights-panel__assess-balance-end graph-insights-panel__assess-balance-end--left">
+                    Reflective
+                  </span>
+                  <input
+                    id="insights-assess-reflection-balance"
+                    type="range"
+                    className="graph-insights-panel__assess-balance-range"
+                    data-testid="graph-insights-assess-reflection-balance"
+                    min={INSIGHT_ASSESS_REFLECTION_BALANCE_MIN}
+                    max={INSIGHT_ASSESS_REFLECTION_BALANCE_MAX}
+                    step={INSIGHT_ASSESS_REFLECTION_BALANCE_STEP}
+                    value={insightsAssessReflectionBalance}
+                    onChange={(e) => {
+                      const next = parseInt(e.target.value, 10);
+                      setInsightsAssessReflectionBalance(
+                        Number.isFinite(next)
+                          ? next
+                          : INSIGHT_ASSESS_REFLECTION_BALANCE_DEFAULT
+                      );
+                    }}
+                    disabled={insightsAssessLoading}
+                    aria-label="Reflective to discovery balance"
+                    aria-valuemin={INSIGHT_ASSESS_REFLECTION_BALANCE_MIN}
+                    aria-valuemax={INSIGHT_ASSESS_REFLECTION_BALANCE_MAX}
+                    aria-valuenow={insightsAssessReflectionBalance}
+                    aria-valuetext={formatInsightAssessReflectionBalance(
+                      insightsAssessReflectionBalance
+                    )}
+                    title="Slide left for reflective (describe what's in the graph) or right for discovery (speculate on emergent directions)."
+                  />
+                  <span className="graph-insights-panel__assess-balance-end graph-insights-panel__assess-balance-end--right">
+                    Discovery
+                  </span>
+                </label>
+                <div
+                  className="graph-insights-panel__assess-balance-readout"
+                  aria-live="polite"
+                  data-testid="graph-insights-assess-reflection-balance-readout"
+                >
+                  {formatInsightAssessReflectionBalance(
+                    insightsAssessReflectionBalance
+                  )}
+                </div>
+              </div>
               <select
                 id="insights-assess-length"
                 className="graph-insights-panel__assess-select graph-insights-panel__assess-select--length"
@@ -3881,24 +4135,6 @@ function GraphVisualization({
               </div>
             );
           })()}
-          {insightsAssessTone === 'custom' ? (
-            <div className="graph-insights-panel__custom-tone-wrap">
-              <label htmlFor="insights-assess-custom" className="graph-insights-panel__assess-label">
-                Custom voice (how the write-up should sound)
-              </label>
-              <textarea
-                id="insights-assess-custom"
-                className="graph-insights-panel__custom-tone"
-                data-testid="graph-insights-assess-custom"
-                rows={2}
-                maxLength={4000}
-                placeholder="e.g. Dry academic sociology; or playful podcast banter; avoid inventing facts…"
-                value={insightsAssessCustomTone}
-                onChange={(e) => setInsightsAssessCustomTone(e.target.value)}
-                disabled={insightsAssessLoading}
-              />
-            </div>
-          ) : null}
           {insightsAssessGuidingFocus === 'custom' ? (
             <div className="graph-insights-panel__custom-tone-wrap">
               <label
@@ -4550,6 +4786,210 @@ function GraphVisualization({
         </div>
       )}
 
+      {extendModal.open && (() => {
+        const anchor = data.nodes.find(
+          (n) => String(n.id) === String(extendModal.nodeId)
+        );
+        const anchorLabel = anchor?.label || String(extendModal.nodeId || '');
+        const submit = (e) => {
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
+          const nodeId = extendModal.nodeId;
+          setExtendModal({ open: false, nodeId: null });
+          hideCanvasTooltip();
+          if (nodeId != null && nodeId !== '') {
+            void handleExtendNodeRef.current?.(nodeId);
+          }
+        };
+        const cancel = () => setExtendModal({ open: false, nodeId: null });
+        const busy = extendInProgress;
+        return (
+          <div className="modal-overlay" onMouseDown={cancel}>
+            <div
+              className="modal-content graph-tooltip-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="graph-extend-modal-title"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <h2 id="graph-extend-modal-title">
+                Extend from: <span className="graph-tooltip-modal__anchor">{anchorLabel}</span>
+              </h2>
+              <p className="graph-tooltip-modal__desc">
+                Add one new concept linked to this anchor. Optionally pin the link label
+                (<em>Relationship</em>) or hint at the subject (<em>Concept</em>).
+              </p>
+              <form onSubmit={submit} className="graph-tooltip-modal__form">
+                <fieldset
+                  className="form-group graph-tooltip-modal__kind"
+                  aria-label="Extend constraint type"
+                >
+                  <legend>Constraint</legend>
+                  <label className="graph-tooltip-modal__kind-opt">
+                    <input
+                      type="radio"
+                      name="graph-extend-modal-kind"
+                      value="relationship"
+                      checked={extendTooltipKind === 'relationship'}
+                      onChange={() => setExtendTooltipKind('relationship')}
+                      data-testid="graph-extend-modal-kind-relationship"
+                    />
+                    <span>Relationship</span>
+                  </label>
+                  <label className="graph-tooltip-modal__kind-opt">
+                    <input
+                      type="radio"
+                      name="graph-extend-modal-kind"
+                      value="concept"
+                      checked={extendTooltipKind === 'concept'}
+                      onChange={() => setExtendTooltipKind('concept')}
+                      data-testid="graph-extend-modal-kind-concept"
+                    />
+                    <span>Concept</span>
+                  </label>
+                </fieldset>
+                <div className="form-group">
+                  <label htmlFor="graph-extend-modal-text">
+                    {extendTooltipKind === 'concept'
+                      ? 'Concept hint (optional)'
+                      : 'Relationship label (optional)'}
+                  </label>
+                  <input
+                    id="graph-extend-modal-text"
+                    type="text"
+                    maxLength={200}
+                    value={extendTooltipText}
+                    onChange={(e) =>
+                      setExtendTooltipText(String(e.target.value).slice(0, 200))
+                    }
+                    placeholder={
+                      extendTooltipKind === 'concept'
+                        ? 'e.g. "chaos theory in biology"'
+                        : 'e.g. "is an example of", "contradicts"'
+                    }
+                    data-testid="graph-extend-modal-text"
+                  />
+                </div>
+                <GenerationGuidanceFields
+                  idPrefix="graph-extend-modal"
+                  label="Guidance"
+                  showOptionalHint
+                  preset={guidancePreset}
+                  onPresetChange={setGuidancePreset}
+                  customText={guidanceCustomText}
+                  onCustomTextChange={setGuidanceCustomText}
+                  helpText="Shapes tone & focus for this generation."
+                />
+                <div className="modal-buttons">
+                  <button
+                    type="submit"
+                    className="graph-tooltip-extend-btn graph-tooltip-modal__primary"
+                    disabled={busy}
+                    data-testid="graph-extend-modal-submit"
+                  >
+                    {busy ? 'Extending…' : '🌳 Extend 🌳'}
+                  </button>
+                  <button type="button" onClick={cancel} disabled={busy}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {explodeModal.open && (() => {
+        const anchor = data.nodes.find(
+          (n) => String(n.id) === String(explodeModal.nodeId)
+        );
+        const anchorLabel = anchor?.label || String(explodeModal.nodeId || '');
+        const alreadyExpanded = anchor?.explosionExpandedAt != null;
+        const submit = (e) => {
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
+          const nodeId = explodeModal.nodeId;
+          setExplodeModal({ open: false, nodeId: null });
+          hideCanvasTooltip();
+          if (nodeId != null && nodeId !== '') {
+            void handleExplodeNodeRef.current?.(nodeId);
+          }
+        };
+        const cancel = () => setExplodeModal({ open: false, nodeId: null });
+        const busy = explodeInProgress;
+        return (
+          <div className="modal-overlay" onMouseDown={cancel}>
+            <div
+              className="modal-content graph-tooltip-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="graph-explode-modal-title"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <h2 id="graph-explode-modal-title">
+                Explode from: <span className="graph-tooltip-modal__anchor">{anchorLabel}</span>
+              </h2>
+              {alreadyExpanded ? (
+                <p className="graph-tooltip-modal__desc">
+                  Subgraph already expanded for this concept. Close and pick a different node.
+                </p>
+              ) : (
+                <p className="graph-tooltip-modal__desc">
+                  Wikipedia-grounded burst of 2–6 related concepts, all bridged back to this anchor.
+                </p>
+              )}
+              <form onSubmit={submit} className="graph-tooltip-modal__form">
+                <GenerationGuidanceFields
+                  idPrefix="graph-explode-modal"
+                  label="Guidance"
+                  showOptionalHint
+                  preset={guidancePreset}
+                  onPresetChange={setGuidancePreset}
+                  customText={guidanceCustomText}
+                  onCustomTextChange={setGuidanceCustomText}
+                  helpText="Shapes tone & focus for this explosion."
+                />
+                <div className="form-group">
+                  <label htmlFor="graph-explode-modal-count">
+                    Concepts to add: <strong>{explodeTooltipNumNodes}</strong>
+                  </label>
+                  <input
+                    id="graph-explode-modal-count"
+                    type="range"
+                    min="2"
+                    max="6"
+                    step="1"
+                    value={explodeTooltipNumNodes}
+                    onChange={(e) => {
+                      const n = Math.min(
+                        6,
+                        Math.max(2, Math.round(Number(e.target.value)) || 4)
+                      );
+                      setExplodeTooltipNumNodes(n);
+                    }}
+                    aria-valuemin={2}
+                    aria-valuemax={6}
+                    aria-valuenow={explodeTooltipNumNodes}
+                    data-testid="graph-explode-modal-count"
+                  />
+                </div>
+                <div className="modal-buttons">
+                  <button
+                    type="submit"
+                    className="graph-tooltip-explode-btn graph-tooltip-modal__primary"
+                    disabled={busy || alreadyExpanded}
+                    data-testid="graph-explode-modal-submit"
+                  >
+                    {busy ? 'Exploding…' : '💥 Explode 💥'}
+                  </button>
+                  <button type="button" onClick={cancel} disabled={busy}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
       {deleteDecision && (
         <div className="modal-overlay" onMouseDown={closeDeleteDecision}>
           <div
@@ -4767,7 +5207,7 @@ function GraphVisualization({
                     />
                   </label>
                   <label>
-                    Memory window (nodes along path):
+                    Memory window (prompt context, nodes along path):
                     <input
                       type="number"
                       min="1"
@@ -4778,6 +5218,24 @@ function GraphVisualization({
                           Math.min(
                             40,
                             Math.max(1, parseInt(e.target.value, 10) || 1)
+                          )
+                        );
+                        setGenerateSubmitError(null);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Cross-links per iteration (back-edges into memory):
+                    <input
+                      type="number"
+                      min="0"
+                      max="6"
+                      value={brCrossLinksPerIteration}
+                      onChange={e => {
+                        setBrCrossLinksPerIteration(
+                          Math.min(
+                            6,
+                            Math.max(0, parseInt(e.target.value, 10) || 0)
                           )
                         );
                         setGenerateSubmitError(null);

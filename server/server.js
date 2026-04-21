@@ -532,6 +532,51 @@ app.post('/api/generate-node', async (req, res) => {
         ? await wikiAnchorLinesForNodes(selectedNodes)
         : '';
 
+    /**
+     * Manual-mode single-anchor constraint (optional — validated upstream).
+     * When set, every new node MUST link to `requiredAnchorId` using
+     * `requiredRelationshipLabel` (or a close paraphrase). Links to the other
+     * highlighted anchors become optional instead of required. See #37 / #62.
+     */
+    const requiredAnchorId =
+      validated.expansionAlgorithm === 'manual'
+        ? validated.requiredAnchorId || null
+        : null;
+    const requiredRelationshipLabel =
+      validated.expansionAlgorithm === 'manual'
+        ? (validated.requiredRelationshipLabel || '').trim()
+        : '';
+    const requiredConceptHint =
+      validated.expansionAlgorithm === 'manual'
+        ? (validated.requiredConceptHint || '').trim()
+        : '';
+    const requiredAnchorNode = requiredAnchorId
+      ? selectedNodes.find((n) => String(n.id) === String(requiredAnchorId))
+      : null;
+    const hasRequiredAnchor = Boolean(requiredAnchorNode);
+    const hasRequiredRelationship =
+      hasRequiredAnchor && requiredRelationshipLabel.length > 0;
+    const hasRequiredConcept =
+      hasRequiredAnchor && requiredConceptHint.length > 0;
+
+    const requiredAnchorBlock = hasRequiredAnchor
+      ? `
+      REQUIRED ANCHOR — every new node MUST include a link to this anchor id (links to other anchors above are OPTIONAL, not forbidden, and should only be added when the relationship is meaningful and supported by the source material):
+      - anchor id: "${requiredAnchorNode.id}"
+      - anchor label: ${requiredAnchorNode.label}${
+        hasRequiredRelationship
+          ? `
+      - required relationship label (use this exact phrasing, or a very close paraphrase, on every link from a new node to anchor "${requiredAnchorNode.id}"): "${requiredRelationshipLabel}"`
+          : ''
+      }${
+        hasRequiredConcept
+          ? `
+      - REQUIRED CONCEPT HINT — every new node you add MUST be specifically about this subject (pick concepts that fit the hint AND connect meaningfully to the required anchor; keep every fact accurate and grounded in Wikipedia material — do NOT invent information): "${requiredConceptHint}"`
+          : ''
+      }
+      `
+      : '';
+
     console.log('Number nodes to add:', numNodesToGenerate);
     console.log(
       'Selected nodes for extension:',
@@ -574,11 +619,16 @@ app.post('/api/generate-node', async (req, res) => {
       Return ONLY the JSON object.
     `
         : `
-      Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to these ANCHOR nodes.
+      Generate ${numNodesToGenerate} new, meaningful concepts that logically connect to ${
+        hasRequiredAnchor
+          ? 'the REQUIRED ANCHOR below (the other listed anchors are context, not mandatory targets)'
+          : 'these ANCHOR nodes'
+      }.
       ${forbiddenBlock}
       ${generationGuidanceBlock}
+      ${requiredAnchorBlock}
 
-      Anchor nodes (use these exact ids in every link target field):
+      ${hasRequiredAnchor ? 'Highlighted anchor nodes (context; ONLY the REQUIRED ANCHOR above is mandatory, others are optional link targets):' : 'Anchor nodes (use these exact ids in every link target field):'}
       ${selectedNodes
         .map(
           node =>
@@ -591,7 +641,9 @@ app.post('/api/generate-node', async (req, res) => {
 
       Each new concept should:
       1. Be a real, well-defined concept or topic not already listed in EXISTING GRAPH CONCEPTS
-      2. Have a clear, meaningful relationship to each ANCHOR node, justified using anchor Wikipedia summaries when available
+      2. Have a clear, meaningful relationship to ${
+        hasRequiredAnchor ? 'the REQUIRED ANCHOR' : 'each ANCHOR node'
+      }, justified using anchor Wikipedia summaries when available
       3. Include a relevant English Wikipedia URL for the NEW concept
       4. Have a concise but informative description
 
@@ -607,13 +659,27 @@ app.post('/api/generate-node', async (req, res) => {
           // Additional nodes use ${timestamp}_2, ${timestamp}_3, etc.
         ],
         "links": [
-          // Each new node must connect to all selected anchor nodes
+          ${
+            hasRequiredAnchor
+              ? `// REQUIRED: every new node must have a link to the required anchor "${requiredAnchorNode.id}"
+          {
+            "source": "${timestamp}_1",
+            "target": "${requiredAnchorNode.id}",
+            "relationship": ${
+              hasRequiredRelationship
+                ? `"${requiredRelationshipLabel}"  // or a very close paraphrase of this label`
+                : `"<specific relationship — reference facts from the anchor Wikipedia summary when possible>"`
+            }
+          }
+          // Optional: additional links to the other highlighted anchors when meaningful`
+              : `// Each new node must connect to all selected anchor nodes
           {
             "source": "${timestamp}_1",
             "target": "<existing anchor node id>",
             "relationship": "<specific relationship — reference facts from the anchor Wikipedia summary when possible>"
           }
-          // Additional links for all connections
+          // Additional links for all connections`
+          }
         ]
       }
 
@@ -621,7 +687,16 @@ app.post('/api/generate-node', async (req, res) => {
       - Generate real, meaningful concepts (not placeholders)
       ${guidanceImportantBullet}- Relationship strings must be specific (not generic "is related to"); tie them to the anchor topic when the summary gives hooks
       - Ensure all Wikipedia URLs are valid and relevant
-      - Each new node must connect to all selected anchor nodes
+      ${
+        hasRequiredAnchor
+          ? `- Every new node MUST include exactly one required link with target "${requiredAnchorNode.id}". Links to the other highlighted anchors are OPTIONAL — add them only when the relationship is meaningful.${
+              hasRequiredRelationship
+                ? `
+      - On the REQUIRED link, the "relationship" string MUST use this exact phrasing or a very close paraphrase: "${requiredRelationshipLabel}". Keep the factual substance accurate.`
+                : ''
+            }`
+          : '- Each new node must connect to all selected anchor nodes'
+      }
       - Use "${timestamp}_1", "${timestamp}_2", etc. for new node IDs
       - Use exact anchor ids: ${selectedNodes.map(n => `"${n.id}"`).join(', ')}
 
@@ -647,6 +722,19 @@ app.post('/api/generate-node', async (req, res) => {
             hasGuidance
               ? `
           8. If the user message includes USER GUIDANCE, apply it to which new concepts you choose and to the tone and phrasing of every new node's description and every relationship string. Facts must remain accurate and grounded in Wikipedia material.`
+              : ''
+          }${
+            hasRequiredAnchor
+              ? `
+          ${hasGuidance ? '9' : '8'}. If the user message includes a REQUIRED ANCHOR, every new node must have exactly one link whose target is the required anchor id. Links to other highlighted anchors are optional.${
+                hasRequiredRelationship
+                  ? ` On the required link, use the provided relationship label exactly, or a very close paraphrase — never a generic filler.`
+                  : ''
+              }${
+                hasRequiredConcept
+                  ? ` If the user message includes a REQUIRED CONCEPT HINT, every new node must be specifically about that subject — pick Wikipedia-suitable concepts that fit the hint AND connect meaningfully to the required anchor. Keep all facts accurate; do not invent claims.`
+                  : ''
+              }`
               : ''
           }`
         },
@@ -788,7 +876,12 @@ app.post('/api/generate-node', async (req, res) => {
         selectedNodeIds
       );
 
-      // Manual: each new node must connect to every highlighted (selected) node
+      /**
+       * Manual connectivity rule:
+       * - Default ("Strict — all highlighted"): each new node must link to every highlighted anchor.
+       * - Single-anchor mode (`requiredAnchorId` set): each new node must link to the required anchor;
+       *   links to the other highlighted anchors are kept when the model returned them but are optional.
+       */
       const connectionMap = new Map();
       newNodeIds.forEach(newId => {
         connectionMap.set(String(newId), new Set());
@@ -818,8 +911,21 @@ app.post('/api/generate-node', async (req, res) => {
 
       let isValid = true;
       const missingConnections = [];
+      const requiredAnchorIdStr = hasRequiredAnchor
+        ? String(requiredAnchorNode.id)
+        : null;
 
       connectionMap.forEach((connections, newId) => {
+        if (hasRequiredAnchor) {
+          if (!connections.has(requiredAnchorIdStr)) {
+            isValid = false;
+            missingConnections.push(
+              `Node ${newId} is missing the required link to anchor ${requiredAnchorIdStr} (${requiredAnchorNode.label}).`
+            );
+          }
+          return;
+        }
+
         console.log(`Checking ${newId} connections:`, {
           has: Array.from(connections),
           needs: Array.from(selectedNodeIds)
@@ -846,6 +952,7 @@ app.post('/api/generate-node', async (req, res) => {
         console.error('Validation details:', {
           newNodes: Array.from(newNodeIds),
           selectedNodes: Array.from(selectedNodeIds),
+          requiredAnchorId: requiredAnchorIdStr,
           connections: Object.fromEntries(connectionMap),
           missingConnections
         });
@@ -863,10 +970,30 @@ app.post('/api/generate-node', async (req, res) => {
         validated.generationContext || ''
       );
 
+      /**
+       * Single-anchor mode: restore the user's required relationship label verbatim
+       * on every new-node → required-anchor edge. The synthesis pass above can otherwise
+       * rewrite it, which defeats the user-pinned label. Optional links to the other
+       * highlighted anchors keep the synthesized, Wikipedia-grounded phrasing.
+       */
+      if (hasRequiredAnchor && hasRequiredRelationship) {
+        const reqTargetStr = String(requiredAnchorNode.id);
+        newData.links = newData.links.map((link) => {
+          const src = typeof link.source === 'object' ? link.source?.id : link.source;
+          const tgt = typeof link.target === 'object' ? link.target?.id : link.target;
+          if (newNodeIds.has(String(src)) && String(tgt) === reqTargetStr) {
+            return { ...link, relationship: requiredRelationshipLabel };
+          }
+          return link;
+        });
+      }
+
       console.log('Validation passed:', {
         newNodes: newData.nodes.length,
         totalLinks: newData.links.length,
-        connectionsPerNode: selectedNodeIds.size
+        connectionsPerNode: selectedNodeIds.size,
+        requiredAnchorId: hasRequiredAnchor ? String(requiredAnchorNode.id) : null,
+        requiredRelationshipLabel: hasRequiredRelationship ? requiredRelationshipLabel : null,
       });
     }
 

@@ -217,3 +217,170 @@ test('validateGenerateNodeRequest explicit deleteStrategy overrides invert', () 
   assert.equal(v.anchorStrategy, 0.9);
   assert.equal(v.deleteStrategy, 0.2);
 });
+
+/** Manual single-anchor constraint (#76 follow-up: requiredAnchorId + requiredRelationshipLabel). */
+test('validateGenerateNodeRequest manual accepts requiredAnchorId + label', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+    numNodes: 2,
+    requiredAnchorId: 'a',
+    requiredRelationshipLabel: '  is an example of  ',
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.expansionAlgorithm, 'manual');
+  assert.equal(v.requiredAnchorId, 'a');
+  assert.equal(v.requiredRelationshipLabel, 'is an example of');
+});
+
+test('validateGenerateNodeRequest manual rejects requiredAnchorId not in selectedNodes', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }, { id: 'b' }],
+    numNodes: 1,
+    requiredAnchorId: 'not-selected',
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'REQUIRED_ANCHOR_NOT_SELECTED');
+  assert.equal(v.details.requiredAnchorId, 'not-selected');
+});
+
+test('validateGenerateNodeRequest manual rejects non-string requiredRelationshipLabel', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    requiredAnchorId: 'a',
+    requiredRelationshipLabel: 42,
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'INVALID_REQUIRED_RELATIONSHIP_LABEL');
+});
+
+test('validateGenerateNodeRequest manual rejects requiredRelationshipLabel too long', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    requiredAnchorId: 'a',
+    requiredRelationshipLabel: 'x'.repeat(201),
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'REQUIRED_RELATIONSHIP_LABEL_TOO_LONG');
+});
+
+test('validateGenerateNodeRequest randomizedGrowth silently drops requiredAnchorId', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    expansionAlgorithm: 'randomizedGrowth',
+    connectionsPerNewNode: 1,
+    existingGraphNodeIds: ['a'],
+    requiredAnchorId: 'not-selected',
+    requiredRelationshipLabel: 'ignored',
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.requiredAnchorId, undefined);
+  assert.equal(v.requiredRelationshipLabel, undefined);
+});
+
+test('buildGenerateNodeDryRunPreview reflects single-anchor estimates', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    numNodes: 4,
+    dryRun: true,
+    requiredAnchorId: 'b',
+    requiredRelationshipLabel: 'precedes',
+  });
+  assert.equal(v.ok, true);
+  const p = buildGenerateNodeDryRunPreview(v);
+  assert.equal(p.expansionAlgorithm, 'manual');
+  assert.equal(p.requiredAnchorId, 'b');
+  assert.equal(p.requiredRelationshipLabel, 'precedes');
+  /** Required anchor only guarantees one edge per new node (others optional). */
+  assert.equal(p.estimatedNewLinks, 4);
+});
+
+test('buildGenerateNodeDryRunPreview strict mode estimates edges to all anchors', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    numNodes: 4,
+    dryRun: true,
+  });
+  assert.equal(v.ok, true);
+  const p = buildGenerateNodeDryRunPreview(v);
+  assert.equal(p.requiredAnchorId, null);
+  assert.equal(p.estimatedNewLinks, 12);
+});
+
+/** Manual single-anchor CONCEPT constraint (alternative to relationship label). */
+test('validateGenerateNodeRequest manual accepts requiredConceptHint', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a', label: 'A' }],
+    numNodes: 2,
+    requiredAnchorId: 'a',
+    requiredConceptHint: '  chaos theory in biology  ',
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.requiredConceptHint, 'chaos theory in biology');
+  assert.equal(v.requiredRelationshipLabel, '');
+});
+
+test('validateGenerateNodeRequest manual rejects non-string requiredConceptHint', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    requiredAnchorId: 'a',
+    requiredConceptHint: 7,
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'INVALID_REQUIRED_CONCEPT_HINT');
+});
+
+test('validateGenerateNodeRequest manual rejects requiredConceptHint too long', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    requiredAnchorId: 'a',
+    requiredConceptHint: 'x'.repeat(201),
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'REQUIRED_CONCEPT_HINT_TOO_LONG');
+});
+
+test('validateGenerateNodeRequest manual rejects both relationship label and concept hint', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    requiredAnchorId: 'a',
+    requiredRelationshipLabel: 'is an example of',
+    requiredConceptHint: 'chaos theory',
+  });
+  assert.equal(v.ok, false);
+  assert.equal(v.code, 'CONFLICTING_REQUIRED_CONSTRAINTS');
+});
+
+test('validateGenerateNodeRequest randomizedGrowth silently drops requiredConceptHint', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }],
+    numNodes: 1,
+    expansionAlgorithm: 'randomizedGrowth',
+    connectionsPerNewNode: 1,
+    existingGraphNodeIds: ['a'],
+    requiredConceptHint: 'ignored outside manual',
+  });
+  assert.equal(v.ok, true);
+  assert.equal(v.requiredConceptHint, undefined);
+});
+
+test('buildGenerateNodeDryRunPreview reflects concept hint', () => {
+  const v = validateGenerateNodeRequest({
+    selectedNodes: [{ id: 'a' }, { id: 'b' }],
+    numNodes: 3,
+    dryRun: true,
+    requiredAnchorId: 'a',
+    requiredConceptHint: 'Balkan folk music',
+  });
+  assert.equal(v.ok, true);
+  const p = buildGenerateNodeDryRunPreview(v);
+  assert.equal(p.requiredAnchorId, 'a');
+  assert.equal(p.requiredConceptHint, 'Balkan folk music');
+  assert.equal(p.requiredRelationshipLabel, '');
+  assert.equal(p.estimatedNewLinks, 3);
+});

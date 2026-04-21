@@ -6,6 +6,11 @@ jest.mock('../context/SessionContext', () => ({
   useSession: () => ({ sessionId: 'test-session' }),
 }));
 
+jest.mock('../api/http', () => ({
+  apiRequest: jest.fn(async () => ({ success: true, data: { nodes: [], links: [] } })),
+  getApiErrorMessage: (e) => (e && e.message) || 'error',
+}));
+
 const minimalData = {
   nodes: [
     { id: 'n1', label: 'One' },
@@ -207,19 +212,24 @@ describe('GraphVisualization graph action menu', () => {
     expect(nodeG).toBeTruthy();
     fireEvent.click(nodeG);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('graph-tooltip-explode-btn')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('graph-tooltip-explode-preset')).toBeInTheDocument();
-    const explodeCount = screen.getByTestId('graph-tooltip-explode-count');
-    expect(explodeCount).toBeInTheDocument();
-    expect(explodeCount).toHaveAttribute('min', '2');
-    expect(explodeCount).toHaveAttribute('max', '6');
-    expect(explodeCount).toHaveAttribute('value', '4');
-    expect(screen.getByTestId('graph-tooltip-explode-count-value')).toHaveTextContent('4');
+    // Tooltip now only surfaces the two action buttons (Extend + Explode).
+    // Clicking Explode opens a dedicated modal that hosts the guidance + count controls.
+    const explodeBtn = await screen.findByTestId('graph-tooltip-explode-btn');
+    expect(explodeBtn).toBeInTheDocument();
+    expect(screen.getByTestId('graph-tooltip-extend-btn')).toBeInTheDocument();
+
+    fireEvent.click(explodeBtn);
+
+    // Modal should render the guidance preset, count slider (2–6 default 4), and primary submit.
+    const modalCount = await screen.findByTestId('graph-explode-modal-count');
+    expect(modalCount).toBeInTheDocument();
+    expect(modalCount).toHaveAttribute('min', '2');
+    expect(modalCount).toHaveAttribute('max', '6');
+    expect(modalCount).toHaveValue('4');
     expect(
-      screen.getByRole('button', { name: /^Explode$/i })
+      document.getElementById('graph-explode-modal-preset')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('graph-explode-modal-submit')).toBeInTheDocument();
   });
 
   it('does not show Explode subgraph on the tooltip when readOnly (#69)', async () => {
@@ -393,5 +403,105 @@ describe('GraphVisualization empty graph guidance (#40)', () => {
     expect(
       screen.queryByRole('region', { name: /Getting started with an empty graph/i })
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Regression: the on-canvas `.graph-canvas-tooltip` popover must be dismissed
+ * when any node-generation / edit submit fires. Otherwise the stale popover
+ * lingers over the graph while nodes rebuild around it. Covers Extend, Explode,
+ * and Add Concept submit paths (Apply, Add Relationship, Add connections share
+ * the same `hideCanvasTooltip` helper).
+ */
+describe('GraphVisualization canvas tooltip dismissal on submit', () => {
+  const openTooltipForFirstNode = () => {
+    const svg = document.querySelector('.graph-visualization');
+    const nodeG = svg.querySelector('g.node');
+    fireEvent.click(nodeG);
+    return document.querySelector('.graph-canvas-tooltip');
+  };
+
+  it('hides the canvas tooltip after the Extend modal is submitted', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const tip = openTooltipForFirstNode();
+    expect(tip).toBeTruthy();
+    await waitFor(() => {
+      expect(tip.style.opacity).not.toBe('0');
+    });
+
+    fireEvent.click(await screen.findByTestId('graph-tooltip-extend-btn'));
+    const submit = await screen.findByTestId('graph-extend-modal-submit');
+    fireEvent.click(submit);
+
+    await waitFor(() => {
+      expect(tip.style.opacity).toBe('0');
+    });
+  });
+
+  it('hides the canvas tooltip after the Explode modal is submitted', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const tip = openTooltipForFirstNode();
+    expect(tip).toBeTruthy();
+    await waitFor(() => {
+      expect(tip.style.opacity).not.toBe('0');
+    });
+
+    fireEvent.click(await screen.findByTestId('graph-tooltip-explode-btn'));
+    const submit = await screen.findByTestId('graph-explode-modal-submit');
+    fireEvent.click(submit);
+
+    await waitFor(() => {
+      expect(tip.style.opacity).toBe('0');
+    });
+  });
+
+  it('hides the canvas tooltip after Add Concept is submitted', async () => {
+    render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+
+    const tip = openTooltipForFirstNode();
+    expect(tip).toBeTruthy();
+    await waitFor(() => {
+      expect(tip.style.opacity).not.toBe('0');
+    });
+
+    fireEvent.contextMenu(document.querySelector('.graph-visualization'), {
+      clientX: 120,
+      clientY: 140,
+      bubbles: true,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Add Node$/i }));
+    const modal = screen
+      .getByRole('heading', { name: /Add New Concept/i })
+      .closest('.modal-content');
+    const labelInput = modal.querySelector('input[type="text"]');
+    fireEvent.change(labelInput, { target: { value: 'Fresh concept' } });
+    fireEvent.click(within(modal).getByRole('button', { name: /Add Concept/i }));
+
+    await waitFor(() => {
+      expect(tip.style.opacity).toBe('0');
+    });
   });
 });

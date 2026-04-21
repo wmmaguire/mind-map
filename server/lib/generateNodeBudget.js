@@ -8,6 +8,19 @@ const DEFAULT_MAX_CONNECTIONS_PER_NEW_NODE = 12;
 /** Optional user guidance string on POST /api/generate-node (step 1 + step 2 prompts). */
 export const MAX_GENERATION_CONTEXT_CHARS = 2000;
 
+/**
+ * Manual-mode single-anchor constraint (post–#76 guided generation):
+ * length cap for the relationship-label hint the user enters alongside `requiredAnchorId`.
+ */
+export const MAX_REQUIRED_RELATIONSHIP_LABEL_CHARS = 200;
+
+/**
+ * Manual-mode single-anchor **concept** constraint (alternative to `requiredRelationshipLabel`):
+ * short free-text hint that pins *what the new node is about* rather than the edge phrasing.
+ * Server rejects requests that set both on the same call (pick one).
+ */
+export const MAX_REQUIRED_CONCEPT_HINT_CHARS = 200;
+
 export function getRandomizedExpansionCaps() {
   const maxCycles = clampInt(
     process.env.GENERATE_NODE_MAX_EXPANSION_CYCLES,
@@ -182,6 +195,92 @@ export function validateGenerateNodeRequest(body) {
           error: 'Each selected node must be an object with an id'
         };
       }
+    }
+  }
+
+  /**
+   * Manual single-anchor constraint (optional, manual mode only):
+   * - `requiredAnchorId` must appear in `selectedNodes`.
+   * - `requiredRelationshipLabel` is a short free-text label that the model must use
+   *   (or closely paraphrase) on every new link from a new node to the required anchor.
+   * Both fields are no-ops in `randomizedGrowth` / `branchExtrapolation`; the server
+   * silently drops them outside manual mode so stale payloads don't 400.
+   */
+  let requiredAnchorId = null;
+  let requiredRelationshipLabel = '';
+  let requiredConceptHint = '';
+  if (expansionAlgorithm === 'manual') {
+    if (body.requiredAnchorId !== undefined && body.requiredAnchorId !== null && body.requiredAnchorId !== '') {
+      const rid = String(body.requiredAnchorId);
+      const selectedIdSet = new Set(selectedNodes.map((n) => String(n.id)));
+      if (!selectedIdSet.has(rid)) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'REQUIRED_ANCHOR_NOT_SELECTED',
+          error: 'requiredAnchorId must be one of the selectedNodes',
+          details: { requiredAnchorId: rid },
+        };
+      }
+      requiredAnchorId = rid;
+    }
+    if (
+      body.requiredRelationshipLabel !== undefined &&
+      body.requiredRelationshipLabel !== null
+    ) {
+      if (typeof body.requiredRelationshipLabel !== 'string') {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_REQUIRED_RELATIONSHIP_LABEL',
+          error: 'requiredRelationshipLabel must be a string',
+        };
+      }
+      const trimmed = body.requiredRelationshipLabel.trim();
+      if (trimmed.length > MAX_REQUIRED_RELATIONSHIP_LABEL_CHARS) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'REQUIRED_RELATIONSHIP_LABEL_TOO_LONG',
+          error: `requiredRelationshipLabel cannot exceed ${MAX_REQUIRED_RELATIONSHIP_LABEL_CHARS} characters`,
+          details: { max: MAX_REQUIRED_RELATIONSHIP_LABEL_CHARS },
+        };
+      }
+      requiredRelationshipLabel = trimmed;
+    }
+    if (
+      body.requiredConceptHint !== undefined &&
+      body.requiredConceptHint !== null
+    ) {
+      if (typeof body.requiredConceptHint !== 'string') {
+        return {
+          ok: false,
+          status: 400,
+          code: 'INVALID_REQUIRED_CONCEPT_HINT',
+          error: 'requiredConceptHint must be a string',
+        };
+      }
+      const trimmed = body.requiredConceptHint.trim();
+      if (trimmed.length > MAX_REQUIRED_CONCEPT_HINT_CHARS) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'REQUIRED_CONCEPT_HINT_TOO_LONG',
+          error: `requiredConceptHint cannot exceed ${MAX_REQUIRED_CONCEPT_HINT_CHARS} characters`,
+          details: { max: MAX_REQUIRED_CONCEPT_HINT_CHARS },
+        };
+      }
+      requiredConceptHint = trimmed;
+    }
+    /** Mutually exclusive: the label pins the *edge*, the hint pins the *subject*. Pick one. */
+    if (requiredRelationshipLabel && requiredConceptHint) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'CONFLICTING_REQUIRED_CONSTRAINTS',
+        error:
+          'requiredRelationshipLabel and requiredConceptHint are mutually exclusive; send at most one on a single request',
+      };
     }
   }
 
@@ -429,6 +528,13 @@ export function validateGenerateNodeRequest(body) {
     expansionAlgorithm,
     existingGraphNodes,
     generationContext,
+    ...(expansionAlgorithm === 'manual'
+      ? {
+          requiredAnchorId,
+          requiredRelationshipLabel,
+          requiredConceptHint,
+        }
+      : {}),
     ...(expansionAlgorithm === 'randomizedGrowth'
       ? {
           connectionsPerNewNode,
@@ -480,13 +586,19 @@ export function buildGenerateNodeDryRunPreview(v) {
     };
   }
 
+  const hasRequiredAnchor =
+    typeof v.requiredAnchorId === 'string' && v.requiredAnchorId.length > 0;
   return {
     generationContextIncluded: Boolean(v.generationContext),
     generationContextMaxChars: MAX_GENERATION_CONTEXT_CHARS,
     expansionAlgorithm: 'manual',
     numNodes,
     selectedCount,
-    estimatedNewLinks: numNodes * selectedCount,
+    /** When a required anchor is set, only those edges are guaranteed; other anchor edges become optional. */
+    estimatedNewLinks: hasRequiredAnchor ? numNodes : numNodes * selectedCount,
+    requiredAnchorId: hasRequiredAnchor ? v.requiredAnchorId : null,
+    requiredRelationshipLabel: v.requiredRelationshipLabel || '',
+    requiredConceptHint: v.requiredConceptHint || '',
     caps: {
       maxNewNodes: caps.maxNewNodes,
       maxSelected: caps.maxSelected
