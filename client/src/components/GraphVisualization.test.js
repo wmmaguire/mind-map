@@ -636,6 +636,7 @@ describe('GraphVisualization keyed data joins across playback scrubs (#103)', ()
         {
           id: 't1',
           label: 'BadThumb',
+          // eslint-disable-next-line no-script-url -- deliberate XSS payload: proves the fallback path rejects javascript: schemes
           thumbnailUrl: 'javascript:alert(1)',
         },
       ],
@@ -722,5 +723,97 @@ describe('GraphVisualization keyed data joins across playback scrubs (#103)', ()
     // setup effect ever starts depending on `playbackScrubToken` again,
     // this will fail, which is exactly the check we want.
     expect(graphRootAfter).toBe(graphRootBefore);
+  });
+
+  it('graph-root holds only canonical layer groups (M5 dead-code guard)', () => {
+    // Before M5, dropping the M3 wipe exposed a latent leak: legacy
+    // `const node = g.selectAll('.node')...` and `linkGroups` blocks in the
+    // outer effect appended duplicate DOM that used to get wiped by
+    // `updateVisualization()`'s `g.selectAll('*').remove()`. Without the
+    // wipe, those siblings leaked next to the canonical layer groups,
+    // giving two `<g class="node">` per community with competing click /
+    // drag handlers and a plain `r=20` circle stacked over the real
+    // thumbnail or disc. This test guards the cleanup: the only direct
+    // children of `g.graph-root` must be the three canonical layers.
+    const seed = {
+      nodes: [
+        { id: 'n1', label: 'One' },
+        { id: 'n2', label: 'Two' },
+      ],
+      links: [{ source: 'n1', target: 'n2', relationship: 'related' }],
+    };
+    render(
+      <GraphVisualization
+        data={seed}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const root = svg.querySelector('g.graph-root');
+    expect(root).toBeTruthy();
+
+    const directChildClasses = Array.from(root.children).map(
+      (c) => c.getAttribute('class') || ''
+    );
+    // Exactly the three canonical layers. Order isn't asserted (z-order is
+    // handled by insertion order elsewhere) but presence + no extras is.
+    expect(directChildClasses.sort()).toEqual([
+      'cluster-thumb-layer',
+      'links-layer',
+      'nodes-layer',
+    ]);
+    // Direct children that used to leak must stay at zero count.
+    expect(root.querySelectorAll(':scope > g.node').length).toBe(0);
+    expect(root.querySelectorAll(':scope > g.link-group').length).toBe(0);
+    // And the canonical places still hold the expected DOM.
+    expect(
+      svg.querySelectorAll('g.nodes-layer > g.node').length
+    ).toBe(2);
+    expect(
+      svg.querySelectorAll('g.links-layer > line.link').length
+    ).toBe(1);
+  });
+
+  it('node subtree has drag listeners wired (M5 drag regression guard)', () => {
+    // M5 deleted the legacy `const node = g.selectAll('.node')...call(dragBehavior)`
+    // block because its DOM was redundant with `g.nodes-layer > g.node`.
+    // The drag wiring had to migrate to the keyed-join `onEnter` hook. This
+    // test guards that migration: the canonical node subtree must carry
+    // d3-drag listeners after mount. d3 stores them on `__on` (array of
+    // `{type, name, value}` entries). Without `.call(dragBehavior)`, the
+    // array would be empty or missing the drag namespace.
+    const seed = {
+      nodes: [
+        { id: 'n1', label: 'One' },
+        { id: 'n2', label: 'Two' },
+      ],
+      links: [],
+    };
+    render(
+      <GraphVisualization
+        data={seed}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const targetNode = svg.querySelector('g.nodes-layer g.node');
+    expect(targetNode).toBeTruthy();
+
+    const listeners = Array.isArray(targetNode.__on) ? targetNode.__on : [];
+    const dragTypes = listeners
+      .map((entry) => entry && entry.type)
+      .filter(Boolean);
+    // d3-drag attaches to at least mousedown / pointerdown / touchstart
+    // depending on the environment. We assert at least one of these
+    // pointer-start event types is wired — which is strictly more than
+    // the "no drag" case (empty `__on`).
+    const hasDragStart = dragTypes.some((t) =>
+      ['mousedown', 'pointerdown', 'touchstart'].includes(t)
+    );
+    expect(hasDragStart).toBe(true);
   });
 });

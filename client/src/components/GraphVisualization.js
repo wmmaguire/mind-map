@@ -1479,35 +1479,12 @@ function GraphVisualization({
       });
     }
 
-    // Draw the links with clickable areas
-    const linkGroups = g.append('g')
-      .selectAll('g')
-      .data(processedLinks)
-      .join('g')
-      .attr('class', 'link-group');
-
-    // Add visible lines directly to linkGroups
-    linkGroups.append('line')
-      .attr('class', 'link-line')
-      .attr('stroke', '#999')
-      .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', 2);
-
-    // Add wider invisible lines for better hover/click area
-    linkGroups.append('line')
-      .attr('class', 'link-hover-area')
-      .attr('stroke', 'transparent')
-      .attr('stroke-width', 10)
-      .on('mouseover', handleLinkMouseover)
-      .on('mouseout', handleLinkMouseout);
-
-    // Add relationship labels to links
-    const linkLabels = linkGroups.append('text')
-      .attr('class', 'link-label')
-      .text(d => d.relationship)
-      .attr('text-anchor', 'middle')
-      .attr('dy', -5)
-      .attr('opacity', 0);
+    // #103 M5: the legacy `linkGroups` + `linkLabels` construction used to
+    // be erased by the M3-dropped `g.selectAll('*').remove()` wipe before the
+    // keyed join inside `updateVisualization()` rebuilt them. Now that the
+    // wipe is gone the legacy blocks would leak as duplicate DOM on every
+    // setup. Drop them — the canonical link rendering lives inside
+    // `g.links-layer` via `applyKeyedJoin` below.
 
     // Add drag behavior
     const drag = d3.drag()
@@ -1529,196 +1506,17 @@ function GraphVisualization({
     const dragBehavior =
       readOnly && playbackScrubTokenRef.current === 0 ? noOpDrag : drag;
 
-    // Update node selection with click and drag handlers
-    const node = g.selectAll('.node')
-      .data(data.nodes)
-      .join('g')
-      .attr('class', 'node')
-      .classed('selected', d =>
-        selectedNodes.some(
-          (n) =>
-            String(n.id) === String(d.id) ||
-            (Array.isArray(d.nodes) &&
-              d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
-        )
-      )
-      .on('click', (event, d) => {
-        event.stopPropagation();
-        
-        // Handle both community structure and raw node data
-        if (!d) {
-          console.log('No data provided');
-          return;
-        }
-
-        // If it's a raw node (not a community), wrap it in the community structure
-        if (!d.nodes) {
-          d = {
-            id: d.id,
-            nodes: [d],
-            label: d.label,
-            description: d.description,
-            wikiUrl: d.wikiUrl,
-            color: defaultNodeColor
-          };
-        }
-
-        // Now proceed with the existing logic
-        if (d.nodes.length === 1) {
-          try {
-            const node = d.nodes[0];
-            if (!node) {
-              console.log('Invalid node in single node community:', d);
-              return;
-            }
-            handleNodeClick(event, node);
-          } catch (error) {
-            console.error('Error handling node click:', error);
-          }
-          return;
-        }
-
-        // Clear previous selection
-        selectedNodeIds.current.clear();
-        
-        // For communities
-        const selectedNode = d.nodes[0];
-        if (!selectedNode) {
-          console.log('No valid node found in:', d);
-          return;
-        }
-
-        selectedNodeIds.current.add(selectedNode.id);
-        selectedNodeId.current = selectedNode.id;
-
-        // Find all directly connected nodes
-        const connectedLinks = data.links.filter(link => {
-          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-          return sourceId === selectedNode.id || targetId === selectedNode.id;
-        });
-
-        updateHighlighting();
-
-        // Show tooltip with node details
-        const tooltip = d3.select('.tooltip');
-        tooltip.style('opacity', 0.9);
-
-        let tooltipContent = '';
-        try {
-          console.log(d);
-          if (d.nodes.length > 1) {
-            // For community nodes
-            const communityLabel = d.label || 'Group';
-            const communityDescription = d.description || `Contains ${d.nodes.length} nodes`;
-            const validNodes = d.nodes.filter(node => node && typeof node === 'object');
-            const nodeLabels = validNodes
-              .map(node => node.label || 'Unnamed Node')
-              .join(', ');
-
-            tooltipContent = `
-              <strong>${communityLabel}</strong><br/>
-              <br/>
-              ${communityDescription}<br/>
-              <br/>
-              Nodes: ${nodeLabels}
-            `;
-          } else if (selectedNode) {
-            // For single nodes - verify all properties exist
-            const nodeLabel = selectedNode.label || 'Unnamed Node';
-            const nodeDescription = selectedNode.description || '';
-            const nodeWikiUrl = selectedNode.wikiUrl || '';
-            
-            tooltipContent = `
-              <strong>${nodeLabel}</strong><br/>
-              ${nodeDescription ? `${nodeDescription}<br/>` : ''}
-              ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
-            `;
-
-            // Add related nodes section if there are any
-            if (connectedLinks.length > 0) {
-              tooltipContent += '<br/><strong>Related Concepts:</strong><br/>';
-              const relatedNodesContent = connectedLinks
-                .map(link => {
-                  try {
-                    const otherNodeId = typeof link.source === 'object' 
-                      ? (link.source.id === selectedNode.id ? link.target.id : link.source.id)
-                      : (link.source === selectedNode.id ? link.target : link.source);
-                    
-                    const otherNode = data.nodes.find(n => n.id === otherNodeId);
-                    if (!otherNode) return '';
-                    
-                    const strengthNum =
-                      typeof link.strength === 'number' && Number.isFinite(link.strength)
-                        ? Math.max(0, Math.min(1, link.strength))
-                        : null;
-                    const strengthLabel =
-                      strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
-                    return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
-                  } catch (e) {
-                    console.error('Error processing related node:', e);
-                    return '';
-                  }
-                })
-                .filter(Boolean)
-                .join('<br/>');
-              tooltipContent += relatedNodesContent;
-            }
-            tooltipContent += explodeTooltipActionsHtml(selectedNode);
-          } else {
-            tooltipContent = '<strong>Node information unavailable</strong>';
-          }
-        } catch (e) {
-          console.error('Error generating tooltip:', e);
-          console.log('Node data:', d);
-          tooltipContent = '<strong>Error displaying node information</strong>';
-        }
-        
-        tooltip.html(withTooltipChrome(tooltipContent));
-        scheduleTooltipPosition(event.currentTarget);
-      })
-      .call(dragBehavior);
-
-    // Link selection is disabled; links only show hover tooltip.
-    g.selectAll('.link-group')
-      .data(data.links)
-      .join('g')
-      .attr('class', 'link-group')
-      .on('click', null);
-
-    // Update visual states
-    node.selectAll('circle')
-      .data(d => [d])
-      .join('circle')
-      .attr('r', 20)
-      .attr(
-        'fill',
-        d =>
-          selectedNodes.some(
-            (n) =>
-              String(n.id) === String(d.id) ||
-              (Array.isArray(d.nodes) &&
-                d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
-          )
-            ? highlightedColor
-            : defaultNodeColor
-      )
-      .classed('selected', d =>
-        selectedNodes.some(
-          (n) =>
-            String(n.id) === String(d.id) ||
-            (Array.isArray(d.nodes) &&
-              d.nodes.some((nn) => nn && String(nn.id) === String(n.id)))
-        )
-      );
-
-    // Add labels
-    node.append('text')
-      .text(d => d.label)
-      .attr('x', 0)
-      .attr('y', 30)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#333');
+    // #103 M5: the legacy `const node = g.selectAll('.node')` block used to
+    // be erased on every `updateVisualization()` call by the M3-dropped
+    // `g.selectAll('*').remove()` wipe before the keyed join rebuilt the
+    // canonical DOM. After M3 we no longer wipe, so keeping this block would
+    // leak a second set of `<g class="node">` siblings of
+    // `g.nodes-layer > g.node`, with competing click / drag handlers and a
+    // plain `r=20` circle overlapping the real thumbnail or disc. The keyed
+    // join inside `updateVisualization()` is now the single source of truth
+    // for node DOM + click/drag wiring; the same applies to the adjacent
+    // `.link-group`, `node.selectAll('circle')`, and `node.append('text')`
+    // blocks that followed. See b2ecda4 (M1) for the wiped-for-free version.
 
     // Interaction handlers
     function handleLinkMouseover(event, link) {
@@ -2346,29 +2144,15 @@ function GraphVisualization({
       d.fy = null;
     }
 
-    // Update positions on each tick
-    simulation.on('tick', () => {
-      if (!minimapRafRef.current) {
-        minimapRafRef.current = requestAnimationFrame(() => {
-          minimapRafRef.current = null;
-          updateMinimapRef.current?.();
-        });
-      }
-      // Update link positions
-      linkGroups.selectAll('line')
-        .attr('x1', d => simX(d.source))
-        .attr('y1', d => simY(d.source))
-        .attr('x2', d => simX(d.target))
-        .attr('y2', d => simY(d.target));
-
-      // Update link label positions
-      linkLabels
-        .attr('x', d => (simX(d.source) + simX(d.target)) / 2)
-        .attr('y', d => (simY(d.source) + simY(d.target)) / 2);
-
-      // Update node positions
-      node.attr('transform', d => `translate(${simX(d)},${simY(d)})`);
-    });
+    // #103 M5: the outer-effect tick handler used to animate the legacy
+    // `linkGroups` / `linkLabels` / `node` selections that were wiped by
+    // `updateVisualization()` before this handler ever fired. Now that the
+    // legacy DOM is gone, this handler has no selections to animate — and
+    // `updateVisualization()` unconditionally re-registers its own tick
+    // below that drives the canonical `g.links-layer` / `g.nodes-layer` /
+    // `g.cluster-thumb-layer` selections. Dropping the stub keeps the
+    // simulation from briefly running a no-op tick callback between setup
+    // and the first `updateVisualization()` call.
 
     // Update the visualization function to handle all node cases properly
     const updateVisualization = () => {
@@ -2473,6 +2257,15 @@ function GraphVisualization({
               .attr('stroke-width', 1)
               .attr('stroke-opacity', 0)
               .style('cursor', 'default');
+            // #103 M5: link hover tooltip used to hang off a separate wider
+            // invisible `.link-hover-area` line in the legacy (wiped-on-every
+            // -render) block. That block is gone now, so wire the hover
+            // handlers directly onto the canonical `<line class="link">`.
+            // Kept on `enter` only so survivors across scrubs don't get
+            // listeners re-bound each call.
+            appended
+              .on('mouseover', handleLinkMouseover)
+              .on('mouseout', handleLinkMouseout);
             appended
               .transition('link-enter')
               .duration(ENTER_DURATION_MS)
