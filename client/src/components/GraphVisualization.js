@@ -462,6 +462,11 @@ function GraphVisualization({
   /** Set in D3 effect: select matched node, refresh highlights, show docked tooltip (Focus next / Enter). */
   const applyDiscoveryFocusNodeUiRef = useRef(null);
   const updateHighlightingRef = useRef(null);
+  /** #103 M2: exposed so the scrub-only effect below can re-render without triggering the full setup effect. */
+  const updateVisualizationRef = useRef(null);
+  /** #103 M2: last-known playback scrub token so closures created inside the setup effect can read the current value without re-running. */
+  const playbackScrubTokenRef = useRef(playbackScrubToken);
+  playbackScrubTokenRef.current = playbackScrubToken;
   const updateMinimapRef = useRef(null);
   const graphTransformRef = useRef(null);
   const minimapRafRef = useRef(null);
@@ -945,7 +950,7 @@ function GraphVisualization({
     const svg = d3.select(svgRef.current);
     // Animations disabled (fade/ease/transition) — user preference.
 
-    if (playbackScrubToken === 0) {
+    if (playbackScrubTokenRef.current === 0) {
       lastPlaybackFadeTokenRef.current = 0;
       playbackPrevCommunityIdsRef.current = null;
       playbackPrevLinkKeysRef.current = null;
@@ -1517,8 +1522,12 @@ function GraphVisualization({
       .on('end', () => {});
     // `readOnly` turns off persistence (e.g. library history scrub) but we still allow dragging
     // for layout while scrubbing; positions reset when the displayed snapshot changes.
+    // #103 M2: read playback state via a ref so this effect doesn't need to
+    // re-run on every scrub. Pre-existing behaviour: readOnly viewers cannot
+    // drag before any playback scrub happens; during/after playback drag is
+    // re-enabled (preserved from before #103).
     const dragBehavior =
-      readOnly && playbackScrubToken === 0 ? noOpDrag : drag;
+      readOnly && playbackScrubTokenRef.current === 0 ? noOpDrag : drag;
 
     // Update node selection with click and drag handlers
     const node = g.selectAll('.node')
@@ -2363,9 +2372,9 @@ function GraphVisualization({
 
     // Update the visualization function to handle all node cases properly
     const updateVisualization = () => {
+      const tokenNow = playbackScrubTokenRef.current;
       const isNewPlaybackScrub =
-        playbackScrubToken > 0 &&
-        playbackScrubToken !== lastPlaybackFadeTokenRef.current;
+        tokenNow > 0 && tokenNow !== lastPlaybackFadeTokenRef.current;
 
       if (!isNewPlaybackScrub) {
         if (playbackEaseHighlightTimerRef.current) {
@@ -2406,8 +2415,12 @@ function GraphVisualization({
         simulation.stop();
       }
 
-      // Clear ALL existing elements before processing new ones
-      g.selectAll('*').remove();
+      // #103 M3: the hard wipe is gone. Keyed data joins below handle
+      // enter / update / exit cleanly for every call path (initial mount,
+      // zoom merge/split, reset view, playback scrub). Dropping the wipe is
+      // what makes the "existing nodes stay put; new nodes animate in"
+      // contract actually deliverable — it's why #86's earlier attempt
+      // without the join contract on top was unsafe.
 
       // Process links between communities
       const processedLinks = data.links.map(link => {
@@ -2434,14 +2447,17 @@ function GraphVisualization({
         link.target
       );
 
-      // #103 M1: persistent layer groups + keyed data joins. Today the wipe
-      // above still runs so these joins see zero survivors (everything enters,
-      // same behaviour as before); M2 removes the wipe and keeps `g.graph-root`
-      // across effect runs so keyed joins can actually find survivors. Going
-      // through this indirection now means the tick callback and simulation
-      // rebinding below are already talking to merged selections.
+      // #103: persistent layer groups + keyed data joins + fade transitions.
+      // The wipe at line ~2410 is GONE — keyed joins now handle enter / update
+      // / exit across every call path. Survivors keep their same `<g>` and
+      // `<line>` elements across scrubs, new elements fade in, removed ones
+      // fade out before being detached. Motion is gated on the reduced-motion
+      // user preference (reused from #89).
       const linksLayer = ensureLayer(g, 'links-layer');
       const nodesLayer = ensureLayer(g, 'nodes-layer');
+      const reducedMotionForJoin = prefersReducedMotion();
+      const ENTER_DURATION_MS = reducedMotionForJoin ? 0 : 450;
+      const EXIT_DURATION_MS = reducedMotionForJoin ? 0 : 280;
 
       const linkJoin = applyKeyedJoin(
         linksLayer,
@@ -2449,13 +2465,30 @@ function GraphVisualization({
         processedLinks,
         linkKeyForProcessedCommunityLink,
         {
-          onEnter: (enter) => enter
-            .append('line')
-            .attr('class', 'link')
-            .attr('stroke', '#999')
-            .attr('stroke-width', 1)
-            .attr('stroke-opacity', 0.6)
-            .style('cursor', 'default'),
+          onEnter: (enter) => {
+            const appended = enter
+              .append('line')
+              .attr('class', 'link')
+              .attr('stroke', '#999')
+              .attr('stroke-width', 1)
+              .attr('stroke-opacity', 0)
+              .style('cursor', 'default');
+            appended
+              .transition('link-enter')
+              .duration(ENTER_DURATION_MS)
+              .ease(d3.easeCubicOut)
+              .attr('stroke-opacity', 0.6);
+            return appended;
+          },
+          onExit: (exit) => {
+            // Interrupt any enter transition still in flight, then fade out.
+            exit
+              .interrupt('link-enter')
+              .transition('link-exit')
+              .duration(EXIT_DURATION_MS)
+              .attr('stroke-opacity', 0)
+              .remove();
+          },
         }
       );
       const links = linkJoin.merged;
@@ -2727,11 +2760,28 @@ function GraphVisualization({
             const appended = enter
               .append('g')
               .attr('class', 'node')
+              .style('opacity', 0)
               .call(dragBehavior);
             attachNodeClickHandler(appended);
             renderNodeDiscOrThumbIntoNew(appended);
             attachNodeLabel(appended);
+            // #103 M3: fade-in (opacity-only keeps thumbnail clipPaths intact;
+            // a scale transform on the `<g>` would compound with the per-tick
+            // `translate(...)` and double-apply during the transition window).
+            appended
+              .transition('node-enter')
+              .duration(ENTER_DURATION_MS)
+              .ease(d3.easeCubicOut)
+              .style('opacity', 1);
             return appended;
+          },
+          onExit: (exit) => {
+            exit
+              .interrupt('node-enter')
+              .transition('node-exit')
+              .duration(EXIT_DURATION_MS)
+              .style('opacity', 0)
+              .remove();
           },
         }
       );
@@ -2817,19 +2867,62 @@ function GraphVisualization({
               .attr('class', 'cluster-thumb')
               .attr('transform', (d) => `translate(${simX(d)},${simY(d)})`)
               .style('cursor', 'pointer')
+              .style('opacity', 0)
               .on('click', (event, d) => {
                 event.stopPropagation();
                 const { node: anchor } = pickCommunityAnchorNode(d, data.links);
                 if (anchor?.id != null) focusOnNodeId(anchor.id, 1.75);
               });
             renderChipContent(appended);
+            appended
+              .transition('chip-enter')
+              .duration(ENTER_DURATION_MS)
+              .ease(d3.easeCubicOut)
+              .style('opacity', 1);
             return appended;
+          },
+          onExit: (exit) => {
+            exit
+              .interrupt('chip-enter')
+              .transition('chip-exit')
+              .duration(EXIT_DURATION_MS)
+              .style('opacity', 0)
+              .remove();
           },
         }
       );
       // `chips` is always a selection now — empty when there are no clusters,
       // which makes `.attr()` in the tick callback a safe no-op.
       const chips = chipJoin.merged;
+
+      // #103 M4: during a playback scrub, pin fx/fy on survivors so the
+      // simulation's post-rebind micro-reheat can't nudge them visible pixels.
+      // Combined with the keyed join keeping survivor DOM identity intact,
+      // this is what lets us honour the "existing nodes move ≤ 1 px" contract.
+      // New entrants remain unpinned so forceLink/forceCollide can ease them
+      // from their seeded component centroid to their steady-state position.
+      // Non-scrub rebuilds (data change, zoom merge/split, reset view) skip
+      // pinning — those are structural and we want the sim to reflow freely.
+      if (isNewPlaybackScrub) {
+        const enteringIds = new Set(
+          nodeJoin.enter.data().map((d) => String(d.id))
+        );
+        visibleElements.forEach((d) => {
+          if (!d || enteringIds.has(String(d.id))) return;
+          if (typeof d.x === 'number' && Number.isFinite(d.x)) d.fx = d.x;
+          if (typeof d.y === 'number' && Number.isFinite(d.y)) d.fy = d.y;
+        });
+        // Release the pin shortly after the enter transition completes so
+        // user drag / next scrub / target-stretch pulse can move survivors again.
+        const releaseDelayMs = ENTER_DURATION_MS + 60;
+        window.setTimeout(() => {
+          visibleElements.forEach((d) => {
+            if (!d || enteringIds.has(String(d.id))) return;
+            d.fx = null;
+            d.fy = null;
+          });
+        }, releaseDelayMs);
+      }
 
       // GitHub #89: seed any newly-visible community with a position biased
       // toward its connected component's centroid so they don't all materialise
@@ -2902,7 +2995,7 @@ function GraphVisualization({
       );
 
       if (isNewPlaybackScrub) {
-        lastPlaybackFadeTokenRef.current = playbackScrubToken;
+        lastPlaybackFadeTokenRef.current = tokenNow;
         {
           const removedComm = prevCommIds
             ? new Set(
@@ -3063,6 +3156,13 @@ function GraphVisualization({
 
     resetCanvasViewRef.current = resetCanvasToFullView;
 
+    // #103 M2: expose updateVisualization so the scrub-only effect below can
+    // re-render into the existing `g.graph-root` without forcing the full setup
+    // effect to re-run. Without this, every playback scrub bumps the setup
+    // effect's `playbackScrubToken` dep and tears the whole scene down,
+    // defeating the "existing nodes stay put" contract from #103.
+    updateVisualizationRef.current = updateVisualization;
+
     // First paint must use the same community DOM as merge/split (thumbnails + tick), not
     // only the legacy circle pass above—otherwise thumbnails appear only after zoom, and
     // reopening the library (width/height) cleared them until zoom again.
@@ -3102,13 +3202,34 @@ function GraphVisualization({
       applyProgrammaticZoomTransformRef.current = null;
       applyDiscoveryFocusNodeUiRef.current = null;
       updateHighlightingRef.current = null;
+      updateVisualizationRef.current = null;
       updateMinimapRef.current = null;
       resetCanvasViewRef.current = null;
     };
     // D3 setup uses handler closures from this render; listing handleDelete* / trackOperation
     // would re-run the full simulation on every render where those identities change.
+    // #103 M2: `playbackScrubToken` is intentionally NOT in deps — it's read
+    // through `playbackScrubTokenRef` and handled by the scrub-only effect
+    // below so scrubs re-render into the existing DOM rather than tearing it
+    // down and rebuilding `g.graph-root` from scratch.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deps above drive graph rebuild
-  }, [data, selectedNodes, width, height, readOnly, playbackScrubToken]);
+  }, [data, selectedNodes, width, height, readOnly]);
+
+  // #103 M2: playback-scrub-only re-render. When the user scrubs the timeline
+  // we bump `playbackScrubToken`; this fires updateVisualization on the
+  // existing DOM via its ref. Survivors stay put (same `<g class="node">`
+  // elements), new communities/links fade in via M3's enter/exit transitions,
+  // and the simulation (stored in communityForceSimulationRef) keeps its
+  // per-node position/velocity state across scrubs.
+  const scrubInitializedRef = useRef(false);
+  useEffect(() => {
+    if (!scrubInitializedRef.current) {
+      scrubInitializedRef.current = true;
+      return;
+    }
+    const fn = updateVisualizationRef.current;
+    if (typeof fn === 'function') fn();
+  }, [playbackScrubToken]);
 
   const handleGenerate = async (event) => {
     event.preventDefault();

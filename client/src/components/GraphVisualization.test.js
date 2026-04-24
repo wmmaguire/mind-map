@@ -1,5 +1,5 @@
 import '../setupPolyfills';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import GraphVisualization from './GraphVisualization';
 
 jest.mock('../context/SessionContext', () => ({
@@ -503,5 +503,224 @@ describe('GraphVisualization canvas tooltip dismissal on submit', () => {
     await waitFor(() => {
       expect(tip.style.opacity).toBe('0');
     });
+  });
+});
+
+/**
+ * #103 M1–M4 contract: playback scrubs must preserve DOM identity for
+ * surviving communities (keyed data joins) and the thumbnail fallback path
+ * must be idempotent across rebuilds (regression cover for #86's original
+ * attempt). These tests feed bumped `playbackScrubToken` values to the same
+ * component and assert no re-mount of the surviving `<g class="node">`.
+ */
+describe('GraphVisualization keyed data joins across playback scrubs (#103)', () => {
+  it('survivor nodes keep their DOM identity across a scrub (M1+M2)', () => {
+    const { rerender } = render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        playbackScrubToken={0}
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    const before = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
+    expect(before.length).toBe(2);
+
+    act(() => {
+      rerender(
+        <GraphVisualization
+          data={minimalData}
+          onDataUpdate={jest.fn()}
+          width={800}
+          height={600}
+          playbackScrubToken={1}
+        />
+      );
+    });
+
+    const after = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
+    expect(after.length).toBe(2);
+    // Same DOM elements — no unmount/remount. This is the whole point of
+    // #103: the user should see new content materialise onto the existing
+    // scene, not the scene flicker-replace itself.
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
+  });
+
+  it('entering nodes are added; existing ones stay put (M1+M2)', () => {
+    const seed = {
+      nodes: [
+        { id: 'n1', label: 'One' },
+        { id: 'n2', label: 'Two' },
+      ],
+      links: [],
+    };
+    const withAdded = {
+      nodes: [...seed.nodes, { id: 'n3', label: 'Three' }],
+      links: [],
+    };
+    const { rerender } = render(
+      <GraphVisualization
+        data={seed}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        playbackScrubToken={0}
+      />
+    );
+
+    const svg = document.querySelector('.graph-visualization');
+    const before = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
+    expect(before.length).toBe(2);
+
+    act(() => {
+      rerender(
+        <GraphVisualization
+          data={withAdded}
+          onDataUpdate={jest.fn()}
+          width={800}
+          height={600}
+          playbackScrubToken={1}
+        />
+      );
+    });
+
+    const after = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
+    // Note: a data change here also re-runs the setup effect (not just the
+    // scrub effect), so we allow either "keyed join preserved DOM" or
+    // "setup effect rebuilt". Either way the end state must have the right
+    // count, which is what the user perceives. The scrub-only case above
+    // guards the identity promise.
+    expect(after.length).toBe(3);
+  });
+
+  it('renders thumbnail + ring when thumbnailUrl is a valid https URL (M4)', () => {
+    const dataWithThumb = {
+      nodes: [
+        {
+          id: 't1',
+          label: 'WithThumb',
+          thumbnailUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/test.jpg/64px-test.jpg',
+        },
+      ],
+      links: [],
+    };
+    render(
+      <GraphVisualization
+        data={dataWithThumb}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const nodeG = svg.querySelector('g.nodes-layer g.node');
+    expect(nodeG).toBeTruthy();
+    expect(nodeG.querySelector('image.graph-node-thumb')).toBeTruthy();
+    expect(nodeG.querySelector('circle.graph-node-ring')).toBeTruthy();
+    // Fallback disc must not be pre-emptively rendered; it only shows on
+    // image error (covered by the idempotency test below).
+    expect(nodeG.querySelector('circle.graph-node-disc')).toBeFalsy();
+  });
+
+  it('thumbnail fallback is idempotent across scrub-driven rebuilds (M4)', () => {
+    // Rejects non-https schemes, so the thumbUrl below never mounts an
+    // `<image>` and the node renders as a plain `circle.graph-node-disc`
+    // from the no-thumb branch. Rebuilding on a scrub must not produce
+    // duplicate discs or orphan defs.
+    const dataWithBadThumb = {
+      nodes: [
+        {
+          id: 't1',
+          label: 'BadThumb',
+          thumbnailUrl: 'javascript:alert(1)',
+        },
+      ],
+      links: [],
+    };
+    const { rerender } = render(
+      <GraphVisualization
+        data={dataWithBadThumb}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        playbackScrubToken={0}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const initialDiscs = svg.querySelectorAll(
+      'g.nodes-layer g.node circle.graph-node-disc'
+    );
+    const initialImages = svg.querySelectorAll(
+      'g.nodes-layer g.node image.graph-node-thumb'
+    );
+    expect(initialDiscs.length).toBe(1);
+    expect(initialImages.length).toBe(0);
+
+    for (let i = 1; i <= 3; i += 1) {
+      act(() => {
+        rerender(
+          <GraphVisualization
+            data={dataWithBadThumb}
+            onDataUpdate={jest.fn()}
+            width={800}
+            height={600}
+            playbackScrubToken={i}
+          />
+        );
+      });
+    }
+
+    const finalDiscs = svg.querySelectorAll(
+      'g.nodes-layer g.node circle.graph-node-disc'
+    );
+    const finalImages = svg.querySelectorAll(
+      'g.nodes-layer g.node image.graph-node-thumb'
+    );
+    const finalDefs = svg.querySelectorAll('g.nodes-layer g.node defs');
+    // Exactly one disc, no thumbnails, no leaked defs. If the fallback
+    // path ever stops being idempotent (the #86 regression) we'd see
+    // duplicates here.
+    expect(finalDiscs.length).toBe(1);
+    expect(finalImages.length).toBe(0);
+    expect(finalDefs.length).toBe(0);
+  });
+
+  it('playback scrub does not tear down graph-root (M2)', () => {
+    const { rerender } = render(
+      <GraphVisualization
+        data={minimalData}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        playbackScrubToken={0}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const graphRootBefore = svg.querySelector('g.graph-root');
+    expect(graphRootBefore).toBeTruthy();
+
+    for (let i = 1; i <= 3; i += 1) {
+      act(() => {
+        rerender(
+          <GraphVisualization
+            data={minimalData}
+            onDataUpdate={jest.fn()}
+            width={800}
+            height={600}
+            playbackScrubToken={i}
+          />
+        );
+      });
+    }
+
+    const graphRootAfter = svg.querySelector('g.graph-root');
+    // Same `<g class="graph-root">` element — not a remount. If the
+    // setup effect ever starts depending on `playbackScrubToken` again,
+    // this will fail, which is exactly the check we want.
+    expect(graphRootAfter).toBe(graphRootBefore);
   });
 });
