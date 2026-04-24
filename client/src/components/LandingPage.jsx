@@ -119,7 +119,7 @@ const FEATURE_CARDS = [
     id: 'assess',
     title: 'Gleam insights',
     body:
-      'Assess produces a two-phase reading — claims grounded in the graph, with clearly marked speculative extensions to encourage creative discovery.',
+      'Assess produces a two-phase reading — claims grounded in the graph, with clearly marked speculative extensions.',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden focusable="false">
         <path
@@ -252,14 +252,17 @@ export default function LandingPage() {
             Why it matters
           </h2>
           <p className="landing-reflection-body">
-            Unstructured, free-flowing conversations often expand in many profound directions. This network of thought
-            takes on a life of its own: self-organizing and self-emergent.
-            Reflecting on the loose associations that push and pull these
-            concepts is how to surface the hidden motives that inspire the power of ideas.
-          </p>
+            Have you ever caught yourself lost in a conversation, asking yourself:
+          </p><br />
           <p className="landing-reflection-questions">
             <span>“What were we talking about again? How did we get here?”</span>
             <span>“Where did that thought come from? And where was it going?”</span>
+          </p><br />
+          <p className="landing-reflection-body">
+            Unstructured, free-flowing thought encourages us to explore a network of ideas that
+            takes on a life of their own: self-organizing and self-emergent.
+            Reflecting on the loose associations that push and pull these
+            concepts is how to surface the inspirations that power novel ideas and creative discovery.
           </p>
         </section>
 
