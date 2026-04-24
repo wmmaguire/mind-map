@@ -12,6 +12,15 @@
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>Mind Map Generator</title>
+    <!--
+      Google Identity Services (GIS) — #102. Async+defer keeps first paint
+      unblocked; the button/One Tap wait for the script via `isGoogleIdentityReady()`
+      in `client/src/lib/googleIdentity.js`. The script is loaded
+      unconditionally even when `REACT_APP_GOOGLE_OAUTH_CLIENT_ID` is unset —
+      runtime guards (`isGoogleSignInConfigured`) hide the UI when not
+      configured, so there's no regression to email/password-only deployments.
+    -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

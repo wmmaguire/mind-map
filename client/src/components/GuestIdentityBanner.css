@@ -600,6 +600,51 @@
   font-weight: 600;
 }
 
+/* #102 — Google primary CTA layout + email form disclosure. */
+.guest-identity-banner__auth-google {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.guest-identity-banner__auth-disclosure {
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.guest-identity-banner__auth-disclosure:hover {
+  color: #bfdbfe;
+}
+
+.guest-identity-banner__auth-link-prompt {
+  padding: 12px 14px;
+  background: rgba(59, 130, 246, 0.08);
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.guest-identity-banner__auth-link-prompt p {
+  margin: 0 0 10px 0;
+}
+
+.guest-identity-banner__auth-secondary {
+  background: transparent;
+  color: #cbd5e1;
+  border-color: #475569;
+  font-weight: 500;
+}
+
 /* Consolidated account controls (guest preview + registered menu trigger) */
 .guest-identity-banner__account-control {
   margin: 0;

@@ -1,0 +1,26 @@
+.google-sign-in-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.google-sign-in-button > div:first-child {
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.google-sign-in-button__fallback {
+  font-size: 0.85rem;
+  color: var(--banner-subtle-color, #6b7280);
+}
+
+.google-sign-in-button__error {
+  font-size: 0.85rem;
+  color: #b91c1c;
+  text-align: center;
+}

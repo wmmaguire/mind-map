@@ -11,6 +11,8 @@ import { useLibraryUi } from '../context/LibraryUiContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
 import BannerActionsDrawer from './BannerActionsDrawer';
+import GoogleSignInButton from './auth/GoogleSignInButton';
+import './auth/GoogleSignInButton.css';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
@@ -37,6 +39,8 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
     logout,
     updateProfile,
     requestPasswordReset,
+    linkGoogleAccount,
+    isGoogleSignInConfigured: googleSignInConfigured,
   } = useAuth();
   const { graphTitle } = useGraphTitle();
   const { openMobileLibrary } = useLibraryUi();
@@ -102,11 +106,18 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [forgotEmailSent, setForgotEmailSent] = useState(false);
+  // #102 — email/password is secondary when Google is configured; users click a
+  // disclosure to reveal it. When Google is not configured, the email form is
+  // shown by default so the modal still works on local dev / passwordless hosts.
+  const [emailFormExpanded, setEmailFormExpanded] = useState(!googleSignInConfigured);
+  const [linkPrompt, setLinkPrompt] = useState(null); // { linkToken, email } | null
 
   const closeAuthModal = () => {
     setAuthModalOpen(false);
     setForgotEmailSent(false);
     setAuthError('');
+    setLinkPrompt(null);
+    setEmailFormExpanded(!googleSignInConfigured);
   };
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -632,7 +643,73 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     Create account
                   </button>
                 </div>
-              ) : (
+              ) : null}
+              {/* #102 — Link-required dialog: email already exists under password; ask to link. */}
+              {linkPrompt ? (
+                <div className="guest-identity-banner__auth-link-prompt" role="alertdialog" aria-label="Link your Google account">
+                  <p>
+                    An account with <strong>{linkPrompt.email}</strong> already exists.
+                    Link your Google account to it?
+                  </p>
+                  <div className="guest-identity-banner__auth-actions">
+                    <button
+                      type="button"
+                      disabled={authBusy}
+                      onClick={async () => {
+                        setAuthBusy(true);
+                        setAuthError('');
+                        try {
+                          await linkGoogleAccount(linkPrompt.linkToken);
+                          setLinkPrompt(null);
+                          closeAuthModal();
+                        } catch (err) {
+                          setAuthError(err?.message || 'Linking failed. Please try again.');
+                        } finally {
+                          setAuthBusy(false);
+                        }
+                      }}
+                    >
+                      {authBusy ? 'Linking…' : 'Link Google account'}
+                    </button>
+                    <button
+                      type="button"
+                      className="guest-identity-banner__auth-secondary"
+                      onClick={() => setLinkPrompt(null)}
+                      disabled={authBusy}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {/* #102 — Google Sign-In primary CTA; renders nothing when unconfigured. */}
+              {googleSignInConfigured && (authMode === 'login' || authMode === 'register') && !linkPrompt ? (
+                <div className="guest-identity-banner__auth-google">
+                  <GoogleSignInButton
+                    text={authMode === 'register' ? 'signup_with' : 'signin_with'}
+                    onSuccess={() => {
+                      closeAuthModal();
+                    }}
+                    onLinkRequired={({ linkToken, email }) => {
+                      setLinkPrompt({ linkToken, email });
+                      setAuthError('');
+                    }}
+                    onError={(err) => {
+                      setAuthError(err?.message || 'Google sign-in failed');
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="guest-identity-banner__auth-disclosure"
+                    aria-expanded={emailFormExpanded}
+                    onClick={() => setEmailFormExpanded((v) => !v)}
+                  >
+                    {emailFormExpanded ? 'Hide email sign-in' : 'Or sign in with email'}
+                  </button>
+                </div>
+              ) : null}
+              {/* Forgot-password toolbar only when we're in that sub-mode. */}
+              {authMode === 'forgot-password' ? (
                 <div className="guest-identity-banner__auth-forgot-toolbar">
                   <button
                     type="button"
@@ -646,7 +723,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     ← Sign in
                   </button>
                 </div>
-              )}
+              ) : null}
               {authMode === 'forgot-password' && forgotEmailSent ? (
                 <div className="guest-identity-banner__auth-success" role="status">
                   <p>
@@ -709,7 +786,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                   </div>
                 </form>
               ) : null}
-              {authMode === 'login' || authMode === 'register' ? (
+              {(authMode === 'login' || authMode === 'register') && emailFormExpanded && !linkPrompt ? (
                 <form
                   className="guest-identity-banner__auth-form"
                   onSubmit={async (e) => {
