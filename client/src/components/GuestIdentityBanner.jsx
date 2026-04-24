@@ -516,7 +516,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                   title="Zoom to fit all nodes and show each concept (no clusters)"
                 >
                   <span className="banner-actions-drawer-item__icon" aria-hidden>
-                    🎯
+                    🔄
                   </span>
                   <span className="banner-actions-drawer-item__label">Reset view</span>
                 </button>
@@ -1114,7 +1114,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                 title="Zoom to fit all nodes and show each concept (no clusters)"
               >
                 <span className="banner-actions-drawer-item__icon" aria-hidden>
-                  🎯
+                  🔄
                 </span>
                 <span className="banner-actions-drawer-item__label">Reset view</span>
               </button>
