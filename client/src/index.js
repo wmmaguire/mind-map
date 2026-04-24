@@ -12,6 +12,7 @@ import { LibraryUiProvider } from './context/LibraryUiContext';
 import { GraphHistoryUiProvider } from './context/GraphHistoryUiContext';
 import { GraphChromeUiProvider } from './context/GraphChromeUiContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import GoogleOneTap from './components/auth/GoogleOneTap';
 
 function AuthIdentityBridge({ children }) {
   const { user } = useAuth();
@@ -19,6 +20,10 @@ function AuthIdentityBridge({ children }) {
     <IdentityProvider
       initialRegisteredUserId={user?.id || process.env.REACT_APP_MINDMAP_USER_ID}
     >
+      {/* #102 — One Tap fires at most once per boot when GIS is configured and
+          the user is a guest. Renders nothing; sits inside AuthProvider so it
+          can read the current auth state. */}
+      <GoogleOneTap />
       {children}
     </IdentityProvider>
   );
