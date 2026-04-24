@@ -1272,12 +1272,14 @@ function GraphVisualization({
     // Create the force simulation with processed data.
     // forceX + forceY (vs forceCenter) behave better for disjoint-style graphs: each component
     // eases toward the viewport center without one combined pull (Observable disjoint graph pattern).
-    // GitHub #89: collide radius scales with community size (single nodes: 20,
-    // merged clusters: up to ~200) instead of a fixed 50 — fixes merged-cluster
-    // overlap after splits and keeps per-component spacing visually honest.
+    // GitHub #89: collide radius scales with community size instead of a fixed 50.
+    //   - Singleton communities keep the pre-#89 ~50px breathing room (42 + 8 padding)
+    //     so the graph doesn't read as too tightly packed during playback.
+    //   - Merged clusters grow with node count (capped at ~200 + 8) so splits /
+    //     community evolution / explode-merge don't produce overlapping clusters.
     const communityCollideRadius = (d) => {
       const nodeCount = Array.isArray(d?.nodes) ? d.nodes.length : 0;
-      const base = nodeCount > 1 ? Math.min(200, Math.max(40, 20 + 3 * nodeCount)) : 20;
+      const base = nodeCount > 1 ? Math.min(200, Math.max(50, 20 + 3 * nodeCount)) : 42;
       return base + COMMUNITY_SIM_COLLIDE_PADDING;
     };
     const simulation = d3.forceSimulation(data.nodes)
