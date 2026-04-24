@@ -43,6 +43,7 @@ import {
   newLinkKeysForPlaybackTransition,
   linkKeyForProcessedCommunityLink,
 } from '../utils/playbackGraphTransition';
+import { seedPositionsForNewCommunities } from '../utils/graphLayoutComponents';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -75,6 +76,28 @@ const COMMUNITY_SIM_ALPHA_TARGET_EXPLODE = 0.055;
 const COMMUNITY_SIM_ALPHA_MIN_EXPLODE = 0.2;
 /** `forceX` / `forceY` strength toward `width/2` & `height/2` (default D3 is 0.1). */
 const COMMUNITY_SIM_XY_STRENGTH = 0.1;
+
+/**
+ * GitHub #89: gentler alpha energy when a playback scrub re-binds the sim so
+ * converged positions don't get flung. Non-playback rebuilds (zoom merge/split,
+ * AI generation, etc.) keep the full `0.3` reheat since the structure changes.
+ */
+const COMMUNITY_SIM_ALPHA_PLAYBACK_SCRUB = 0.12;
+/** Reduced-motion floor: barely reheat so positions settle without drift. */
+const COMMUNITY_SIM_ALPHA_REDUCED_MOTION = 0.04;
+/** `forceCollide` padding added to the community's radius so neighbours don't touch. */
+const COMMUNITY_SIM_COLLIDE_PADDING = 8;
+
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (_) {
+    return false;
+  }
+}
 
 /**
  * Layout coordinates for a node-like datum: missing, non-finite, or exactly (0,0) are unset.
@@ -868,6 +891,13 @@ function GraphVisualization({
   /** GitHub #86: highlight the delta for the current scrub step. */
   const playbackStepHotNodeIdsRef = useRef(new Set());
   const playbackStepHotLinkKeysRef = useRef(new Set());
+  /**
+   * GitHub #89: disjoint-force playback continuity. Snapshot of the last
+   * community layout (`{ x, y, vx, vy }` by community id) captured before each
+   * `updateVisualization` rebuild. Seeded back into the fresh community map so
+   * unchanged nodes don't get flung when the scrub advances.
+   */
+  const previousCommunityPositionsRef = useRef(null);
 
   const defaultNodeColor = '#4a90e2';  // default node color is blue
   const highlightedColor = '#e74c3c' ; // highlighted node color is red
@@ -904,6 +934,10 @@ function GraphVisualization({
       playbackPrevLinkKeysRef.current = null;
       playbackStepHotNodeIdsRef.current = new Set();
       playbackStepHotLinkKeysRef.current = new Set();
+      // Tail of playback → live graph: drop the sim-position snapshot so the
+      // live structural rebuild starts from the authored positions, not scrub
+      // residue.
+      previousCommunityPositionsRef.current = null;
     }
 
     // Rapid playback scrubs can re-render before the prior fade-out completes.
@@ -917,19 +951,28 @@ function GraphVisualization({
       prevRoot.remove();
     }
 
-    // Initialize hierarchical communities with individual nodes
+    // Initialize hierarchical communities with individual nodes.
+    // GitHub #89: when a prior simulation snapshot exists for the same id, carry
+    // over its `{ x, y, vx, vy }` so playback scrubs don't re-flatten the layout
+    // back to `nodeXIn/nodeYIn`. Brand-new communities still fall through to the
+    // source node's coordinates (and get seeded near their component centroid
+    // below once we know the links).
     const initializeCommunities = () => {
       const communities = new Map();
-      
+      const prior = previousCommunityPositionsRef.current;
+
       data.nodes.forEach(node => {
+        const priorPos = prior ? prior.get(String(node.id)) : null;
         communities.set(node.id, {
           id: node.id,
           nodes: [{ ...node }],
           parent: null,
           children: [],
           level: 0,
-          x: nodeXIn(node),
-          y: nodeYIn(node),
+          x: priorPos ? priorPos.x : nodeXIn(node),
+          y: priorPos ? priorPos.y : nodeYIn(node),
+          vx: priorPos ? priorPos.vx : 0,
+          vy: priorPos ? priorPos.vy : 0,
           label: node.label,
           description: node.description,
           wikiUrl: node.wikiUrl,
@@ -1229,6 +1272,14 @@ function GraphVisualization({
     // Create the force simulation with processed data.
     // forceX + forceY (vs forceCenter) behave better for disjoint-style graphs: each component
     // eases toward the viewport center without one combined pull (Observable disjoint graph pattern).
+    // GitHub #89: collide radius scales with community size (single nodes: 20,
+    // merged clusters: up to ~200) instead of a fixed 50 — fixes merged-cluster
+    // overlap after splits and keeps per-component spacing visually honest.
+    const communityCollideRadius = (d) => {
+      const nodeCount = Array.isArray(d?.nodes) ? d.nodes.length : 0;
+      const base = nodeCount > 1 ? Math.min(200, Math.max(40, 20 + 3 * nodeCount)) : 20;
+      return base + COMMUNITY_SIM_COLLIDE_PADDING;
+    };
     const simulation = d3.forceSimulation(data.nodes)
       .force('link', d3.forceLink(processedLinks)
         .id(d => d.id)
@@ -1236,7 +1287,7 @@ function GraphVisualization({
       .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
       .force('x', d3.forceX(width / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
       .force('y', d3.forceY(height / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
-      .force('collision', d3.forceCollide().radius(50));
+      .force('collision', d3.forceCollide().radius(communityCollideRadius).iterations(2));
 
     // Tooltip: placed just left of the clicked node/link (clamped inside canvas)
     const tooltipMount =
@@ -2312,6 +2363,25 @@ function GraphVisualization({
       const prevCommIds = playbackPrevCommunityIdsRef.current;
       const prevLinkKeys = playbackPrevLinkKeysRef.current;
 
+      // GitHub #89: snapshot the current sim positions before we stop and rebind
+      // so the next `initializeCommunities()` can reuse them (keeps the mental
+      // map stable across playback step advances + zoom merge/split).
+      if (simulation && Array.isArray(simulation.nodes())) {
+        const snap = new Map();
+        for (const d of simulation.nodes()) {
+          if (!d || d.id == null) continue;
+          if (typeof d.x !== 'number' || !Number.isFinite(d.x)) continue;
+          if (typeof d.y !== 'number' || !Number.isFinite(d.y)) continue;
+          snap.set(String(d.id), {
+            x: d.x,
+            y: d.y,
+            vx: Number.isFinite(d.vx) ? d.vx : 0,
+            vy: Number.isFinite(d.vy) ? d.vy : 0,
+          });
+        }
+        if (snap.size > 0) previousCommunityPositionsRef.current = snap;
+      }
+
       // Stop the current simulation
       if (simulation) {
         simulation.stop();
@@ -2683,6 +2753,17 @@ function GraphVisualization({
         });
       }
 
+      // GitHub #89: seed any newly-visible community with a position biased
+      // toward its connected component's centroid so they don't all materialise
+      // at the viewport center and scatter (disjoint-force pattern). Existing
+      // communities already carry positions from the pre-rebuild snapshot via
+      // `initializeCommunities`, so this is a no-op for them.
+      seedPositionsForNewCommunities(
+        visibleElements,
+        processedLinks,
+        { x: width / 2, y: height / 2 }
+      );
+
       // Update simulation with proper handling of both single nodes and communities
       simulation
         .nodes(visibleElements)
@@ -2724,7 +2805,19 @@ function GraphVisualization({
         });
 
       communityForceSimulationRef.current = simulation;
-      simulation.alpha(0.3).restart();
+      // GitHub #89: pick a gentler reheat when the structural delta is a
+      // playback scrub (most nodes unchanged — we just want new ones to ease
+      // in without flinging the rest). `prefers-reduced-motion` clamps further.
+      const reducedMotion = prefersReducedMotion();
+      let reheatAlpha;
+      if (reducedMotion) {
+        reheatAlpha = COMMUNITY_SIM_ALPHA_REDUCED_MOTION;
+      } else if (isNewPlaybackScrub) {
+        reheatAlpha = COMMUNITY_SIM_ALPHA_PLAYBACK_SCRUB;
+      } else {
+        reheatAlpha = 0.3;
+      }
+      simulation.alphaTarget(0).alpha(reheatAlpha).restart();
 
       playbackPrevCommunityIdsRef.current = buildCommunityIdSet(visibleElements);
       playbackPrevLinkKeysRef.current = new Set(
