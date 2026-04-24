@@ -82,7 +82,9 @@ describe('critical path integration (mocked fetch)', () => {
     renderApp(['/']);
 
     await waitFor(() => {
-      expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: /^mindmap$/i })
+      ).toBeInTheDocument();
     });
 
     expect(
@@ -134,7 +136,9 @@ describe('critical path integration (mocked fetch)', () => {
     renderApp(['/']);
 
     await waitFor(() => {
-      expect(screen.getByText(/MindMap/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: /^mindmap$/i })
+      ).toBeInTheDocument();
     });
 
     await user.click(

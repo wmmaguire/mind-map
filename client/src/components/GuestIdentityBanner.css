@@ -776,6 +776,13 @@
   max-width: 24ch;
 }
 
+/* #90 — Mobile drawer trigger: hidden on desktop; replaces inline cluster on phones.
+   Extra specificity (3 class selectors) overrides the shared `.library-mobile-rail--banner`
+   `display: inline-flex` so the chip stays hidden at wide widths. */
+.guest-identity-banner .library-mobile-rail--banner.guest-identity-banner__menu-chip {
+  display: none;
+}
+
 /* Narrow viewports (typical phones): icon-only rail chips + tighter grid so controls don’t overlap */
 @media (max-width: 36rem) {
   .guest-identity-banner:not(.guest-identity-banner--playback-strip) {
@@ -787,6 +794,22 @@
   .guest-identity-banner__leading,
   .guest-identity-banner__trailing-cluster {
     gap: 0.22rem;
+  }
+
+  /* #90: collapse the inline trailing cluster behind a single Menu chip that
+     opens the BannerActionsDrawer. All former chips live inside the drawer. */
+  .guest-identity-banner__trailing-cluster--inline {
+    display: none;
+  }
+
+  .guest-identity-banner .library-mobile-rail--banner.guest-identity-banner__menu-chip {
+    display: inline-flex;
+  }
+
+  /* #90: the leading 📚 Library chip on /visualize is redundant once the drawer
+     provides an "Open Library" item inside its Library section. Hide on phones. */
+  .guest-identity-banner .library-mobile-rail--banner.guest-identity-banner__library-banner {
+    display: none;
   }
 
   .guest-identity-banner .library-mobile-rail--banner {

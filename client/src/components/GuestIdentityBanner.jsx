@@ -10,6 +10,7 @@ import { useGraphTitle } from '../context/GraphTitleContext';
 import { useLibraryUi } from '../context/LibraryUiContext';
 import { useGraphChromeUi } from '../context/GraphChromeUiContext';
 import { useGraphHistoryUi } from '../context/GraphHistoryUiContext';
+import BannerActionsDrawer from './BannerActionsDrawer';
 import './GuestIdentityBanner.css';
 
 /** Dev preview uses this stable id (matches button copy). */
@@ -124,6 +125,74 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen, viewMenuOpen]);
 
+  // Mobile banner actions drawer (#90). Desktop keeps the inline chip cluster.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const mobileMenuTriggerRef = useRef(null);
+
+  // Auto-close the drawer on route change so users never land on a new page with
+  // a stale menu overlay blocking the view.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Right-edge swipe-to-open: only active on narrow viewports, direction-locked
+  // to horizontal so it can't steal vertical scroll gestures. The hint is a
+  // progressive-enhancement — the Menu chip remains the discoverable entry point.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const EDGE_PX = 24;
+    const OPEN_DX = -60; // leftward drag from right edge
+    const NARROW_PX = 576; // matches @media (max-width: 36rem)
+    let startX = null;
+    let startY = null;
+    let tracking = false;
+    const reset = () => {
+      startX = null;
+      startY = null;
+      tracking = false;
+    };
+    const isNarrow = () => window.innerWidth <= NARROW_PX;
+    const onStart = (e) => {
+      if (drawerOpen || !isNarrow()) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      if (window.innerWidth - t.clientX > EDGE_PX) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      tracking = true;
+    };
+    const onMove = (e) => {
+      if (!tracking || startX == null) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) * 2 && dx < OPEN_DX) {
+        reset();
+        setDrawerOpen(true);
+      }
+    };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchmove', onMove, { passive: true });
+    document.addEventListener('touchend', reset, { passive: true });
+    document.addEventListener('touchcancel', reset, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', reset);
+      document.removeEventListener('touchcancel', reset);
+    };
+  }, [drawerOpen]);
+
+  const openDrawer = () => {
+    // Dismiss desktop popovers so we never stack menus when the user reaches
+    // for the mobile drawer on a hybrid (keyboard+touch) device.
+    setMenuOpen(false);
+    setViewMenuOpen(false);
+    setDrawerOpen(true);
+  };
+  const closeDrawer = () => setDrawerOpen(false);
+
   if (isGuest) {
     return (
       <aside
@@ -162,7 +231,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
           {onVisualizeRoute ? (
             <button
               type="button"
-              className="library-mobile-rail library-mobile-rail--banner"
+              className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__library-banner"
               onClick={openMobileLibrary}
               aria-label="Open Library"
             >
@@ -184,7 +253,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
           )}
         </div>
         <div className="guest-identity-banner__trailing">
-          <div className="guest-identity-banner__trailing-cluster">
+          <div className="guest-identity-banner__trailing-cluster guest-identity-banner__trailing-cluster--inline">
             {onVisualizeRoute ? (
               <div className="guest-identity-banner__view-wrap">
                 <button
@@ -316,6 +385,165 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
               </button>
             )}
           </div>
+          <button
+            type="button"
+            ref={mobileMenuTriggerRef}
+            className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__menu-chip"
+            aria-label="Open menu"
+            aria-expanded={drawerOpen}
+            aria-haspopup="dialog"
+            onClick={openDrawer}
+          >
+            <span className="library-mobile-rail__icon" aria-hidden>
+              ☰
+            </span>
+            <span className="library-mobile-rail__label">Menu</span>
+          </button>
+          <BannerActionsDrawer
+            open={drawerOpen}
+            onClose={closeDrawer}
+            title="Menu"
+            returnFocusRef={mobileMenuTriggerRef}
+          >
+            <div className="banner-actions-drawer-section">
+              <h3 className="banner-actions-drawer-section__heading">Account</h3>
+              {devControls ? (
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  onClick={() => {
+                    setDevRegisteredUserId(DEV_PREVIEW_USER_ID);
+                    closeDrawer();
+                  }}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    🧪
+                  </span>
+                  <span className="banner-actions-drawer-item__label">
+                    Preview {DEV_PREVIEW_USER_ID}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item banner-actions-drawer-item--primary"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setForgotEmailSent(false);
+                    setAuthError('');
+                    setAuthModalOpen(true);
+                    closeDrawer();
+                  }}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    🔐
+                  </span>
+                  <span className="banner-actions-drawer-item__label">
+                    {authStatus === 'loading' ? 'Checking…' : 'Sign in'}
+                  </span>
+                </button>
+              )}
+            </div>
+            {!shareViewerMode ? (
+              <div className="banner-actions-drawer-section">
+                <h3 className="banner-actions-drawer-section__heading">Library</h3>
+                {onVisualizeRoute ? (
+                  <button
+                    type="button"
+                    className="banner-actions-drawer-item"
+                    onClick={() => {
+                      closeDrawer();
+                      openMobileLibrary();
+                    }}
+                  >
+                    <span className="banner-actions-drawer-item__icon" aria-hidden>
+                      📚
+                    </span>
+                    <span className="banner-actions-drawer-item__label">Open Library</span>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  onClick={() => {
+                    closeDrawer();
+                    onOpenUpload();
+                  }}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    📄
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Upload files</span>
+                </button>
+              </div>
+            ) : null}
+            {onVisualizeRoute ? (
+              <div className="banner-actions-drawer-section">
+                <h3 className="banner-actions-drawer-section__heading">View</h3>
+                {sharePayload ? (
+                  <button
+                    type="button"
+                    className="banner-actions-drawer-item"
+                    onClick={() => {
+                      sharePayload.onShareClick();
+                      closeDrawer();
+                    }}
+                    aria-label="Copy read-only share link to clipboard"
+                  >
+                    <span className="banner-actions-drawer-item__icon" aria-hidden>
+                      🔗
+                    </span>
+                    <span className="banner-actions-drawer-item__label">Share link</span>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  role="menuitemcheckbox"
+                  aria-checked={playbackStripVisible}
+                  onClick={() => togglePlaybackStrip()}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    ▶
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Playback</span>
+                  <span className="banner-actions-drawer-item__check" aria-hidden>
+                    {playbackStripVisible ? '✓' : '○'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  role="menuitemcheckbox"
+                  aria-checked={graphSearchBarVisible}
+                  onClick={() => toggleGraphSearchBar()}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    🔎
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Search</span>
+                  <span className="banner-actions-drawer-item__check" aria-hidden>
+                    {graphSearchBarVisible ? '✓' : '○'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  role="menuitemcheckbox"
+                  aria-checked={insightsPanelVisible}
+                  onClick={() => toggleInsightsPanel()}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    📊
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Insights</span>
+                  <span className="banner-actions-drawer-item__check" aria-hidden>
+                    {insightsPanelVisible ? '✓' : '○'}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </BannerActionsDrawer>
         </div>
         {authModalOpen ? (
           <div className="guest-identity-banner__auth-overlay" role="dialog" aria-label="Account">
@@ -569,7 +797,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
         {onVisualizeRoute ? (
           <button
             type="button"
-            className="library-mobile-rail library-mobile-rail--banner"
+            className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__library-banner"
             onClick={openMobileLibrary}
             aria-label="Open Library"
           >
@@ -591,7 +819,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
         className="guest-identity-banner__trailing"
         ref={menuWrapRef}
       >
-        <div className="guest-identity-banner__trailing-cluster">
+        <div className="guest-identity-banner__trailing-cluster guest-identity-banner__trailing-cluster--inline">
           {onVisualizeRoute ? (
             <div className="guest-identity-banner__view-wrap">
               <button
@@ -719,6 +947,162 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
             </span>
           </button>
         </div>
+        <button
+          type="button"
+          ref={mobileMenuTriggerRef}
+          className="library-mobile-rail library-mobile-rail--banner guest-identity-banner__menu-chip"
+          aria-label="Open menu"
+          aria-expanded={drawerOpen}
+          aria-haspopup="dialog"
+          onClick={openDrawer}
+        >
+          <span className="library-mobile-rail__icon" aria-hidden>
+            ☰
+          </span>
+          <span className="library-mobile-rail__label">Menu</span>
+        </button>
+        <BannerActionsDrawer
+          open={drawerOpen}
+          onClose={closeDrawer}
+          title="Menu"
+          returnFocusRef={mobileMenuTriggerRef}
+        >
+          <div className="banner-actions-drawer-section">
+            <h3 className="banner-actions-drawer-section__heading">Account</h3>
+            <div className="banner-actions-drawer-meta" title={userId || ''}>
+              {authUser?.name?.trim() || userId || '—'}
+            </div>
+            {authStatus === 'authenticated' && authUser ? (
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                onClick={() => {
+                  setSettingsName(authUser.name || '');
+                  setSettingsError('');
+                  setSettingsOpen(true);
+                  closeDrawer();
+                }}
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  ⚙️
+                </span>
+                <span className="banner-actions-drawer-item__label">User settings</span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="banner-actions-drawer-item banner-actions-drawer-item--danger"
+              onClick={async () => {
+                closeDrawer();
+                await logout();
+              }}
+            >
+              <span className="banner-actions-drawer-item__icon" aria-hidden>
+                ↩
+              </span>
+              <span className="banner-actions-drawer-item__label">Sign out</span>
+            </button>
+          </div>
+          {!shareViewerMode ? (
+            <div className="banner-actions-drawer-section">
+              <h3 className="banner-actions-drawer-section__heading">Library</h3>
+              {onVisualizeRoute ? (
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  onClick={() => {
+                    closeDrawer();
+                    openMobileLibrary();
+                  }}
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    📚
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Open Library</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                onClick={() => {
+                  closeDrawer();
+                  onOpenUpload();
+                }}
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  📄
+                </span>
+                <span className="banner-actions-drawer-item__label">Upload files</span>
+              </button>
+            </div>
+          ) : null}
+          {onVisualizeRoute ? (
+            <div className="banner-actions-drawer-section">
+              <h3 className="banner-actions-drawer-section__heading">View</h3>
+              {sharePayload ? (
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  onClick={() => {
+                    sharePayload.onShareClick();
+                    closeDrawer();
+                  }}
+                  aria-label="Copy read-only share link to clipboard"
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    🔗
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Share link</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                role="menuitemcheckbox"
+                aria-checked={playbackStripVisible}
+                onClick={() => togglePlaybackStrip()}
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  ▶
+                </span>
+                <span className="banner-actions-drawer-item__label">Playback</span>
+                <span className="banner-actions-drawer-item__check" aria-hidden>
+                  {playbackStripVisible ? '✓' : '○'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                role="menuitemcheckbox"
+                aria-checked={graphSearchBarVisible}
+                onClick={() => toggleGraphSearchBar()}
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  🔎
+                </span>
+                <span className="banner-actions-drawer-item__label">Search</span>
+                <span className="banner-actions-drawer-item__check" aria-hidden>
+                  {graphSearchBarVisible ? '✓' : '○'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                role="menuitemcheckbox"
+                aria-checked={insightsPanelVisible}
+                onClick={() => toggleInsightsPanel()}
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  📊
+                </span>
+                <span className="banner-actions-drawer-item__label">Insights</span>
+                <span className="banner-actions-drawer-item__check" aria-hidden>
+                  {insightsPanelVisible ? '✓' : '○'}
+                </span>
+              </button>
+            </div>
+          ) : null}
+        </BannerActionsDrawer>
         {menuOpen && (
           <div className="guest-identity-banner__menu" role="menu">
             <div className="guest-identity-banner__menu-meta" role="none">

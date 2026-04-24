@@ -1248,6 +1248,20 @@ function GraphVisualization({
       .attr('aria-live', 'polite')
       .style('opacity', 0);
 
+    const TOOLTIP_CLOSE_HTML =
+      '<button type="button" class="graph-tooltip-close" data-tooltip-close="1" aria-label="Close tooltip">×</button>';
+
+    function withTooltipChrome(innerHtml) {
+      return (
+        '<div class="graph-tooltip-chrome">' +
+        TOOLTIP_CLOSE_HTML +
+        '<div class="graph-tooltip-body">' +
+        innerHtml +
+        '</div>' +
+        '</div>'
+      );
+    }
+
     function escapeHtmlAttr(s) {
       return String(s)
         .replace(/&/g, '&amp;')
@@ -1311,6 +1325,20 @@ function GraphVisualization({
       onTooltipWrapInteraction = (e) => {
         if (e.type !== 'click') return;
         const tgt = e.target;
+        const closeBtn =
+          tgt && typeof tgt.closest === 'function'
+            ? tgt.closest('[data-tooltip-close="1"]')
+            : null;
+        if (closeBtn && wrapForExplode.contains(closeBtn)) {
+          e.preventDefault();
+          e.stopPropagation();
+          tooltip.style('opacity', 0);
+          selectedNodeIds.current.clear();
+          selectedNodeId.current = null;
+          setSelectedNodes([]);
+          updateHighlighting();
+          return;
+        }
         const extendBtn =
           tgt && typeof tgt.closest === 'function'
             ? tgt.closest('[data-tooltip-extend="1"]')
@@ -1567,7 +1595,7 @@ function GraphVisualization({
           tooltipContent = '<strong>Error displaying node information</strong>';
         }
         
-        tooltip.html(tooltipContent);
+        tooltip.html(withTooltipChrome(tooltipContent));
         scheduleTooltipPosition(event.currentTarget);
       })
       .call(dragBehavior);
@@ -1640,7 +1668,7 @@ function GraphVisualization({
         <strong>${targetLabel}</strong>
       `;
 
-      tooltip.html(tooltipContent);
+      tooltip.html(withTooltipChrome(tooltipContent));
       scheduleTooltipPosition(event.currentTarget);
     }
 
@@ -1749,7 +1777,7 @@ function GraphVisualization({
           tooltipContent += explodeTooltipActionsHtml(nodeToShow);
         }
 
-        tooltip.html(tooltipContent);
+        tooltip.html(withTooltipChrome(tooltipContent));
         scheduleTooltipPosition(event.currentTarget);
 
       } catch (error) {
@@ -2466,7 +2494,7 @@ function GraphVisualization({
             tooltipContent = '<strong>Error displaying node information</strong>';
           }
           
-          tooltip.html(tooltipContent);
+          tooltip.html(withTooltipChrome(tooltipContent));
           scheduleTooltipPosition(event.currentTarget);
         });
 
@@ -4299,8 +4327,8 @@ function GraphVisualization({
                           aria-label={`${meta.name} (top ${rows.length})`}
                         >
                           <div className="graph-insights-panel__cmetric-head">
-                            <a
-                              href="#"
+                            <button
+                              type="button"
                               className="graph-insights-panel__cmetric-title"
                               id={`insights-cmetric-heading-${meta.key}`}
                               data-testid={`graph-insights-centrality-help-${meta.key}`}
@@ -4308,7 +4336,6 @@ function GraphVisualization({
                               aria-label={`Open help: what ${meta.name} means in this list`}
                               title={`Open help — what ${meta.name} means`}
                               onClick={(e) => {
-                                e.preventDefault();
                                 setInsightsMetricHelpKey(meta.key);
                               }}
                               onKeyDown={(e) => {
@@ -4329,7 +4356,7 @@ function GraphVisualization({
                                   ?
                                 </span>
                               </span>
-                            </a>
+                            </button>
                           </div>
                           <ul
                             className="graph-insights-panel__cmetric-list"

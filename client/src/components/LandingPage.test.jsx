@@ -28,9 +28,9 @@ describe('LandingPage (#76)', () => {
     expect(
       screen.getByRole('heading', { name: /^what you can do$/i })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /^why it matters$/i })
-    ).toBeInTheDocument();
+    // "Why it matters" is now collapsed behind a `<details>` disclosure whose
+    // `<summary>` reads "Why MindMap?". Assert the summary is present.
+    expect(screen.getByText(/^why mindmap\?$/i)).toBeInTheDocument();
 
     // Each of the six feature cards is present.
     expect(screen.getByRole('heading', { level: 3, name: /ingest your sources/i })).toBeInTheDocument();

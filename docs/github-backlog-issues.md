@@ -52,6 +52,84 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 - **#76** — *Apr 2026: Value loop + Get Started CTA shipped in App. Remaining: optional illustration/screenshot, richer hero, A/B copy, analytics per original scope.*
 - **#76 (Apr 20 2026 — in review, branch `feature/76-landing-value-prop-hero`):** **`LandingPage`** moved out of **`App.js`** into **`client/src/components/LandingPage.jsx`** (+ **`LandingPage.css`**) and extended with a hero (eyebrow + H1 + tagline + CTA with guest hint), a six-card **What you can do** grid (ingest / analyze + merge / explore canvas + playback / edit + generate + explode / Insights + centrality / two-phase Assess), a **Why it matters** reflection blurb, and a second **Get Started** CTA. Both CTAs use **`useNavigate('/visualize')`** and the existing animated **`.landing-cta-primary--dynamic`** (reduced-motion respected). Navigation stays in **`GuestIdentityBanner`** per **#40** — the page adds product context, not nav. Source content aligned with the rewritten **`ValueProposition.md`** (typos fixed, structure clarified). Tests: new **`LandingPage.test.jsx`** + **`App.test.js`** updated for multiple CTAs; full client suite green. Remaining **#76** scope (next passes / next ticket): illustration/screenshot, A/B copy variants, analytics, landing-level E2E in **#24**.
 
+### Mobile UX polish + landing quick wins (Apr 2026) — shipped slice + follow-ups (GitHub #90 + #76)
+
+**Shipped (branch `issue-90-mobile-ux-polish`):**
+
+1. **Graph tooltip — mobile close affordance.** `GraphVisualization` tooltips render through `withTooltipChrome()` (adds `✕` `.graph-tooltip-close` button + normalised padding; close wired through `onTooltipWrapInteraction`). `GraphVisualization.css` gains a `@media (max-width: 480px)` block that clamps width and bumps tap targets to **44×44**. Residual `jsx-a11y/anchor-is-valid` on an inline `<a>` cleared with `<button type="button">`. Refs #90 → *Improve tooltip behavior on touch*.
+2. **Modal — small-viewport fit.** `Modal.css` adds `padding: 16px` + `box-sizing: border-box` on `.modal-overlay` + `@media (max-width: 600px)` clamp on `max-height` / `align-items`. Refs #90 → *Modals/overlays fit small viewports*.
+3. **`BannerActionsDrawer` — new component** (`client/src/components/BannerActionsDrawer.jsx` + `.css`). Right-edge slide-out `<aside role="dialog">` hosting Account / Library / View sections on narrow viewports. Opens on `☰` menu chip tap or right-edge swipe (`touchstart → touchmove(left) → touchend`); closes via overlay tap / Escape / route change. Focus moves to the close button on open and returns to the trigger on close; `aria-expanded` / `aria-haspopup="dialog"` / `aria-controls` wired; `env(safe-area-inset-*)` respected.
+4. **`GuestIdentityBanner` — drawer plumbing + section reorder.** `drawerOpen` state + `mobileMenuTriggerRef`; `useEffect` auto-close on route change + right-edge swipe listener. Drawer sections reordered **Account → Library → View**. `📚 Open Library` button lives inside the drawer's Library section on `/visualize` (delegates to `LibraryUiContext.openMobileLibrary()`); the leading `📚 Library` chip is hidden at `max-width: 36rem` via `.guest-identity-banner .library-mobile-rail--banner` to avoid mobile duplication.
+5. **`LibrarySidebar` — dark theme promoted globally.** `LibraryVisualize.css` split into (a) layout/animation rules inside `@media (max-width: 768px)` and (b) a palette layer scoped to `.library-visualize .sidebar` (+ descendants) applying to both desktop and mobile. Contrast fixes: `.file-list-header` flattened (no gradient/border/shadow bleed-through); `.file-item:hover` / `.saved-graph-item:hover` gained dark hover states; `.saved-graph-item .graph-info small` takes `display: block`; `.file-list-header__actions` / `.saved-graphs` / `.saved-graph-item` use staggered `rgba(255,255,255, …)` tints (`0.05` → `0.09` → `0.13` hover) for tray → container → item hierarchy. Scrollbar tokens aligned; desktop `.sidebar-resize-handle` restyled.
+6. **`LandingPage` — reflection-as-disclosure + hero facelift (#76).** `.landing-reflection` relocated above `.landing-value-loop`, wrapped in `<details class="landing-reflection-disclosure">` (summary: **Why MindMap?**); closing paragraph trimmed. Quick wins: (a) `.landing-hero-title` dropped `text-transform: uppercase`, added a blue gradient via `background-clip: text` at `clamp(2.25rem, 5vw, 3.5rem)`; (b) hero 1-px border replaced by `.landing-hero::after` blurred glow; (c) `.landing-content` is a flex column with `--landing-section-gap` (2rem / 1.5rem mobile) and section margins zeroed; (d) outro CTA picked up `.landing-cta-primary--outro` (pulse disabled) + reassuring hint line; (e) `FEATURE_CARDS` tagged with `accent` (blue / violet / amber) driving `.landing-feature-card--${accent}` icon gradients + shadows; (f) double-space in tagline collapsed.
+7. **Landing text-align regression fix.** `.content { text-align: center }` from `App.css` beat `.landing-content` on source order at equal specificity; promoted to `.landing-container .landing-content` (specificity `0,2,0`), mobile media query mirrored.
+
+**Tests:** `LandingPage.test.jsx` heading assertion updated to the new summary text; `criticalPath.integration.test.js` tightened to `getByRole('heading', { level: 1, name: /^mindmap$/i })` to disambiguate hero vs. disclosure summary. Full client suite **20 / 124** green; root `npm run lint` clean; `cd client && npm run build` clean.
+
+**Follow-ups (add comments on open issues below; file new backlog issues for items not covered):**
+
+1. **Graph interactions on touch — phase 2 (#90).** Tap-to-toggle tooltip on touch (we only added the close button), larger hit areas for nodes/links and action controls, resolve page-scroll vs. D3 drag/zoom conflicts, narrow-screen audit of the Actions menu + Generate/Extend/Explode modals. Relates to closed #30 and open #57.
+2. **Playback strip mobile density (#90).** `GraphPlaybackBanner` spacing, wrapping, and minimum tap sizes on narrow viewports; empty-state CTA copy.
+3. **`LibrarySidebar` mobile drawer gestures (#90).** Themed in this pass but interaction model unchanged — swipe-close from the right, persistent width memory, maximize-on-tap from the mobile overlay header.
+4. **Modal ergonomics — phase 2 (#90).** Sticky action footers inside scrollable modals; explicit `inputMode` / `type` on forms (`email`, `tel`, `numeric`) to prevent iOS zoom-on-focus; predictable keyboard focus return on close. Relates to #50 (non-blocking error surface).
+5. **Accessibility audit — phase 2 (#90).** Unify focus-ring tokens across drawer/disclosure/summary elements; `prefers-reduced-motion` pass over the new drawer slide + hero glow; screen-reader labels on the `☰` chip vs. open/close state.
+6. **Landing page — structural visual upgrades (#76).** Graph-aware hero (decorative mini-graph SVG), tonal bands layout (drop the single `.content` card), horizontal "How it works" journey with connectors + per-step illustration, feature grid differentiation (unequal spans / accent border), optional product mock / screenshot. Tracked on #76; see suggested comment below.
+7. **Landing page — token + structure hygiene (#76).** Introduce CSS custom properties for the landing palette (blue / violet / amber gradients, reflection card), unify typography casing, consider body-font unification (hero uses the system stack's geometric variant already). Stretch: decouple the landing page from the shared `.content` card wrapper in `App.js`/`App.css` so the `.landing-container .landing-content` specificity bump from this pass can be reverted.
+8. **Landing-level E2E (#24).** From `/`, assert `Get Started` + the outro CTA both navigate to `/visualize` and that the `Why MindMap?` disclosure is collapsed by default and opens on summary click.
+9. **Tech debt — shared menu-item source of truth.** `BannerActionsDrawer` re-implements the Account / Library / View sections that the desktop popovers already render. Any add/remove/rename needs to happen in two places; factor into a config list or shared sub-component. *Not covered by an existing issue — new backlog issue filed.*
+10. **Tech debt — `LibrarySidebar` palette tokens.** The dark theme is now global; if a light mode is revisited it's a painful diff. Extract CSS custom properties (`--sidebar-bg`, `--sidebar-text`, `--sidebar-item-tint`, `--sidebar-item-tint-hover`) so a light variant becomes a prop flip. *Not covered by an existing issue — new backlog issue filed.*
+
+**Suggested GitHub comments (paste on issue):**
+
+- **#90** — *Apr 2026: Phase-1 shipped in branch `issue-90-mobile-ux-polish` — graph tooltip close affordance + 480px block, modal small-viewport padding/clamp, new `BannerActionsDrawer` (edge-swipe + menu chip), `GuestIdentityBanner` drawer integration with Account → Library → View ordering and on-mobile Library consolidation, and `LibrarySidebar` dark-theme promoted globally with tray/container/item tint hierarchy. Remaining scope (phase 2): tap-to-toggle tooltip, larger node/link hit areas, page-scroll vs. D3 drag/zoom, `GraphPlaybackBanner` mobile density, sidebar drawer gestures (swipe-close / persistent width / maximize), modal sticky footers + iOS input-zoom prevention, a11y audit across the new drawer/disclosure. See `docs/status.md` + `docs/github-backlog-issues.md`.*
+- **#76** — *Apr 2026: Landing facelift shipped on the same branch — `.landing-reflection` converted to a `<details>` disclosure above `.landing-value-loop`; hero title unshouted with a gradient fill + soft glow divider; `.landing-content` unified under `--landing-section-gap`; outro CTA gets a non-pulsing modifier + guest hint; feature cards tagged with blue/violet/amber accents so the grid reads as input → interaction → output; tagline double-space fixed. Text-align regression (`App.css` `.content { text-align: center }` bleeding into the reflection) fixed by promoting to `.landing-container .landing-content`. Remaining #76 scope: structural upgrades (graph-aware hero, tonal bands, horizontal How-it-works with per-step illustrations, product mock, feature grid differentiation) and token/structure hygiene (palette custom properties, decouple landing from the `.content` card wrapper).*
+- **#57** — *Apr 2026: `LibrarySidebar` dark theme, `BannerActionsDrawer`, and the new landing `<details>` disclosure all want a a11y pass (focus ring tokens, reduced motion, screen-reader labels on the menu/disclosure triggers). Part of #90 phase 2 remaining scope.*
+- **#55** — *Apr 2026: `LibraryVisualize.css` grew a palette layer scoped to `.library-visualize .sidebar` (desktop + mobile) plus targeted overrides on `.file-list-header` / `.saved-graphs` / `.saved-graph-item`; revisit any remaining `!important` + `.library-graph-mount` usage after this pass.*
+- **#52** — *Apr 2026: `BannerActionsDrawer` overlay renders at z-index above banner popovers and below the Library mobile sidebar; re-check stacking during a phase-2 audit (especially against the feedback FAB at `max-width: 36rem`).*
+- **#24** — *Apr 2026: Backlog — landing E2E: `/` → `Get Started` / outro CTA → `/visualize`; `Why MindMap?` summary collapsed by default and opens on click. Also: banner `☰` chip opens drawer, right-edge swipe opens drawer, Escape / overlay tap / route change close it.*
+
+### Backlog: Shared menu-item source of truth for mobile drawer + desktop popovers (suggested new issue, post–#90)
+
+**Title:** `Backlog: Banner + drawer — shared menu-item source of truth for Account / Library / View sections`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026, post–#90 phase 1)
+
+`BannerActionsDrawer` (`client/src/components/BannerActionsDrawer.jsx`) re-implements the Account / Library / View sections that `GuestIdentityBanner` already renders for desktop popover menus. Any add / remove / rename of a menu item has to happen in both places, and the two trees drift (menu stacking workarounds already closed on drawer-open for this reason).
+
+## Scope
+
+1. Extract the menu items for each section into a shared config (array of `{ id, label, icon, onSelect, isVisible, variant }` entries) consumed by both surfaces.
+2. Consider a shared `<MenuItemList variant="popover" | "drawer">` to unify keyboard / pointer semantics.
+3. Verify `aria-expanded` / `aria-haspopup` / `aria-controls` still map cleanly; keep the drawer as a `dialog` and the popovers as `menu`.
+4. Keep the on-mobile-only surfaces (e.g. "Open Library" chip inside the drawer) configurable via a `surface` filter.
+
+Refs: #90 #40 #33
+```
+
+### Backlog: `LibrarySidebar` — extract palette tokens after dark theme promotion (suggested new issue, post–#90)
+
+**Title:** `Backlog: LibrarySidebar — CSS custom properties for palette + optional light variant`
+
+**Body:**
+
+```markdown
+## Context (Apr 2026, post–#90 phase 1)
+
+`LibraryVisualize.css` now applies the dark theme globally to `.library-visualize .sidebar` on both desktop and mobile (palette rules live outside the `@media (max-width: 768px)` block). Hex / `rgba` values are repeated across `.file-list-header`, `.file-item`, `.saved-graphs`, `.saved-graph-item`, `.sidebar-resize-handle`, and their `:hover` / `:selected` states.
+
+## Scope
+
+1. Introduce CSS custom properties on `.library-visualize .sidebar`, e.g. `--sidebar-bg`, `--sidebar-bg-elevated`, `--sidebar-text`, `--sidebar-text-muted`, `--sidebar-border`, `--sidebar-item-tint`, `--sidebar-item-tint-hover`, `--sidebar-accent`.
+2. Replace hard-coded colors across `.file-list-header` / `.file-item` / `.saved-graphs` / `.saved-graph-item` / scrollbar rules with the tokens.
+3. Optional: add a `[data-sidebar-theme="light"]` override set to re-enable a light variant without a diff war.
+4. Docs: update `docs/github-backlog-issues.md` hybrid-palette note.
+
+Refs: #90 #55 #40
+```
+
 ### Password reset (Apr 2026) — shipped slice + follow-ups (outside this ticket)
 
 **Shipped:** `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` (1h token, hashed on `User`); **`GuestIdentityBanner`** forgot flow; **`/reset-password`** page; **nodemailer** + SMTP env; **`APP_PUBLIC_ORIGIN`** for email links; **`SMTP_URL`** must be `smtp(s):` or host-based vars are used; **`GET /health`** / **`GET /api/test`**; HTTP **`maxHeaderSize`**; client **`PORT=3000`** in **`npm start`**.

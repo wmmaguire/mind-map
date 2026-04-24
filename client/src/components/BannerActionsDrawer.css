@@ -1,0 +1,204 @@
+/* Right-edge slide-out drawer (#90 mobile banner actions). */
+
+.banner-actions-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  /* Above LibraryVisualize mobile sidebar (1200) + banner row (1195), matches Modal.css (1300). */
+  z-index: 1300;
+  display: flex;
+  justify-content: flex-end;
+  animation: banner-actions-drawer-fade 0.18s ease;
+}
+
+@keyframes banner-actions-drawer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.banner-actions-drawer-panel {
+  width: min(340px, 88vw);
+  height: 100%;
+  background: #0f172a;
+  color: #f1f5f9;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: banner-actions-drawer-slide 0.2s ease;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
+
+@keyframes banner-actions-drawer-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.banner-actions-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #1f2a44;
+  flex-shrink: 0;
+}
+
+.banner-actions-drawer-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f1f5f9;
+}
+
+.banner-actions-drawer-close {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #334155;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  border-radius: 10px;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-actions-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.banner-actions-drawer-close:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.banner-actions-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.banner-actions-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.banner-actions-drawer-section:first-child {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.banner-actions-drawer-section__heading {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 4px 8px;
+  margin: 0;
+}
+
+.banner-actions-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.banner-actions-drawer-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.banner-actions-drawer-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.banner-actions-drawer-item:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.banner-actions-drawer-item--primary {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
+.banner-actions-drawer-item--primary:hover {
+  background: rgba(56, 189, 248, 0.25);
+}
+
+.banner-actions-drawer-item--danger {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.banner-actions-drawer-item--danger:hover {
+  background: rgba(248, 113, 113, 0.16);
+}
+
+.banner-actions-drawer-item__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 1.4rem;
+  text-align: center;
+}
+
+.banner-actions-drawer-item__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.banner-actions-drawer-item__check {
+  display: inline-flex;
+  width: 1.25rem;
+  justify-content: center;
+  color: #86efac;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.banner-actions-drawer-meta {
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  word-break: break-all;
+}
+
+.banner-actions-drawer-hint {
+  margin: 0;
+  padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+  font-size: 0.72rem;
+  color: #64748b;
+  border-top: 1px solid #1f2a44;
+  flex-shrink: 0;
+}

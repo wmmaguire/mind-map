@@ -12,6 +12,8 @@
   z-index: 1300;
   backdrop-filter: blur(5px);
   animation: fadeIn 0.3s ease;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .modal-content {
@@ -26,6 +28,7 @@
   position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
   animation: slideIn 0.3s ease;
+  box-sizing: border-box;
 }
 
 .modal-header {
@@ -105,5 +108,15 @@
   .modal-content {
     width: 95%;
     padding: 20px;
+    max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-overlay {
+    align-items: flex-start;
+    padding:
+      calc(12px + env(safe-area-inset-top, 0px))
+      12px
+      calc(12px + env(safe-area-inset-bottom, 0px))
+      12px;
   }
 } 

@@ -14,9 +14,17 @@ import './LandingPage.css';
  * shipped across the analyze / canvas / insights / assess surfaces.
  */
 
+/**
+ * Per-card `accent` drives the icon gradient (and future hover accents) via the
+ * `landing-feature-card--${accent}` modifier in `LandingPage.css`. Three hues
+ * scatter across the six cards in input → interaction → output order so the
+ * grid reads as a gentle left-to-right progression instead of six clones of
+ * the same blue tile.
+ */
 const FEATURE_CARDS = [
   {
     id: 'ingest',
+    accent: 'blue',
     title: 'Ingest your sources',
     body:
       'Drop in text, markdown, or recorded audio. Audio is transcribed automatically, with optional segment timestamps preserved.',
@@ -35,6 +43,7 @@ const FEATURE_CARDS = [
   },
   {
     id: 'analyze',
+    accent: 'blue',
     title: 'Analyze into a graph',
     body:
       'An LLM distills each source into a concept graph. Merge multiple sources in a single session to see how they relate.',
@@ -57,6 +66,7 @@ const FEATURE_CARDS = [
   },
   {
     id: 'explore',
+    accent: 'violet',
     title: 'Explore the canvas',
     body:
       'Pan, zoom, search, focus, and use the minimap. Time-travel playback replays how the graph grew from your first source.',
@@ -82,6 +92,7 @@ const FEATURE_CARDS = [
   },
   {
     id: 'develop',
+    accent: 'violet',
     title: 'Edit, generate, explode',
     body:
       'Tune node labels by hand, or ask the model to generate and explode subgraphs from any node to develop an idea further.',
@@ -100,6 +111,7 @@ const FEATURE_CARDS = [
   },
   {
     id: 'insights',
+    accent: 'amber',
     title: 'See the shape',
     body:
       'Insights surface global network metrics and Notable by centrality (degree, betweenness, closeness, eigenvector).',
@@ -117,6 +129,7 @@ const FEATURE_CARDS = [
   },
   {
     id: 'assess',
+    accent: 'amber',
     title: 'Gleam insights',
     body:
       'Assess produces a two-phase reading — claims grounded in the graph, with clearly marked speculative extensions.',
@@ -155,7 +168,7 @@ export default function LandingPage() {
           </h1>
           <p className="landing-hero-tagline">
             Turn your writing and recorded conversations into an
-            interactive concept graph.  Explore it, expand it and reveal the shape of your thinking.
+            interactive concept graph. Explore it, expand it and reveal the shape of your thinking.
           </p>
           <div className="landing-cta landing-cta--hero">
             <button
@@ -169,6 +182,33 @@ export default function LandingPage() {
               No account needed to try — guest mode works out of the box.
             </span>
           </div>
+        </section>
+
+        <section
+          className="landing-reflection"
+          aria-labelledby="landing-reflection-heading"
+        >
+          <details className="landing-reflection-disclosure">
+            <summary
+              id="landing-reflection-heading"
+              className="landing-reflection-summary"
+            >
+              Why MindMap?
+            </summary>
+            <div className="landing-reflection-body-wrap">
+              <p className="landing-reflection-body">
+                Have you ever caught yourself, lost in a conversation, asking yourself:
+              </p>
+              <p className="landing-reflection-questions">
+                <span>“What were we talking about again? How did we get here?”</span>
+                <span>“Where did that thought come from.. and where was it going?”</span>
+              </p>
+              <p className="landing-reflection-body">
+                Creative thinking wanders. MindMap captures these threads so
+                you can uncover what drives you and discover new ideas.
+              </p>
+            </div>
+          </details>
         </section>
 
         <section
@@ -228,7 +268,10 @@ export default function LandingPage() {
           </h2>
           <ul className="landing-feature-grid">
             {FEATURE_CARDS.map((card) => (
-              <li key={card.id} className="landing-feature-card">
+              <li
+                key={card.id}
+                className={`landing-feature-card landing-feature-card--${card.accent}`}
+              >
                 <span className="landing-feature-icon" aria-hidden>
                   {card.icon}
                 </span>
@@ -241,39 +284,17 @@ export default function LandingPage() {
           </ul>
         </section>
 
-        <section
-          className="landing-reflection"
-          aria-labelledby="landing-reflection-heading"
-        >
-          <h2
-            id="landing-reflection-heading"
-            className="landing-section-heading"
-          >
-            Why it matters
-          </h2>
-          <p className="landing-reflection-body">
-            Have you ever caught yourself lost in a conversation, asking yourself:
-          </p><br />
-          <p className="landing-reflection-questions">
-            <span>“What were we talking about again? How did we get here?”</span>
-            <span>“Where did that thought come from? And where was it going?”</span>
-          </p><br />
-          <p className="landing-reflection-body">
-            Unstructured, free-flowing thought encourages us to explore a network of ideas that
-            takes on a life of their own: self-organizing and self-emergent.
-            Reflecting on the loose associations that push and pull these
-            concepts is how to surface the inspirations that power novel ideas and creative discovery.
-          </p>
-        </section>
-
         <div className="landing-cta landing-cta--post-steps">
           <button
             type="button"
-            className="landing-cta-primary landing-cta-primary--dynamic"
+            className="landing-cta-primary landing-cta-primary--dynamic landing-cta-primary--outro"
             onClick={goToVisualize}
           >
             Get Started
           </button>
+          <span className="landing-cta-hint landing-cta-hint--outro">
+            Your first graph takes about 60 seconds. No sign-in required.
+          </span>
         </div>
       </div>
     </div>

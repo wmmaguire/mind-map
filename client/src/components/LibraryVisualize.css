@@ -1456,6 +1456,11 @@
 /*
  * Mobile library: slide-over within .library-visualize only (not the full viewport),
  * so GuestIdentityBanner / playback strip stay visible. Hidden = fully off-canvas left.
+ *
+ * This media query intentionally contains ONLY mobile-specific positioning, animation,
+ * safe-area, and edge-pull behavior. Palette, typography, and component chrome live in
+ * the top-level ".library-visualize .sidebar ..." rules below so that desktop and
+ * mobile share the same BannerActionsDrawer-style dark theme.
  */
 @media (max-width: 768px) {
   .library-visualize {
@@ -1471,10 +1476,13 @@
     min-width: 0;
     height: auto;
     max-height: none;
-    border-radius: 0 12px 12px 0;
+    border-radius: 0 14px 14px 0;
     z-index: 1200;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.14);
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
     transition: transform 0.25s ease, visibility 0.2s;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
   }
 
   .library-visualize .sidebar.mobile.sidebar-mobile--dragging {
@@ -1483,13 +1491,7 @@
 
   .library-visualize .sidebar.mobile.sidebar-mobile--maximized {
     border-radius: 0;
-    box-shadow: 2px 0 20px rgba(15, 23, 42, 0.12);
-  }
-
-  .library-visualize .sidebar.mobile .sidebar-maximize {
-    width: 36px;
-    height: 36px;
-    font-size: 1rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.35);
   }
 
   /* Right-edge pull / resize (mobile drawer) */
@@ -1506,8 +1508,8 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(15, 23, 42, 0.06) 45%,
-      rgba(15, 23, 42, 0.1) 100%
+      rgba(255, 255, 255, 0.04) 45%,
+      rgba(255, 255, 255, 0.1) 100%
     );
     cursor: ew-resize;
     touch-action: none;
@@ -1519,7 +1521,7 @@
   }
 
   .library-visualize .sidebar.mobile .sidebar-mobile-edge-pull:focus-visible {
-    outline: 2px solid #4299e1;
+    outline: 2px solid #38bdf8;
     outline-offset: -2px;
   }
 
@@ -1535,44 +1537,379 @@
     pointer-events: none;
   }
 
-  .library-visualize .sidebar.mobile .sidebar-header {
-    padding: 6px 22px 6px 10px;
-    flex-shrink: 0;
-    align-items: center;
-    border-bottom: 1px solid #edf2f7;
-  }
-
-  .library-visualize .sidebar.mobile .sidebar-title {
-    font-size: 1rem;
-    line-height: 1.2;
-  }
-
-  .library-visualize .sidebar.mobile .sidebar-close {
-    width: 36px;
-    height: 36px;
-    font-size: 1.25rem;
-  }
-
+  /* sidebar-content needs flex behaviour only on mobile (desktop already stretches). */
   .library-visualize .sidebar.mobile .sidebar-content {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     margin-bottom: 0 !important;
-    padding: 6px 14px 12px 12px;
-  }
-
-  .library-visualize .sidebar.mobile .sidebar-error {
-    margin: 0 8px 6px;
-    padding: 8px;
-  }
-
-  .library-visualize .sidebar.mobile .library-section__toggle {
-    min-height: 40px;
-    padding: 8px 12px;
   }
 
   .library-visualize .visualization-panel {
     padding-bottom: 0 !important;
   }
+}
+
+/*
+ * #90 — BannerActionsDrawer-style dark theme, applied at all viewports.
+ * Kept outside any media query so the desktop sidebar and the mobile drawer
+ * share one palette and typography. Layout-only differences (positioning,
+ * slide animation, safe-area padding, edge-pull) live in the mobile media
+ * query above.
+ */
+
+/* --- Panel shell --------------------------------------------------------- */
+.library-visualize .sidebar {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-right: 1px solid #1f2a44;
+}
+
+/* Desktop resize handle (sibling of .sidebar) darkened to match. */
+.library-visualize .sidebar-resize-handle {
+  background: #1f2a44;
+}
+.library-visualize .sidebar-resize-handle:hover,
+.library-visualize .sidebar-resize-handle.is-active {
+  background: #38bdf8;
+}
+.library-visualize .sidebar-resize-handle:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
+}
+
+/* --- Header -------------------------------------------------------------- */
+.library-visualize .sidebar-header {
+  background: transparent;
+  border-bottom: 1px solid #1f2a44;
+  padding: 12px 14px;
+  align-items: center;
+  color: #f1f5f9;
+}
+
+.library-visualize .sidebar-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f1f5f9;
+}
+
+.library-visualize .sidebar-header__actions {
+  gap: 8px;
+}
+
+/* Match `.banner-actions-drawer-close`: 44×44 tap target, rounded, dark chip. */
+.library-visualize .sidebar-close,
+.library-visualize .sidebar-maximize {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #334155;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  border-radius: 10px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.library-visualize .sidebar-close {
+  font-size: 1.5rem;
+}
+
+.library-visualize .sidebar-maximize {
+  font-size: 1.1rem;
+}
+
+.library-visualize .sidebar-close:hover,
+.library-visualize .sidebar-maximize:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.library-visualize .sidebar-close:focus-visible,
+.library-visualize .sidebar-maximize:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.library-visualize .sidebar-maximize[aria-pressed='true'] {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
+/* --- Content / scrollbar ------------------------------------------------- */
+.library-visualize .sidebar-content {
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #e2e8f0;
+  /* Firefox dark scrollbar (WebKit handled by pseudo-elements below). */
+  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.04);
+  scrollbar-width: thin;
+}
+
+.library-visualize .sidebar-content::-webkit-scrollbar {
+  width: 6px;
+}
+.library-visualize .sidebar-content::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+.library-visualize .sidebar-content::-webkit-scrollbar-track {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.library-visualize .sidebar-error {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+  border-radius: 8px;
+}
+
+/* --- Search + sort toolbar ---------------------------------------------- */
+.library-visualize .sidebar .library-sources-toolbar {
+  background: transparent;
+  padding: 4px 0 6px;
+  gap: 8px;
+}
+
+.library-visualize .sidebar .library-file-search-input,
+.library-visualize .sidebar .library-file-sort-select {
+  background: rgba(255, 255, 255, 0.04);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.library-visualize .sidebar .library-file-search-input::placeholder {
+  color: #64748b;
+}
+
+.library-visualize .sidebar .library-file-search-input:focus-visible,
+.library-visualize .sidebar .library-file-sort-select:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.library-visualize .sidebar .library-sources-filter-hint,
+.library-visualize .sidebar .file-list-filter-hint {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+/* --- Sections (Files / Graphs) ----------------------------------------- */
+.library-visualize .sidebar .library-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+}
+.library-visualize .sidebar .library-section:last-child {
+  border-bottom: none;
+}
+
+.library-visualize .sidebar .library-section__toggle {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 48px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin: 4px 0;
+}
+.library-visualize .sidebar .library-section__toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.library-visualize .sidebar .library-section__toggle:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+.library-visualize .sidebar .library-section__chevron {
+  color: #94a3b8;
+}
+.library-visualize .sidebar .library-section__body {
+  padding: 4px 2px 10px;
+}
+
+/* --- File list ---------------------------------------------------------- */
+/* Flat on-drawer header (override the light gradient/border/shadow from the base rule). */
+.library-visualize .sidebar .file-list-header {
+  background: transparent;
+  background-image: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  box-shadow: none;
+  color: #e2e8f0;
+  padding: 6px 4px 10px;
+  margin-bottom: 8px;
+}
+.library-visualize .sidebar .file-list-header__count {
+  color: #cbd5e1;
+}
+/* Group the action buttons into a visible tray on the dark panel. */
+.library-visualize .sidebar .file-list-header__actions {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.library-visualize .sidebar .file-list-action-btn {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+.library-visualize .sidebar .file-list-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.library-visualize .sidebar .file-list-action-btn:disabled {
+  opacity: 0.45;
+}
+
+.library-visualize .sidebar .library-toolbar-btn {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.library-visualize .sidebar .library-toolbar-btn--primary {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+.library-visualize .sidebar .library-toolbar-btn--primary:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.26);
+}
+.library-visualize .sidebar .library-toolbar-btn--danger {
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+.library-visualize .sidebar .library-toolbar-btn--danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+.library-visualize .sidebar .file-list-items .file-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  margin: 4px 0;
+}
+.library-visualize .sidebar .file-list-items .file-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.library-visualize .sidebar .file-list-items .file-item.selected {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+.library-visualize .sidebar .file-list-items .file-item.selected:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.55);
+}
+.library-visualize .sidebar .file-label {
+  color: #e2e8f0;
+  padding: 10px 10px;
+  min-height: 44px;
+}
+.library-visualize .sidebar .file-name {
+  color: #f1f5f9;
+}
+.library-visualize .sidebar .file-meta {
+  color: #cbd5e1;
+}
+
+.library-visualize .sidebar .file-list-skeleton__row {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+}
+
+.library-visualize .sidebar .no-files,
+.library-visualize .sidebar .no-saved-graphs,
+.library-visualize .sidebar .file-list-empty__hint {
+  color: #94a3b8;
+}
+.library-visualize .sidebar .file-list-empty__title {
+  color: #f1f5f9;
+}
+.library-visualize .sidebar .file-list-empty__cta {
+  color: #7dd3fc;
+}
+.library-visualize .sidebar .file-list-empty__cta--btn {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+/* --- Saved graphs ------------------------------------------------------- */
+/* Outer container: subtle raised surface overriding base ".saved-graphs { background: #f8f9fa }". */
+.library-visualize .sidebar .saved-graphs {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+}
+/* Item sits INSIDE .saved-graphs, so it uses a slightly brighter tint to stand out. */
+.library-visualize .sidebar .saved-graph-item {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e2e8f0;
+  margin: 4px 0;
+  box-shadow: none;
+}
+.library-visualize .sidebar .saved-graph-item:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.library-visualize .sidebar .saved-graph-item .graph-info strong {
+  color: #f1f5f9;
+}
+.library-visualize .sidebar .saved-graph-item .graph-info small {
+  color: #cbd5e1;
+  display: block;
+}
+.library-visualize .sidebar .load-button {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+  border-radius: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+.library-visualize .sidebar .load-button:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.26);
+}
+
+/* --- Share-viewer note -------------------------------------------------- */
+.library-visualize .sidebar .library-share-viewer-sidebar-note {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #e0f2fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 8px 0;
+}
+.library-visualize .sidebar .library-share-viewer-sidebar-note a {
+  color: #7dd3fc;
 }

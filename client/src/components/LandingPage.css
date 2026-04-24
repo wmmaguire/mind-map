@@ -8,29 +8,70 @@
  * duplicate the Home / Visualize rails.
  */
 
-.landing-content {
+/* Chain `.landing-container .landing-content` so this rule beats the global
+   `.content { text-align: center; }` in `App.css` regardless of CSS bundle
+   order. Without this, short single-line copy inside the reflection body
+   inherits `text-align: center` and visibly centers. */
+.landing-container .landing-content {
   text-align: left;
   max-width: 960px;
   padding: 2.5rem 2.5rem 2.75rem;
+  /* Centralise section rhythm: every direct child spaces by this gap rather
+     than each section hand-tuning its own margins. Keeps the page on a grid
+     even as we add/remove sections. */
+  --landing-section-gap: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-section-gap);
 }
 
 /* --- Hero ---------------------------------------------------------------- */
 
 .landing-hero {
+  position: relative;
   text-align: center;
-  margin-bottom: 2rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Soft horizontal glow in place of the old 1px slate border — reads as a
+   section break without feeling like a docs-page separator. */
+.landing-hero::after {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -0.75rem;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(74, 144, 226, 0.35) 50%,
+    transparent 100%
+  );
+  filter: blur(0.4px);
+  pointer-events: none;
 }
 
 .landing-hero-title {
   margin: 0 0 0.85rem;
-  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
-  line-height: 1.15;
+  /* Larger, mixed-case "MindMap" with a brand gradient fill. Keeping the
+     text content literal ("MindMap", not "MINDMAP") so screen readers and
+     existing tests that match `^mindmap$` (case-insensitive) still pass. */
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 1.1;
   font-weight: 800;
-  color: #357abd;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    135deg,
+    #4a90e2 0%,
+    #357abd 55%,
+    #1e40af 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .landing-hero-tagline {
@@ -62,10 +103,24 @@
   color: #475569;
 }
 
+/* --- Rhythm resets (flex gap owns the vertical spacing now) -------------- */
+
+/* Hero no longer needs its own margin-bottom — `.landing-content` flex gap
+   handles the spacing. Keep its internal padding-bottom for the glow. */
+.landing-content > .landing-hero {
+  margin-bottom: 0;
+}
+
+/* `.landing-value-loop` ships a `margin: 0 0 1.5rem` from `App.css`; zero the
+   trailing margin so it doesn't stack with the flex gap. */
+.landing-content > .landing-value-loop {
+  margin-bottom: 0;
+}
+
 /* --- Feature cards ------------------------------------------------------- */
 
 .landing-features {
-  margin: 1.75rem 0 0.5rem;
+  margin: 0;
 }
 
 .landing-feature-grid {
@@ -118,8 +173,26 @@
   height: 2.25rem;
   border-radius: 10px;
   color: #ffffff;
+  /* Default hue — overridden by .landing-feature-card--{blue|violet|amber}
+     below. Blue stays the default so any future card without an explicit
+     accent still renders on-brand. */
   background: linear-gradient(145deg, #4a90e2 0%, #357abd 100%);
   box-shadow: 0 2px 6px rgba(74, 144, 226, 0.35);
+}
+
+/* Three-hue scatter across the grid: input (blue) → interaction (violet) →
+   output (amber). Tuned saturations so no card dominates visually. */
+.landing-feature-card--blue .landing-feature-icon {
+  background: linear-gradient(145deg, #4a90e2 0%, #357abd 100%);
+  box-shadow: 0 2px 6px rgba(74, 144, 226, 0.35);
+}
+.landing-feature-card--violet .landing-feature-icon {
+  background: linear-gradient(145deg, #8b5cf6 0%, #6d28d9 100%);
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.35);
+}
+.landing-feature-card--amber .landing-feature-icon {
+  background: linear-gradient(145deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
 }
 
 .landing-feature-icon svg {
@@ -149,14 +222,78 @@
   color: #475569;
 }
 
-/* --- Reflection blurb ---------------------------------------------------- */
+/* --- Outro CTA (post-steps) --------------------------------------------- */
+
+/* The second "Get Started" CTA reuses --dynamic for size/weight, but we kill
+   the pulse so the page ends with a confident, calm button rather than a
+   second pulsing copy of the hero CTA. Specificity chain beats the base
+   `--dynamic { animation: ... }` rule in App.css. */
+.landing-cta-primary--dynamic.landing-cta-primary--outro {
+  animation: none;
+}
+
+.landing-cta-hint--outro {
+  max-width: 28rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* --- Reflection disclosure ---------------------------------------------- */
 
 .landing-reflection {
-  margin: 1.75rem 0 0.5rem;
-  padding: 1.25rem 1.35rem;
+  margin: 0;
+  padding: 0.75rem 1.1rem;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border: 1px solid #e2e8f0;
   border-radius: 12px;
+  transition: padding 0.15s ease;
+}
+
+.landing-reflection:has(.landing-reflection-disclosure[open]) {
+  padding: 1.25rem 1.35rem;
+}
+
+.landing-reflection-disclosure > summary.landing-reflection-summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  padding: 0.25rem 0;
+  user-select: none;
+}
+
+.landing-reflection-summary::-webkit-details-marker {
+  display: none;
+}
+
+.landing-reflection-summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #4a90e2;
+  transition: transform 0.15s ease;
+}
+
+.landing-reflection-disclosure[open] > .landing-reflection-summary::before {
+  transform: rotate(90deg);
+}
+
+.landing-reflection-summary:hover {
+  color: #1e293b;
+}
+
+.landing-reflection-summary:focus-visible {
+  outline: 2px solid #4a90e2;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.landing-reflection-body-wrap {
+  padding-top: 0.75rem;
 }
 
 .landing-reflection-body {
@@ -166,11 +303,15 @@
   color: #334155;
 }
 
+.landing-reflection-body-wrap > .landing-reflection-body:last-child {
+  margin-bottom: 0;
+}
+
 .landing-reflection-questions {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin: 0;
+  margin: 0 0 0.85rem;
   padding-left: 1rem;
   border-left: 3px solid #4a90e2;
   font-style: italic;
@@ -181,12 +322,15 @@
 /* --- Responsive tweaks --------------------------------------------------- */
 
 @media (max-width: 600px) {
-  .landing-content {
+  /* Mirror the bumped specificity of the desktop rule so mobile padding +
+     gap still take effect. */
+  .landing-container .landing-content {
     padding: 1.75rem 1.5rem 2rem;
+    /* Tighten section rhythm on mobile so the page doesn't feel lofty. */
+    --landing-section-gap: 1.5rem;
   }
 
   .landing-hero {
-    margin-bottom: 1.5rem;
     padding-bottom: 1.25rem;
   }
 
@@ -195,6 +339,10 @@
   }
 
   .landing-reflection {
+    padding: 0.6rem 0.95rem;
+  }
+
+  .landing-reflection:has(.landing-reflection-disclosure[open]) {
     padding: 1rem 1.1rem;
   }
 }
