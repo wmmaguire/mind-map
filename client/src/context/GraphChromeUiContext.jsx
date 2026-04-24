@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import PropTypes from 'prop-types';
@@ -101,6 +102,26 @@ export function GraphChromeUiProvider({ children }) {
     });
   }, []);
 
+  // Imperative "reset graph view" hook (#89 follow-up): GraphVisualization registers its
+  // resetCanvasToFullView handler here so the mobile banner drawer can invoke it without
+  // needing a ref chain up through LibraryVisualize → App. No-ops cleanly before the
+  // visualize route has mounted, matching the existing resetCanvasViewRef?.() pattern.
+  const resetGraphViewHandlerRef = useRef(null);
+
+  const registerResetGraphView = useCallback((fn) => {
+    resetGraphViewHandlerRef.current = typeof fn === 'function' ? fn : null;
+    return () => {
+      if (resetGraphViewHandlerRef.current === fn) {
+        resetGraphViewHandlerRef.current = null;
+      }
+    };
+  }, []);
+
+  const resetGraphView = useCallback(() => {
+    const fn = resetGraphViewHandlerRef.current;
+    if (typeof fn === 'function') fn();
+  }, []);
+
   const value = useMemo(
     () => ({
       playbackStripVisible,
@@ -112,6 +133,8 @@ export function GraphChromeUiProvider({ children }) {
       togglePlaybackStrip,
       toggleGraphSearchBar,
       toggleInsightsPanel,
+      registerResetGraphView,
+      resetGraphView,
     }),
     [
       playbackStripVisible,
@@ -123,6 +146,8 @@ export function GraphChromeUiProvider({ children }) {
       togglePlaybackStrip,
       toggleGraphSearchBar,
       toggleInsightsPanel,
+      registerResetGraphView,
+      resetGraphView,
     ]
   );
 
@@ -150,6 +175,8 @@ export function useGraphChromeUi() {
       togglePlaybackStrip: () => {},
       toggleGraphSearchBar: () => {},
       toggleInsightsPanel: () => {},
+      registerResetGraphView: () => () => {},
+      resetGraphView: () => {},
     };
   }
   return ctx;

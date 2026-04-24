@@ -476,10 +476,26 @@ function GraphVisualization({
   const communitiesRef = useRef(null);
 
   const { sessionId } = useSession();
-  const { graphSearchBarVisible, insightsPanelVisible } = useGraphChromeUi();
+  const {
+    graphSearchBarVisible,
+    insightsPanelVisible,
+    registerResetGraphView,
+  } = useGraphChromeUi();
   const graphTitleContext = useContext(GraphTitleContext);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+
+  // Expose the in-panel "Show all" (zoom-to-fit + ungroup clusters) action to the mobile banner
+  // drawer so it can render a "Reset view" item alongside Playback/Search/Insights (#90).
+  // The trampoline calls the current resetCanvasViewRef, which the main simulation effect
+  // wires up to resetCanvasToFullView; this stays stable across force-sim rebuilds.
+  useEffect(() => {
+    if (typeof registerResetGraphView !== 'function') return undefined;
+    return registerResetGraphView(() => {
+      const fn = resetCanvasViewRef.current;
+      if (typeof fn === 'function') fn();
+    });
+  }, [registerResetGraphView]);
 
   /** Clears all graph edit tool modes, modals, and node selections (Escape + mutual exclusivity). */
   const exitGraphEditModes = useCallback(() => {

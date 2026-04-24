@@ -56,6 +56,7 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
     togglePlaybackStrip,
     toggleGraphSearchBar,
     toggleInsightsPanel,
+    resetGraphView,
   } = useGraphChromeUi();
   const { sharePayload } = useGraphHistoryUi();
   const onVisualizeRoute = pathname === '/visualize';
@@ -480,6 +481,22 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
             {onVisualizeRoute ? (
               <div className="banner-actions-drawer-section">
                 <h3 className="banner-actions-drawer-section__heading">View</h3>
+                <button
+                  type="button"
+                  className="banner-actions-drawer-item"
+                  data-testid="banner-drawer-reset-view"
+                  onClick={() => {
+                    resetGraphView();
+                    closeDrawer();
+                  }}
+                  aria-label="Reset view: zoom to fit all nodes and ungroup clusters"
+                  title="Zoom to fit all nodes and show each concept (no clusters)"
+                >
+                  <span className="banner-actions-drawer-item__icon" aria-hidden>
+                    🎯
+                  </span>
+                  <span className="banner-actions-drawer-item__label">Reset view</span>
+                </button>
                 {sharePayload ? (
                   <button
                     type="button"
@@ -1039,6 +1056,22 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
           {onVisualizeRoute ? (
             <div className="banner-actions-drawer-section">
               <h3 className="banner-actions-drawer-section__heading">View</h3>
+              <button
+                type="button"
+                className="banner-actions-drawer-item"
+                data-testid="banner-drawer-reset-view"
+                onClick={() => {
+                  resetGraphView();
+                  closeDrawer();
+                }}
+                aria-label="Reset view: zoom to fit all nodes and ungroup clusters"
+                title="Zoom to fit all nodes and show each concept (no clusters)"
+              >
+                <span className="banner-actions-drawer-item__icon" aria-hidden>
+                  🎯
+                </span>
+                <span className="banner-actions-drawer-item__label">Reset view</span>
+              </button>
               {sharePayload ? (
                 <button
                   type="button"
