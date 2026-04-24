@@ -44,6 +44,7 @@ import {
   linkKeyForProcessedCommunityLink,
 } from '../utils/playbackGraphTransition';
 import { seedPositionsForNewCommunities } from '../utils/graphLayoutComponents';
+import { applyKeyedJoin, ensureLayer } from '../utils/graphJoinHelpers';
 import GenerationGuidanceFields from './GenerationGuidanceFields';
 import './GraphVisualization.css';
 
@@ -2433,284 +2434,317 @@ function GraphVisualization({
         link.target
       );
 
-      // Draw new links
-      const links = g.selectAll('.link')
-        .data(processedLinks)
-        .enter()
-        .append('line')
-        .attr('class', 'link')
-        .attr('stroke', '#999')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.6)
-        .style('cursor', 'default');
+      // #103 M1: persistent layer groups + keyed data joins. Today the wipe
+      // above still runs so these joins see zero survivors (everything enters,
+      // same behaviour as before); M2 removes the wipe and keeps `g.graph-root`
+      // across effect runs so keyed joins can actually find survivors. Going
+      // through this indirection now means the tick callback and simulation
+      // rebinding below are already talking to merged selections.
+      const linksLayer = ensureLayer(g, 'links-layer');
+      const nodesLayer = ensureLayer(g, 'nodes-layer');
 
-      // Draw nodes using visible elements but preserve original node data
-      const nodes = g.selectAll('.node')
-        .data(visibleElements, d => d.id)
-        .enter()
-        .append('g')
-        .attr('class', 'node')
-        .call(dragBehavior)
-        .on('click', (event, d) => {
-          event.stopPropagation();
+      const linkJoin = applyKeyedJoin(
+        linksLayer,
+        'line.link',
+        processedLinks,
+        linkKeyForProcessedCommunityLink,
+        {
+          onEnter: (enter) => enter
+            .append('line')
+            .attr('class', 'link')
+            .attr('stroke', '#999')
+            .attr('stroke-width', 1)
+            .attr('stroke-opacity', 0.6)
+            .style('cursor', 'default'),
+        }
+      );
+      const links = linkJoin.merged;
+
+      // Enter-only content builder for a `<g class="node">` — drag, click
+      // handler, thumbnail / disc, text label. Only runs on first entry for
+      // each community id; survivors keep their existing DOM subtree intact
+      // across rebuilds (once M2 makes survivors possible).
+      const attachNodeClickHandler = (sel) => sel.on('click', (event, d) => {
+        event.stopPropagation();
           
-          // Handle both community structure and raw node data
-          if (!d) {
-            console.log('No data provided');
-            return;
-          }
+        // Handle both community structure and raw node data
+        if (!d) {
+          console.log('No data provided');
+          return;
+        }
 
-          // If it's a raw node (not a community), wrap it in the community structure
-          if (!d.nodes) {
-            d = {
-              id: d.id,
-              nodes: [d],
-              label: d.label,
-              description: d.description,
-              wikiUrl: d.wikiUrl,
-              thumbnailUrl: d.thumbnailUrl,
-              color: defaultNodeColor
-            };
-          }
+        // If it's a raw node (not a community), wrap it in the community structure
+        if (!d.nodes) {
+          d = {
+            id: d.id,
+            nodes: [d],
+            label: d.label,
+            description: d.description,
+            wikiUrl: d.wikiUrl,
+            thumbnailUrl: d.thumbnailUrl,
+            color: defaultNodeColor
+          };
+        }
 
-          // Now proceed with the existing logic
-          if (d.nodes.length === 1) {
-            try {
-              const node = d.nodes[0];
-              if (!node) {
-                console.log('Invalid node in single node community:', d);
-                return;
-              }
-              handleNodeClick(event, node);
-            } catch (error) {
-              console.error('Error handling node click:', error);
-            }
-            return;
-          }
-
-          // Clear previous selection
-          selectedNodeIds.current.clear();
-          
-          // For communities
-          const selectedNode = d.nodes[0];
-          if (!selectedNode) {
-            console.log('No valid node found in:', d);
-            return;
-          }
-
-          selectedNodeIds.current.add(selectedNode.id);
-          selectedNodeId.current = selectedNode.id;
-
-          // Find all directly connected nodes
-          const connectedLinks = data.links.filter(link => {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-            return sourceId === selectedNode.id || targetId === selectedNode.id;
-          });
-
-          updateHighlighting();
-
-          // Show tooltip with node details
-          const tooltip = d3.select('.tooltip');
-          tooltip.style('opacity', 0.9);
-
-          let tooltipContent = '';
+        // Now proceed with the existing logic
+        if (d.nodes.length === 1) {
           try {
-            if (d.nodes.length > 1) {
-              // For community nodes
-              const communityLabel = d.label || 'Group';
-              const validNodes = d.nodes.filter(node => node && typeof node === 'object');
-              const nodeLabels = validNodes
-                .map(node => node.label || 'Unnamed Node')
-                .join(', ');
+            const node = d.nodes[0];
+            if (!node) {
+              console.log('Invalid node in single node community:', d);
+              return;
+            }
+            handleNodeClick(event, node);
+          } catch (error) {
+            console.error('Error handling node click:', error);
+          }
+          return;
+        }
 
-              tooltipContent = `
+        // Clear previous selection
+        selectedNodeIds.current.clear();
+          
+        // For communities
+        const selectedNode = d.nodes[0];
+        if (!selectedNode) {
+          console.log('No valid node found in:', d);
+          return;
+        }
+
+        selectedNodeIds.current.add(selectedNode.id);
+        selectedNodeId.current = selectedNode.id;
+
+        // Find all directly connected nodes
+        const connectedLinks = data.links.filter(link => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          return sourceId === selectedNode.id || targetId === selectedNode.id;
+        });
+
+        updateHighlighting();
+
+        // Show tooltip with node details
+        const tooltip = d3.select('.tooltip');
+        tooltip.style('opacity', 0.9);
+
+        let tooltipContent = '';
+        try {
+          if (d.nodes.length > 1) {
+            // For community nodes
+            const communityLabel = d.label || 'Group';
+            const validNodes = d.nodes.filter(node => node && typeof node === 'object');
+            const nodeLabels = validNodes
+              .map(node => node.label || 'Unnamed Node')
+              .join(', ');
+
+            tooltipContent = `
                 <strong>${communityLabel}</strong><br/>
                 <br/>
                 Number of nodes: ${validNodes.length}<br/>
                 <br/>
                 Nodes: ${nodeLabels}
               `;
-            } else if (selectedNode) {
-              // For single nodes - verify all properties exist
-              const nodeLabel = selectedNode.label || 'Unnamed Node';
-              const nodeDescription = selectedNode.description || '';
-              const nodeWikiUrl = selectedNode.wikiUrl || '';
+          } else if (selectedNode) {
+            // For single nodes - verify all properties exist
+            const nodeLabel = selectedNode.label || 'Unnamed Node';
+            const nodeDescription = selectedNode.description || '';
+            const nodeWikiUrl = selectedNode.wikiUrl || '';
               
-              tooltipContent = `
+            tooltipContent = `
                 <strong>${nodeLabel}</strong><br/>
                 ${nodeDescription ? `${nodeDescription}<br/>` : ''}
                 ${nodeWikiUrl ? `<a href="${nodeWikiUrl}" target="_blank">Learn more</a><br/>` : ''}
               `;
 
-              // Add related nodes section if there are any
-              if (connectedLinks.length > 0) {
-                tooltipContent += '<br/><strong>Related Concepts:</strong><br/>';
-                const relatedNodesContent = connectedLinks
-                  .map(link => {
-                    try {
-                      const otherNodeId = typeof link.source === 'object' 
-                        ? (link.source.id === selectedNode.id ? link.target.id : link.source.id)
-                        : (link.source === selectedNode.id ? link.target : link.source);
+            // Add related nodes section if there are any
+            if (connectedLinks.length > 0) {
+              tooltipContent += '<br/><strong>Related Concepts:</strong><br/>';
+              const relatedNodesContent = connectedLinks
+                .map(link => {
+                  try {
+                    const otherNodeId = typeof link.source === 'object' 
+                      ? (link.source.id === selectedNode.id ? link.target.id : link.source.id)
+                      : (link.source === selectedNode.id ? link.target : link.source);
                         
-                      const otherNode = data.nodes.find(n => n.id === otherNodeId);
-                      if (!otherNode) return '';
+                    const otherNode = data.nodes.find(n => n.id === otherNodeId);
+                    if (!otherNode) return '';
 
-                      const strengthNum =
+                    const strengthNum =
                         typeof link.strength === 'number' && Number.isFinite(link.strength)
                           ? Math.max(0, Math.min(1, link.strength))
                           : null;
-                      const strengthLabel =
+                    const strengthLabel =
                         strengthNum == null ? 'n/a' : `${Math.round(strengthNum * 100)}%`;
-                      return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
-                    } catch (e) {
-                      console.error('Error processing related node:', e);
-                      return '';
-                    }
-                  })
-                  .filter(Boolean)
-                  .join('<br/>');
-                tooltipContent += relatedNodesContent;
-              }
-              tooltipContent += explodeTooltipActionsHtml(selectedNode);
-            } else {
-              tooltipContent = '<strong>Node information unavailable</strong>';
+                    return `${otherNode.label || 'Unnamed Node'} - ${link.relationship || 'related to'} (${strengthLabel})`;
+                  } catch (e) {
+                    console.error('Error processing related node:', e);
+                    return '';
+                  }
+                })
+                .filter(Boolean)
+                .join('<br/>');
+              tooltipContent += relatedNodesContent;
             }
-          } catch (e) {
-            console.error('Error generating tooltip:', e);
-            console.log('Node data:', d);
-            tooltipContent = '<strong>Error displaying node information</strong>';
+            tooltipContent += explodeTooltipActionsHtml(selectedNode);
+          } else {
+            tooltipContent = '<strong>Node information unavailable</strong>';
           }
-          
-          tooltip.html(withTooltipChrome(tooltipContent));
-          scheduleTooltipPosition(event.currentTarget);
-        });
-
-      // Circles or clipped Wikipedia thumbnails (single-node communities only, #75)
-      nodes.each(function renderNodeDiscOrThumb(d) {
-        const nodeG = d3.select(this);
-        const r0 = initialCommunityRadius(d);
-        const single = d.nodes?.length === 1 ? d.nodes[0] : null;
-        const thumbUrl =
-          single &&
-          d.nodes.length === 1 &&
-          isSafeThumbnailUrlForTooltip(single.thumbnailUrl)
-            ? single.thumbnailUrl
-            : null;
-
-        if (thumbUrl) {
-          const clipId = `node-thumb-clip-${String(d.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-          nodeG
-            .append('defs')
-            .append('clipPath')
-            .attr('id', clipId)
-            .append('circle')
-            .attr('cx', 0)
-            .attr('cy', 0)
-            .attr('r', r0);
-
-          // Full-disc hit target: ring has fill none (only stroke hits) and image uses
-          // pointer-events none — without this, only the stroke perimeter was clickable.
-          nodeG
-            .append('circle')
-            .attr('class', 'graph-node-hit')
-            .attr('r', r0)
-            .attr('fill', 'rgba(0,0,0,0)')
-            .attr('stroke', 'none')
-            .attr('pointer-events', 'all');
-
-          nodeG
-            .append('image')
-            .attr('class', 'graph-node-thumb')
-            .attr('href', thumbUrl)
-            .attr('x', -r0)
-            .attr('y', -r0)
-            .attr('width', r0 * 2)
-            .attr('height', r0 * 2)
-            .attr('clip-path', `url(#${clipId})`)
-            .attr('preserveAspectRatio', 'xMidYMid slice')
-            .attr('pointer-events', 'none')
-            .on('error', function onThumbImageError() {
-              d3.select(this).on('error', null);
-              const parent = d3.select(this.parentNode);
-              parent.select('defs').remove();
-              parent.select('circle.graph-node-hit').remove();
-              parent.select('circle.graph-node-ring').remove();
-              d3.select(this).remove();
-              const dd = parent.datum();
-              const rr = initialCommunityRadius(dd);
-              const fill =
-                dd.nodes && dd.nodes.length > 1 ? dd.color : defaultNodeColor;
-              if (parent.select('circle.graph-node-disc').empty()) {
-                const before =
-                  parent.select('text').empty() ? null : 'text';
-                const disc = before
-                  ? parent.insert('circle', before)
-                  : parent.append('circle');
-                disc
-                  .attr('class', 'graph-node-disc')
-                  .attr('r', rr)
-                  .attr('fill', fill)
-                  .attr('stroke', '#fff')
-                  .attr('stroke-width', 1.5);
-              }
-              updateHighlightingRef.current?.();
-            });
-
-          nodeG
-            .append('circle')
-            .attr('class', 'graph-node-ring')
-            .attr('r', r0)
-            .attr('fill', 'none')
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 2);
-        } else {
-          nodeG
-            .append('circle')
-            .attr('class', 'graph-node-disc')
-            .attr('r', r0)
-            .attr('fill', d.nodes.length > 1 ? d.color : defaultNodeColor)
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 1.5);
+        } catch (e) {
+          console.error('Error generating tooltip:', e);
+          console.log('Node data:', d);
+          tooltipContent = '<strong>Error displaying node information</strong>';
         }
+          
+        tooltip.html(withTooltipChrome(tooltipContent));
+        scheduleTooltipPosition(event.currentTarget);
       });
 
-      // Add labels with proper text
-      nodes.append('text')
-        .attr('dy', d => {
-          if (!d || !d.nodes) return 25;
-          return d.nodes.length > 1 
-            ? Math.min(100, Math.max(30, 20 * Math.sqrt(d.nodes.length))) + 15
-            : 25;
-        })
-        .attr('text-anchor', 'middle')
-        .text(d => {
-          if (!d || !d.nodes) return 'Unknown';
-          if (d.nodes.length > 1) return '';
-          return d.nodes[0]?.label || 'Unknown';
+      // Circles or clipped Wikipedia thumbnails (single-node communities only, #75).
+      // Enter-only — survivors keep their existing DOM subtree across rebuilds.
+      const renderNodeDiscOrThumbIntoNew = (sel) => {
+        sel.each(function renderNodeDiscOrThumb(d) {
+          const nodeG = d3.select(this);
+          const r0 = initialCommunityRadius(d);
+          const single = d.nodes?.length === 1 ? d.nodes[0] : null;
+          const thumbUrl =
+            single &&
+            d.nodes.length === 1 &&
+            isSafeThumbnailUrlForTooltip(single.thumbnailUrl)
+              ? single.thumbnailUrl
+              : null;
+
+          if (thumbUrl) {
+            const clipId = `node-thumb-clip-${String(d.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            nodeG
+              .append('defs')
+              .append('clipPath')
+              .attr('id', clipId)
+              .append('circle')
+              .attr('cx', 0)
+              .attr('cy', 0)
+              .attr('r', r0);
+
+            // Full-disc hit target: ring has fill none (only stroke hits) and image uses
+            // pointer-events none — without this, only the stroke perimeter was clickable.
+            nodeG
+              .append('circle')
+              .attr('class', 'graph-node-hit')
+              .attr('r', r0)
+              .attr('fill', 'rgba(0,0,0,0)')
+              .attr('stroke', 'none')
+              .attr('pointer-events', 'all');
+
+            nodeG
+              .append('image')
+              .attr('class', 'graph-node-thumb')
+              .attr('href', thumbUrl)
+              .attr('x', -r0)
+              .attr('y', -r0)
+              .attr('width', r0 * 2)
+              .attr('height', r0 * 2)
+              .attr('clip-path', `url(#${clipId})`)
+              .attr('preserveAspectRatio', 'xMidYMid slice')
+              .attr('pointer-events', 'none')
+              .on('error', function onThumbImageError() {
+                // #103: fallback must be idempotent — #86 regressed here when
+                // partial rebuilds re-ran on the same `<g>`. Guard against
+                // double-demotion by checking before we remove/insert, and
+                // unregister ourselves so a future rebind of the same `<image>`
+                // doesn't re-enter this handler.
+                d3.select(this).on('error', null);
+                const parent = d3.select(this.parentNode);
+                parent.select('defs').remove();
+                parent.select('circle.graph-node-hit').remove();
+                parent.select('circle.graph-node-ring').remove();
+                d3.select(this).remove();
+                const dd = parent.datum();
+                const rr = initialCommunityRadius(dd);
+                const fill =
+                  dd && dd.nodes && dd.nodes.length > 1
+                    ? dd.color
+                    : defaultNodeColor;
+                if (parent.select('circle.graph-node-disc').empty()) {
+                  const before =
+                    parent.select('text').empty() ? null : 'text';
+                  const disc = before
+                    ? parent.insert('circle', before)
+                    : parent.append('circle');
+                  disc
+                    .attr('class', 'graph-node-disc')
+                    .attr('r', rr)
+                    .attr('fill', fill)
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 1.5);
+                }
+                updateHighlightingRef.current?.();
+              });
+
+            nodeG
+              .append('circle')
+              .attr('class', 'graph-node-ring')
+              .attr('r', r0)
+              .attr('fill', 'none')
+              .attr('stroke', '#fff')
+              .attr('stroke-width', 2);
+          } else {
+            nodeG
+              .append('circle')
+              .attr('class', 'graph-node-disc')
+              .attr('r', r0)
+              .attr('fill', d.nodes.length > 1 ? d.color : defaultNodeColor)
+              .attr('stroke', '#fff')
+              .attr('stroke-width', 1.5);
+          }
         });
+      };
+
+      // Labels sit below the disc/image; only meaningful for singleton
+      // communities — multi-node clusters use their chip instead.
+      const attachNodeLabel = (sel) => {
+        sel
+          .append('text')
+          .attr('dy', (d) => {
+            if (!d || !d.nodes) return 25;
+            return d.nodes.length > 1
+              ? Math.min(100, Math.max(30, 20 * Math.sqrt(d.nodes.length))) + 15
+              : 25;
+          })
+          .attr('text-anchor', 'middle')
+          .text((d) => {
+            if (!d || !d.nodes) return 'Unknown';
+            if (d.nodes.length > 1) return '';
+            return d.nodes[0]?.label || 'Unknown';
+          });
+      };
+
+      const nodeJoin = applyKeyedJoin(
+        nodesLayer,
+        'g.node',
+        visibleElements,
+        (d) => d.id,
+        {
+          onEnter: (enter) => {
+            const appended = enter
+              .append('g')
+              .attr('class', 'node')
+              .call(dragBehavior);
+            attachNodeClickHandler(appended);
+            renderNodeDiscOrThumbIntoNew(appended);
+            attachNodeLabel(appended);
+            return appended;
+          },
+        }
+      );
+      const nodes = nodeJoin.merged;
 
       // GitHub #81: cluster/community thumbnail chip anchored to most-connected node.
-      const clusterThumbs = visibleElements.filter((c) => Array.isArray(c.nodes) && c.nodes.length > 1);
-      let chips = null;
-      if (clusterThumbs.length) {
-        chips = g
-          .append('g')
-          .attr('class', 'cluster-thumb-layer')
-          .selectAll('g.cluster-thumb')
-          .data(clusterThumbs, (d) => d.id)
-          .enter()
-          .append('g')
-          .attr('class', 'cluster-thumb')
-          .attr('transform', (d) => `translate(${simX(d)},${simY(d)})`)
-          .style('cursor', 'pointer')
-          .on('click', (event, d) => {
-            event.stopPropagation();
-            const { node: anchor } = pickCommunityAnchorNode(d, data.links);
-            if (anchor?.id != null) focusOnNodeId(anchor.id, 1.75);
-          });
+      const clusterThumbs = visibleElements.filter(
+        (c) => Array.isArray(c.nodes) && c.nodes.length > 1
+      );
+      const chipsLayer = ensureLayer(g, 'cluster-thumb-layer');
 
-        chips.each(function renderChip(d) {
+      const renderChipContent = (sel) => {
+        sel.each(function renderChip(d) {
           const chip = d3.select(this);
           const { node: anchor } = pickCommunityAnchorNode(d, data.links);
           const label = String(anchor?.label || d.label || 'Cluster');
@@ -2769,7 +2803,33 @@ function GraphVisualization({
             .attr('font-weight', 650)
             .text(label.length > 24 ? `${label.slice(0, 24)}…` : label);
         });
-      }
+      };
+
+      const chipJoin = applyKeyedJoin(
+        chipsLayer,
+        'g.cluster-thumb',
+        clusterThumbs,
+        (d) => d.id,
+        {
+          onEnter: (enter) => {
+            const appended = enter
+              .append('g')
+              .attr('class', 'cluster-thumb')
+              .attr('transform', (d) => `translate(${simX(d)},${simY(d)})`)
+              .style('cursor', 'pointer')
+              .on('click', (event, d) => {
+                event.stopPropagation();
+                const { node: anchor } = pickCommunityAnchorNode(d, data.links);
+                if (anchor?.id != null) focusOnNodeId(anchor.id, 1.75);
+              });
+            renderChipContent(appended);
+            return appended;
+          },
+        }
+      );
+      // `chips` is always a selection now — empty when there are no clusters,
+      // which makes `.attr()` in the tick callback a safe no-op.
+      const chips = chipJoin.merged;
 
       // GitHub #89: seed any newly-visible community with a position biased
       // toward its connected component's centroid so they don't all materialise
@@ -2816,10 +2876,9 @@ function GraphVisualization({
             return `translate(${tx},${ty})`;
           });
 
-          // Keep cluster chips anchored to the live community centroid as forces run.
-          if (chips) {
-            chips.attr('transform', (d) => `translate(${simX(d)},${simY(d)})`);
-          }
+          // Keep cluster chips anchored to the live community centroid as
+          // forces run. Empty selection is a safe no-op.
+          chips.attr('transform', (d) => `translate(${simX(d)},${simY(d)})`);
         });
 
       communityForceSimulationRef.current = simulation;
