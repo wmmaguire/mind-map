@@ -76,8 +76,8 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 6. **Landing page — structural visual upgrades (#76).** Graph-aware hero (decorative mini-graph SVG), tonal bands layout (drop the single `.content` card), horizontal "How it works" journey with connectors + per-step illustration, feature grid differentiation (unequal spans / accent border), optional product mock / screenshot. Tracked on #76; see suggested comment below.
 7. **Landing page — token + structure hygiene (#76).** Introduce CSS custom properties for the landing palette (blue / violet / amber gradients, reflection card), unify typography casing, consider body-font unification (hero uses the system stack's geometric variant already). Stretch: decouple the landing page from the shared `.content` card wrapper in `App.js`/`App.css` so the `.landing-container .landing-content` specificity bump from this pass can be reverted.
 8. **Landing-level E2E (#24).** From `/`, assert `Get Started` + the outro CTA both navigate to `/visualize` and that the `Why MindMap?` disclosure is collapsed by default and opens on summary click.
-9. **Tech debt — shared menu-item source of truth.** `BannerActionsDrawer` re-implements the Account / Library / View sections that the desktop popovers already render. Any add/remove/rename needs to happen in two places; factor into a config list or shared sub-component. *Not covered by an existing issue — new backlog issue filed.*
-10. **Tech debt — `LibrarySidebar` palette tokens.** The dark theme is now global; if a light mode is revisited it's a painful diff. Extract CSS custom properties (`--sidebar-bg`, `--sidebar-text`, `--sidebar-item-tint`, `--sidebar-item-tint-hover`) so a light variant becomes a prop flip. *Not covered by an existing issue — new backlog issue filed.*
+9. **Tech debt — shared menu-item source of truth.** `BannerActionsDrawer` re-implements the Account / Library / View sections that the desktop popovers already render. Any add/remove/rename needs to happen in two places; factor into a config list or shared sub-component. Filed as **GitHub #98**.
+10. **Tech debt — `LibrarySidebar` palette tokens.** The dark theme is now global; if a light mode is revisited it's a painful diff. Extract CSS custom properties (`--sidebar-bg`, `--sidebar-text`, `--sidebar-item-tint`, `--sidebar-item-tint-hover`) so a light variant becomes a prop flip. Filed as **GitHub #99**.
 
 **Suggested GitHub comments (paste on issue):**
 
@@ -88,7 +88,9 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 - **#52** — *Apr 2026: `BannerActionsDrawer` overlay renders at z-index above banner popovers and below the Library mobile sidebar; re-check stacking during a phase-2 audit (especially against the feedback FAB at `max-width: 36rem`).*
 - **#24** — *Apr 2026: Backlog — landing E2E: `/` → `Get Started` / outro CTA → `/visualize`; `Why MindMap?` summary collapsed by default and opens on click. Also: banner `☰` chip opens drawer, right-edge swipe opens drawer, Escape / overlay tap / route change close it.*
 
-### Backlog: Shared menu-item source of truth for mobile drawer + desktop popovers (suggested new issue, post–#90)
+### Backlog: Shared menu-item source of truth for mobile drawer + desktop popovers — GitHub **#98**
+
+Tracked as **`https://github.com/wmmaguire/mind-map/issues/98`** (filed Apr 2026; do not re-file).
 
 **Title:** `Backlog: Banner + drawer — shared menu-item source of truth for Account / Library / View sections`
 
@@ -109,7 +111,9 @@ In **Roadmap** settings, ensure the layout uses **Start date** / **End date** (o
 Refs: #90 #40 #33
 ```
 
-### Backlog: `LibrarySidebar` — extract palette tokens after dark theme promotion (suggested new issue, post–#90)
+### Backlog: `LibrarySidebar` — extract palette tokens after dark theme promotion — GitHub **#99**
+
+Tracked as **`https://github.com/wmmaguire/mind-map/issues/99`** (filed Apr 2026; do not re-file).
 
 **Title:** `Backlog: LibrarySidebar — CSS custom properties for palette + optional light variant`
 
