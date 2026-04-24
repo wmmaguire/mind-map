@@ -301,7 +301,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                       className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                       role="menuitemcheckbox"
                       aria-checked={playbackStripVisible}
-                      onClick={() => togglePlaybackStrip()}
+                      onClick={() => {
+                        togglePlaybackStrip();
+                        setViewMenuOpen(false);
+                      }}
                     >
                       <span className="guest-identity-banner__menu-check" aria-hidden>
                         {playbackStripVisible ? '✓' : '○'}
@@ -313,7 +316,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                       className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                       role="menuitemcheckbox"
                       aria-checked={graphSearchBarVisible}
-                      onClick={() => toggleGraphSearchBar()}
+                      onClick={() => {
+                        toggleGraphSearchBar();
+                        setViewMenuOpen(false);
+                      }}
                     >
                       <span className="guest-identity-banner__menu-check" aria-hidden>
                         {graphSearchBarVisible ? '✓' : '○'}
@@ -325,7 +331,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                       className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                       role="menuitemcheckbox"
                       aria-checked={insightsPanelVisible}
-                      onClick={() => toggleInsightsPanel()}
+                      onClick={() => {
+                        toggleInsightsPanel();
+                        setViewMenuOpen(false);
+                      }}
                     >
                       <span className="guest-identity-banner__menu-check" aria-hidden>
                         {insightsPanelVisible ? '✓' : '○'}
@@ -883,7 +892,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                     role="menuitemcheckbox"
                     aria-checked={playbackStripVisible}
-                    onClick={() => togglePlaybackStrip()}
+                    onClick={() => {
+                      togglePlaybackStrip();
+                      setViewMenuOpen(false);
+                    }}
                   >
                     <span className="guest-identity-banner__menu-check" aria-hidden>
                       {playbackStripVisible ? '✓' : '○'}
@@ -895,7 +907,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                     role="menuitemcheckbox"
                     aria-checked={graphSearchBarVisible}
-                    onClick={() => toggleGraphSearchBar()}
+                    onClick={() => {
+                      toggleGraphSearchBar();
+                      setViewMenuOpen(false);
+                    }}
                   >
                     <span className="guest-identity-banner__menu-check" aria-hidden>
                       {graphSearchBarVisible ? '✓' : '○'}
@@ -907,7 +922,10 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     className="guest-identity-banner__menu-item guest-identity-banner__menu-item--checkbox"
                     role="menuitemcheckbox"
                     aria-checked={insightsPanelVisible}
-                    onClick={() => toggleInsightsPanel()}
+                    onClick={() => {
+                      toggleInsightsPanel();
+                      setViewMenuOpen(false);
+                    }}
                   >
                     <span className="guest-identity-banner__menu-check" aria-hidden>
                       {insightsPanelVisible ? '✓' : '○'}
