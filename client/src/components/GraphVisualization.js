@@ -926,6 +926,23 @@ function GraphVisualization({
   const searchHighlightFill = '#f39c12';
   const searchHighlightStroke = '#d68910';
 
+  // #103 follow-up: unmount-only simulation teardown. The main D3 setup
+  // effect below re-runs on every data / size / selection change, and
+  // stopping the simulation in that effect's cleanup was causing the
+  // "fly in from the periphery" regression on consecutive scrub steps
+  // (a fresh sim on every step re-initializes node positions to d3's
+  // spiral pattern). This dedicated mount-only effect guarantees the
+  // simulation is only stopped when the component itself is actually
+  // going away.
+  useEffect(() => {
+    return () => {
+      if (communityForceSimulationRef.current) {
+        communityForceSimulationRef.current.stop();
+        communityForceSimulationRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!data || !data.nodes || !data.links) return;
 
@@ -966,12 +983,18 @@ function GraphVisualization({
     // Ensure we don't accumulate multiple previous roots (which looks like a duplicated graph).
     svg.selectAll('g.graph-root--prev').remove();
 
-    // Fade out the previous render root instead of hard-clearing the SVG.
-    // Keep it around during playback scrubs so we can highlight removals (last-step deltas).
-    const prevRoot = svg.select('g.graph-root');
-    if (!prevRoot.empty()) {
-      prevRoot.remove();
-    }
+    // #103 follow-up (scrub fly-in regression): we used to `remove()` the
+    // existing `<g class="graph-root">` here on every main-effect re-run.
+    // Library playback feeds `<GraphVisualization>` a *new* `data` prop on
+    // every step (see `LibraryVisualize.displayGraph` memo on
+    // `[playbackStepIndex]`), so the main effect re-runs on every step —
+    // which means this remove() was nuking the scene on every scrub step
+    // and the keyed joins in `updateVisualization()` were seeing every
+    // community as an enter, producing the "everything fly in from the
+    // periphery" symptom the user reported. Keep the existing root instead;
+    // `updateVisualization()`'s keyed joins + persistent layer groups are
+    // the source of truth for enter / update / exit. The `--prev` crossfade
+    // flow that originally owned this remove() was already dead code by M3.
 
     // Initialize hierarchical communities with individual nodes.
     // GitHub #89: when a prior simulation snapshot exists for the same id, carry
@@ -981,7 +1004,32 @@ function GraphVisualization({
     // below once we know the links).
     const initializeCommunities = () => {
       const communities = new Map();
-      const prior = previousCommunityPositionsRef.current;
+      // #103 follow-up: prefer the live persistent simulation's current
+      // community positions over the `previousCommunityPositionsRef`
+      // snapshot. The ref is only refreshed at `updateVisualization()` boundaries,
+      // so between ticks the sim has the freshest positions. Falling back to
+      // the ref covers the (rare) case where the component was fully
+      // unmounted and the sim was torn down but the ref is still warm.
+      let prior = null;
+      const liveSim = communityForceSimulationRef.current;
+      if (liveSim) {
+        const simNodes = liveSim.nodes();
+        if (Array.isArray(simNodes) && simNodes.length > 0 && simNodes[0] && Array.isArray(simNodes[0].nodes)) {
+          prior = new Map();
+          for (const c of simNodes) {
+            if (!c || c.id == null) continue;
+            if (typeof c.x !== 'number' || !Number.isFinite(c.x)) continue;
+            if (typeof c.y !== 'number' || !Number.isFinite(c.y)) continue;
+            prior.set(String(c.id), {
+              x: c.x,
+              y: c.y,
+              vx: Number.isFinite(c.vx) ? c.vx : 0,
+              vy: Number.isFinite(c.vy) ? c.vy : 0,
+            });
+          }
+        }
+      }
+      if (!prior) prior = previousCommunityPositionsRef.current;
 
       data.nodes.forEach(node => {
         const priorPos = prior ? prior.get(String(node.id)) : null;
@@ -1149,15 +1197,25 @@ function GraphVisualization({
     // Always initialize communities when the component mounts or data changes
     communitiesRef.current = initializeCommunities();
 
-    // Note: we do not hard-remove `g.graph-root` here because playback scrub keeps a
-    // previous root around briefly for crossfade + removal highlighting.
-
-    // Modify the zoom behavior
-    const g = svg
-      .append('g')
-      .attr('class', 'graph-root')
-      .style('opacity', 1);
-    graphTransformRef.current = d3.zoomIdentity;
+    // #103 follow-up: create-or-reuse `<g class="graph-root">`. If this main
+    // effect is re-running for a reason other than unmount (e.g. the data
+    // prop changed because playback stepped, or selectedNodes changed, or
+    // dimensions changed) we want the same `<g>` DOM element — that's what
+    // lets keyed joins inside `updateVisualization()` see survivor nodes as
+    // updates instead of fresh enters.
+    let g = svg.select('g.graph-root');
+    if (g.empty()) {
+      g = svg
+        .append('g')
+        .attr('class', 'graph-root')
+        .style('opacity', 1);
+    }
+    // Preserve the user's current pan/zoom across re-runs. Only seed the ref
+    // on first mount (when it's null) so subsequent data updates don't fling
+    // the viewport back to identity mid-scrub.
+    if (!graphTransformRef.current) {
+      graphTransformRef.current = d3.zoomIdentity;
+    }
 
     const zoom = d3.zoom()
       .extent([[0, 0], [width, height]])
@@ -1269,6 +1327,16 @@ function GraphVisualization({
     }
 
     svg.call(zoom);
+    // #103 follow-up: `svg.call(zoom)` re-installs d3-zoom's listeners and
+    // seeds `__zoom` on the svg only when it's undefined. On subsequent
+    // effect re-runs the DOM already has `__zoom`, so the user's existing
+    // pan/scale is preserved. But `g.attr('transform', ...)` wasn't touched
+    // by the install — reapply the stored transform here so the restored
+    // `<g class="graph-root">` reflects the viewport state without waiting
+    // for the next user pan/zoom event.
+    if (graphTransformRef.current && graphTransformRef.current !== d3.zoomIdentity) {
+      g.attr('transform', graphTransformRef.current.toString());
+    }
     applyProgrammaticZoomTransformRef.current = (transform) => {
       if (!svgRef.current || !transform) return;
       d3.select(svgRef.current).call(zoom.transform, transform);
@@ -1276,20 +1344,12 @@ function GraphVisualization({
 
     // no fade-in
 
-    // Create a map of nodes for reference
-    const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
-
-    // Process links to ensure they reference actual node objects
-    const processedLinks = data.links.map(link => {
-      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      
-      return {
-        ...link,
-        source: nodeMap.get(sourceId),
-        target: nodeMap.get(targetId)
-      };
-    });
+    // (The outer `nodeMap` / `processedLinks` used to feed a pre-bound
+    // `forceLink(processedLinks)` into the initial simulation here. That
+    // binding is now owned by `updateVisualization()` below, which
+    // recomputes `processedLinks` on every render so it always matches the
+    // current `data.links` and the current community set. Nothing else in
+    // the outer effect closure needs those locals anymore.)
 
     // Create the force simulation with processed data.
     // forceX + forceY (vs forceCenter) behave better for disjoint-style graphs: each component
@@ -1304,14 +1364,38 @@ function GraphVisualization({
       const base = nodeCount > 1 ? Math.min(200, Math.max(50, 20 + 3 * nodeCount)) : 42;
       return base + COMMUNITY_SIM_COLLIDE_PADDING;
     };
-    const simulation = d3.forceSimulation(data.nodes)
-      .force('link', d3.forceLink(processedLinks)
-        .id(d => d.id)
-        .distance(100))
-      .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
-      .force('x', d3.forceX(width / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
-      .force('y', d3.forceY(height / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
-      .force('collision', d3.forceCollide().radius(communityCollideRadius).iterations(2));
+    // #103 follow-up: reuse the community force simulation across main-
+    // effect re-runs. Playback steps feed a new `data` prop on every scrub,
+    // which re-runs this effect; creating a fresh simulation on each run
+    // loses the per-node velocity state and forces d3 to re-initialize
+    // node positions to its internal spiral pattern — that's the
+    // "fly in from the periphery" symptom. By keeping the same simulation
+    // instance, `updateVisualization()`'s `.nodes(visibleElements)` rebind
+    // carries the existing {x, y, vx, vy} forward on survivor communities
+    // (because initializeCommunities below seeds them from the live sim).
+    // Geometry-dependent forces (forceX/forceY center, forceCollide) are
+    // refreshed each run so width/height changes still take effect.
+    let simulation = communityForceSimulationRef.current;
+    if (simulation) {
+      simulation
+        .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
+        .force('x', d3.forceX(width / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
+        .force('y', d3.forceY(height / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
+        .force('collision', d3.forceCollide().radius(communityCollideRadius).iterations(2));
+    } else {
+      // Fresh mount. Start with empty nodes — `updateVisualization()` below
+      // binds `.nodes(visibleElements)` with the real community set. This
+      // avoids having d3 pre-initialize raw `data.nodes` to its spiral
+      // pattern and then us accidentally snapshotting that into
+      // `previousCommunityPositionsRef`.
+      simulation = d3.forceSimulation()
+        .force('link', d3.forceLink().id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(COMMUNITY_SIM_CHARGE_DEFAULT))
+        .force('x', d3.forceX(width / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
+        .force('y', d3.forceY(height / 2).strength(COMMUNITY_SIM_XY_STRENGTH))
+        .force('collision', d3.forceCollide().radius(communityCollideRadius).iterations(2));
+      communityForceSimulationRef.current = simulation;
+    }
 
     // Tooltip: placed just left of the clicked node/link (clamped inside canvas)
     const tooltipMount =
@@ -2989,8 +3073,14 @@ function GraphVisualization({
       }
       minimapExtentsRef.current = null;
       minimapNavDragRef.current = null;
-      simulation.stop();
-      communityForceSimulationRef.current = null;
+      // #103 follow-up: do NOT stop the simulation or drop
+      // `communityForceSimulationRef.current` here. Main-effect cleanup runs
+      // on *every* re-run (e.g. each playback scrub, any selectedNodes
+      // toggle, any width/height change), not just unmount. Stopping the
+      // sim between runs discards velocity state and causes the next run to
+      // create a fresh sim that re-initializes positions — the root of the
+      // "fly in from the periphery" regression. The dedicated unmount-only
+      // effect below owns final simulation teardown.
       tooltip.remove();
       applyProgrammaticZoomTransformRef.current = null;
       applyDiscoveryFocusNodeUiRef.current = null;

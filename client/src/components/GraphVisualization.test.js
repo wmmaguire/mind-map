@@ -550,7 +550,16 @@ describe('GraphVisualization keyed data joins across playback scrubs (#103)', ()
     expect(after[1]).toBe(before[1]);
   });
 
-  it('entering nodes are added; existing ones stay put (M1+M2)', () => {
+  it('entering nodes are added; existing ones keep DOM identity across a data-changing scrub (M6)', () => {
+    // This is the *real* library-playback path: `displayGraph = useMemo(..., [playbackStepIndex])`
+    // hands `<GraphVisualization>` a brand-new `data` object on every scrub
+    // step. Before M6 the main effect tore down `<g class="graph-root">` on
+    // every such change, so the keyed joins inside `updateVisualization()`
+    // saw every community as an enter — which is what produced the user's
+    // "existing nodes fly in from the periphery on every consecutive step"
+    // regression. The contract we're guarding now: survivor communities
+    // must be the *same* `<g class="node">` DOM elements after the data
+    // change, not freshly re-entered ones.
     const seed = {
       nodes: [
         { id: 'n1', label: 'One' },
@@ -573,8 +582,15 @@ describe('GraphVisualization keyed data joins across playback scrubs (#103)', ()
     );
 
     const svg = document.querySelector('.graph-visualization');
+    const graphRootBefore = svg.querySelector('g.graph-root');
+    const nodesLayerBefore = svg.querySelector('g.nodes-layer');
     const before = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
     expect(before.length).toBe(2);
+    // Map survivor DOM nodes by id so the assertion below doesn't rely on
+    // stable ordering between renders.
+    const beforeById = new Map(
+      before.map((el) => [el.getAttribute('data-id') || el.__data__?.id, el])
+    );
 
     act(() => {
       rerender(
@@ -588,13 +604,100 @@ describe('GraphVisualization keyed data joins across playback scrubs (#103)', ()
       );
     });
 
+    const graphRootAfter = svg.querySelector('g.graph-root');
+    const nodesLayerAfter = svg.querySelector('g.nodes-layer');
     const after = Array.from(svg.querySelectorAll('g.nodes-layer g.node'));
-    // Note: a data change here also re-runs the setup effect (not just the
-    // scrub effect), so we allow either "keyed join preserved DOM" or
-    // "setup effect rebuilt". Either way the end state must have the right
-    // count, which is what the user perceives. The scrub-only case above
-    // guards the identity promise.
     expect(after.length).toBe(3);
+    // `g.graph-root` and the layer group must persist — not re-mounted.
+    expect(graphRootAfter).toBe(graphRootBefore);
+    expect(nodesLayerAfter).toBe(nodesLayerBefore);
+    // Survivor `<g class="node">` DOM identity must be preserved across the
+    // data change. This is the direct guard against the "fly in from
+    // periphery" regression: if these asserts ever fail, the main effect
+    // is wiping and re-creating survivor communities again.
+    const afterById = new Map(
+      after.map((el) => [el.getAttribute('data-id') || el.__data__?.id, el])
+    );
+    for (const [id, el] of beforeById) {
+      expect(afterById.get(id)).toBe(el);
+    }
+  });
+
+  it('consecutive data-driven scrubs keep `g.graph-root` and survivor DOM stable (M6)', () => {
+    // Tighter version of the above: walk a 3-step scrub where every step
+    // replaces `data` with a new object reference (matching
+    // LibraryVisualize.displayGraph). After each step, the graph-root and
+    // every surviving `<g class="node">` must still be the same DOM element
+    // we captured on the first render. Before M6, this failed on step 1 —
+    // `g.graph-root` was a fresh `<g>` on every data change.
+    const step0 = {
+      nodes: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+      links: [],
+    };
+    const step1 = {
+      nodes: [...step0.nodes, { id: 'c', label: 'C' }],
+      links: [],
+    };
+    const step2 = {
+      nodes: [...step1.nodes, { id: 'd', label: 'D' }],
+      links: [],
+    };
+    const step3 = {
+      nodes: [...step2.nodes, { id: 'e', label: 'E' }],
+      links: [],
+    };
+    const { rerender } = render(
+      <GraphVisualization
+        data={step0}
+        onDataUpdate={jest.fn()}
+        width={800}
+        height={600}
+        playbackScrubToken={0}
+      />
+    );
+    const svg = document.querySelector('.graph-visualization');
+    const rootRef = svg.querySelector('g.graph-root');
+    const nodesByIdAtStep0 = new Map(
+      Array.from(svg.querySelectorAll('g.nodes-layer g.node')).map((el) => [
+        el.__data__?.id,
+        el,
+      ])
+    );
+    expect(rootRef).toBeTruthy();
+    expect(nodesByIdAtStep0.size).toBe(2);
+
+    const steps = [
+      { data: step1, token: 1, expectedCount: 3 },
+      { data: step2, token: 2, expectedCount: 4 },
+      { data: step3, token: 3, expectedCount: 5 },
+    ];
+    for (const s of steps) {
+      act(() => {
+        rerender(
+          <GraphVisualization
+            data={s.data}
+            onDataUpdate={jest.fn()}
+            width={800}
+            height={600}
+            playbackScrubToken={s.token}
+          />
+        );
+      });
+      const rootNow = svg.querySelector('g.graph-root');
+      expect(rootNow).toBe(rootRef);
+      const currentNodes = Array.from(
+        svg.querySelectorAll('g.nodes-layer g.node')
+      );
+      expect(currentNodes.length).toBe(s.expectedCount);
+      // Survivors from step 0 must still be the very same DOM elements.
+      for (const [id, originalEl] of nodesByIdAtStep0) {
+        const stillEl = currentNodes.find((el) => el.__data__?.id === id);
+        expect(stillEl).toBe(originalEl);
+      }
+    }
   });
 
   it('renders thumbnail + ring when thumbnailUrl is a valid https URL (M4)', () => {
