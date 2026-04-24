@@ -282,6 +282,20 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                     role="menu"
                     aria-labelledby="guest-chrome-view-trigger"
                   >
+                    <button
+                      type="button"
+                      className="guest-identity-banner__menu-item"
+                      role="menuitem"
+                      data-testid="view-menu-reset-view"
+                      onClick={() => {
+                        resetGraphView();
+                        setViewMenuOpen(false);
+                      }}
+                      aria-label="Reset view: zoom to fit all nodes and ungroup clusters"
+                      title="Zoom to fit all nodes and show each concept (no clusters)"
+                    >
+                      Reset view
+                    </button>
                     {sharePayload ? (
                       <button
                         type="button"
@@ -873,6 +887,20 @@ export default function GuestIdentityBanner({ onOpenUpload = () => {} }) {
                   role="menu"
                   aria-labelledby="guest-chrome-view-trigger-reg"
                 >
+                  <button
+                    type="button"
+                    className="guest-identity-banner__menu-item"
+                    role="menuitem"
+                    data-testid="view-menu-reset-view"
+                    onClick={() => {
+                      resetGraphView();
+                      setViewMenuOpen(false);
+                    }}
+                    aria-label="Reset view: zoom to fit all nodes and ungroup clusters"
+                    title="Zoom to fit all nodes and show each concept (no clusters)"
+                  >
+                    Reset view
+                  </button>
                   {sharePayload ? (
                     <button
                       type="button"
